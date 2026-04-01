@@ -1,0 +1,8 @@
+// strings: concat, len, slice
+let s = "hello"
+print("len(s) =", len(s))
+print(str("s = ", s))
+let t = str(s, " ", "world")
+print(t)
+let sub = slice(s, 0, 3)
+print("slice(0,3) =", sub)

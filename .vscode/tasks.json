@@ -1,0 +1,62 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Kern: Run",
+      "type": "shell",
+      "command": "kern",
+      "args": ["${file}"],
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "Kern: Run (build dir)",
+      "type": "shell",
+      "command": "${workspaceFolder}/build/Release/kern.exe",
+      "args": ["${file}"],
+      "windows": { "command": "${workspaceFolder}/build/Release/kern.exe" },
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "Kern: Check",
+      "type": "shell",
+      "command": "kern",
+      "args": ["--check", "${file}"],
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "Kern: Lint",
+      "type": "shell",
+      "command": "kern",
+      "args": ["--lint", "${file}"],
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "Kern: Format",
+      "type": "shell",
+      "command": "kern",
+      "args": ["--fmt", "${file}"],
+      "group": "none",
+      "presentation": { "reveal": "silent" }
+    },
+    {
+      "label": "Kern: AST",
+      "type": "shell",
+      "command": "kern",
+      "args": ["--ast", "${file}"],
+      "group": "none",
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "Kern: Bytecode",
+      "type": "shell",
+      "command": "kern",
+      "args": ["--bytecode", "${file}"],
+      "group": "none",
+      "presentation": { "reveal": "always", "panel": "shared" }
+    }
+  ]
+}

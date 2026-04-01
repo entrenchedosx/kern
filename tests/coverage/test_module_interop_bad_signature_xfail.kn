@@ -1,0 +1,7 @@
+interop = import("interop")
+
+unsafe {
+  interop.ffi_allow_library("kernel32.dll")
+  // this should fail because paramTypes must be an array.
+  interop.ffi_call("kernel32.dll", "Sleep", "void", "win64", "int", 1)
+}

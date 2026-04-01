@@ -1,0 +1,41 @@
+runtime_mod = import("lib/kern/runtime/modern/module.kn")
+events = import("lib/kern/runtime/modern/events.kn")
+
+let state = {}
+state["attempts"] = 0
+state["after"] = 0
+
+@event("on_command", priority=100, max_failures=1, cooldown_ms=20, max_circuit_trips=2, stop_on_error=false)
+def unstable_listener(ctx, payload) {
+    state["attempts"] = int(state["attempts"]) + 1
+    throw Error("boom", "LISTENER-BOOM")
+}
+
+@event("on_command", priority=1)
+def after_listener(ctx, payload) {
+    state["after"] = int(state["after"]) + 1
+    return null
+}
+
+let rt = runtime_mod.create_runtime({})
+
+let r1 = events.emit(rt["events"], "on_command", rt["ctx"], {})
+let unstable_id = r1["listener_stats"][0]["id"]
+let r2 = events.emit(rt["events"], "on_command", rt["ctx"], {})
+sleep_ms(30)
+let r3 = events.emit(rt["events"], "on_command", rt["ctx"], {})
+sleep_ms(30)
+let r4 = events.emit(rt["events"], "on_command", rt["ctx"], {})
+
+assert_eq(state["attempts"], 2)
+assert_eq(state["after"], 4)
+assert_eq(r2["circuit_skips"], 1)
+assert_eq(r4["quarantine_skips"], 1)
+
+let reset_ok = events.reset_listener(rt["events"], "on_command", unstable_id)
+assert_eq(reset_ok, true)
+let r5 = events.emit(rt["events"], "on_command", rt["ctx"], {})
+assert_eq(state["attempts"], 3)
+assert_eq(r5["circuit_skips"], 0)
+assert_eq(r5["quarantine_skips"], 0)
+print("ok")

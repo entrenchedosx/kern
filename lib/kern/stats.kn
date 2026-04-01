@@ -1,0 +1,51 @@
+// kern statistics (Python statistics) — import("lib/kern/stats.kn")
+// adds: mean, median, variance, stdev, mode_single
+
+def mean(arr) {
+    if (len(arr) == 0) { return 0.0 }
+    let s = 0.0
+    for x in arr { s = s + float(x) }
+    return s / len(arr)
+}
+
+def median(arr) {
+    if (len(arr) == 0) { return 0.0 }
+    let a = copy(arr)
+    sort(a)
+    let n = len(a)
+    let mid = int(n / 2)
+    if (n % 2 == 1) { return float(a[mid]) }
+    return (float(a[mid - 1]) + float(a[mid])) / 2.0
+}
+
+def variance(arr, sample) {
+    if (len(arr) == 0) { return 0.0 }
+    let m = mean(arr)
+    let s = 0.0
+    for x in arr { s = s + (float(x) - m) * (float(x) - m) }
+    if (sample and len(arr) > 1) { return s / (len(arr) - 1) }
+    return s / len(arr)
+}
+
+def stdev(arr, sample) {
+    return sqrt(variance(arr, sample))
+}
+
+def mode_single(arr) {
+    if (len(arr) == 0) { return null }
+    let counts = {}
+    for x in arr {
+        let k = str(x)
+        if (has(counts, k)) { counts[k] = counts[k] + 1 }
+        else { counts[k] = 1 }
+    }
+    let best = null
+    let best_count = 0
+    for k in keys(counts) {
+        if (counts[k] > best_count) {
+            best = k
+            best_count = counts[k]
+        }
+    }
+    return best
+}

@@ -1,0 +1,19 @@
+let g3 = import("g3d")
+if (g3 == null) {
+    print("skip-g3d")
+} else {
+    s0 = g3.status()
+    ok0 = (s0 != null)
+
+    g3.createObject("cube", 1.0)
+    g3.createGroup("g")
+    g3.addDirectionalLight(1, -1, 0, 255, 255, 255, 1.0)
+    s1 = g3.status()
+
+    if (ok0 && s1.objectCount >= 1 && s1.groupCount >= 1 && s1.lightCount >= 1) {
+        print("status-ok")
+    } else {
+        print("status-fail")
+    }
+}
+

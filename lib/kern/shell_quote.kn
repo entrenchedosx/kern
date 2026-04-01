@@ -1,0 +1,9 @@
+// pOSIX shell single-quote — import("lib/kern/shell_quote.kn")
+// shell_quote(arg) — safe for sh -c when one argument is interpolated
+
+def shell_quote(arg) {
+    if (arg == null) { return "''" }
+    let s = str(arg)
+    let parts = split(s, "'")
+    return "'" + join(parts, "'\\''") + "'"
+}

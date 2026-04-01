@@ -1,0 +1,50 @@
+// async facade built on cooperative scheduler tasks.
+
+sched = import("lib/kern/runtime/modern/scheduler.kn")
+
+def _async_fail(code, message, hint) {
+    throw Error(code + ": " + message + " | Hint: " + hint, code)
+}
+
+def create_async_runtime(scheduler) {
+    let rt = {}
+    rt["scheduler"] = scheduler
+    rt["next_task_id"] = 1
+    return rt
+}
+
+def spawn(rt, handler, meta) {
+    let id = rt["next_task_id"]
+    rt["next_task_id"] = id + 1
+    let task = {}
+    task["id"] = id
+    task["state"] = "running"
+    task["result"] = null
+    task["error"] = null
+    try {
+        task["result"] = handler({}, meta)
+        task["state"] = "done"
+    } catch (err) {
+        task["error"] = err
+        task["state"] = "failed"
+    }
+    return task
+}
+
+def status(rt, id) {
+    if (id == null) { return "missing" }
+    return id["state"]
+}
+
+def result(rt, id) {
+    if (id == null) {
+        _async_fail("ASYNC-TASK-NOT-FOUND",
+            "result called with null task handle",
+            "Use spawn(...) first and pass the returned task object.")
+    }
+    return id
+}
+
+def await_task(rt, events_bus, ctx, id, timeout_ms) {
+    return result(rt, id)
+}

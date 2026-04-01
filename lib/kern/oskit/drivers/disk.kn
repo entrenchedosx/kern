@@ -1,0 +1,14 @@
+// oskit drivers/disk.kn
+
+let _blocks = {}
+
+def write_block(id, bytes) {
+    _blocks[str(int(id))] = bytes
+    return true
+}
+
+def read_block(id) {
+    let k = str(int(id))
+    if (!has(_blocks, k)) { return null }
+    return _blocks[k]
+}

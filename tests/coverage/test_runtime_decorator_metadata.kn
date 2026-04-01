@@ -1,0 +1,34 @@
+runtime_mod = import("lib/kern/runtime/modern/module.kn")
+commands = import("lib/kern/runtime/modern/commands.kn")
+
+@command("sum_meta", description="Add two ints", args=[
+    {"name": "a", "type": "int", "required": true},
+    {"name": "b", "type": "int", "required": true}
+], aliases=["sum_alias"], inject_ctx=true)
+def sum_meta(ctx, args) {
+    return int(args["a"]) + int(args["b"])
+}
+
+let init_args = {}
+init_args["mode"] = "decorator-meta"
+let rt = runtime_mod.create_runtime(init_args)
+
+let desc = commands.describe_command(rt["commands"], "sum_meta")
+assert_eq(desc["meta"]["description"], "Add two ints")
+assert_eq(len(desc["meta"]["args"]), 2)
+assert_eq(desc["meta"]["inject_ctx"], true)
+
+let missing = {}
+let validation_errors = commands._validate_args(desc["meta"]["args"], missing)
+assert_eq(len(validation_errors) > 0, true)
+
+let ok_args = {}
+ok_args["a"] = 2
+ok_args["b"] = 5
+let res = commands.run_command(rt["commands"], rt["events"], rt["ctx"], "sum_meta", ok_args)
+assert_eq(res["ok"], true)
+assert_eq(res["value"], 7)
+let res_alias = commands.run_command(rt["commands"], rt["events"], rt["ctx"], "sum_alias", ok_args)
+assert_eq(res_alias["ok"], true)
+assert_eq(res_alias["value"], 7)
+print("ok")

@@ -1,0 +1,27 @@
+runtime_mod = import("lib/kern/runtime/modern/module.kn")
+commands = import("lib/kern/runtime/modern/commands.kn")
+
+let seen = {}
+seen["n"] = 0
+
+@event("on_command")
+def on_command_event(ctx, payload) {
+    seen["n"] = int(seen["n"]) + 1
+    return null
+}
+
+@command("hello_auto")
+def hello_auto(ctx, args) {
+    return "ok"
+}
+
+let init_args = {}
+init_args["mode"] = "decorator-autoreg"
+let rt = runtime_mod.create_runtime(init_args)
+
+let named = {}
+let result = commands.run_command(rt["commands"], rt["events"], rt["ctx"], "hello_auto", named)
+assert_eq(result["ok"], true)
+assert_eq(result["value"], "ok")
+assert_eq(seen["n"], 1)
+print("ok")

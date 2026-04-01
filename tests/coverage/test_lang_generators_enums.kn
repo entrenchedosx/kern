@@ -1,0 +1,34 @@
+enum Color {
+    RED,
+    GREEN = 5,
+    BLUE
+}
+
+assert_eq(Color.RED, 0)
+assert_eq(Color.GREEN, 5)
+assert_eq(Color.BLUE, 6)
+
+def simpleYield(x) {
+    if x <= 0 {
+        yield 0
+    }
+    yield x
+}
+
+let g7 = simpleYield(7)
+let first7 = null
+for n in g7 {
+    first7 = n
+    break
+}
+assert_eq(first7, 7)
+
+let g0 = simpleYield(0)
+let first0 = null
+for n in g0 {
+    first0 = n
+    break
+}
+assert_eq(first0, 0)
+
+print("OK: test_lang_generators_enums")

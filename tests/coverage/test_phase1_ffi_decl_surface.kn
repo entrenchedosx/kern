@@ -1,0 +1,7 @@
+extern def GetTickCount() : int from "kernel32.dll"
+extern def QueryPerformanceCounter(ptr outCounter) : int from "kernel32.dll" as "QueryPerformanceCounter"
+
+assert_eq(type(GetTickCount), "function")
+assert_eq(type(QueryPerformanceCounter), "function")
+
+print("OK: test_phase1_ffi_decl_surface")

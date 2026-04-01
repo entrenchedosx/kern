@@ -1,0 +1,5 @@
+obs = import("observability")
+
+print("has runtime_info:", has(obs, "runtime_info"))
+print("has profile_cycles:", has(obs, "profile_cycles"))
+print("stack depth text len:", len(obs.stack_trace()))

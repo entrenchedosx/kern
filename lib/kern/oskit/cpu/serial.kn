@@ -1,0 +1,29 @@
+// oskit cpu/serial.kn
+
+port = import("lib/kern/oskit/cpu/port.kn")
+let _ready = false
+let _buffer = []
+
+def setup() {
+    _ready = true
+    return true
+}
+
+def write_byte(v) {
+    if (!_ready) { setup() }
+    port.write(1016, int(v))
+    push(_buffer, int(v))
+    return true
+}
+
+def write(text) {
+    let s = str(text)
+    push(_buffer, s)
+    return true
+}
+
+def flush_log() {
+    let out = str(_buffer)
+    _buffer = []
+    return out
+}

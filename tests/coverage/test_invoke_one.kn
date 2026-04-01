@@ -1,0 +1,4 @@
+def dbl(x) {
+    return x * 2
+}
+print(invoke(dbl, [5]))

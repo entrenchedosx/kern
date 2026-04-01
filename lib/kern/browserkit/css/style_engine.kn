@@ -1,0 +1,65 @@
+// browserkit css/style_engine.kn
+// apply CSS rules to DOM nodes.
+
+def _bk_fail(code, message, hint) {
+    throw Error(code + ": " + message + " | Hint: " + hint, code)
+}
+
+def _match_selector(node, selector) {
+    let s = trim(selector)
+    if (s == "") { return false }
+    if (node == null || node["type"] != "element") { return false }
+    if (starts_with(s, "#")) {
+        let id = slice(s, 1, len(s))
+        return has(node["attrs"], "id") && node["attrs"]["id"] == id
+    }
+    if (starts_with(s, ".")) {
+        let c = slice(s, 1, len(s))
+        if (!has(node["attrs"], "class")) { return false }
+        let arr = split(node["attrs"]["class"], " ")
+        let i = 0
+        while (i < len(arr)) {
+            if (arr[i] == c) { return true }
+            i = i + 1
+        }
+        return false
+    }
+    return lower(node["tag"]) == lower(s)
+}
+
+def _apply_to_node(node, rules) {
+    if (node["type"] == "element") {
+        if (!has(node, "computed_style") || node["computed_style"] == null) {
+            node["computed_style"] = {}
+        }
+        let i = 0
+        while (i < len(rules)) {
+            let rule = rules[i]
+            if (_match_selector(node, rule["selector"])) {
+                for k in keys(rule["decl"]) {
+                    node["computed_style"][k] = rule["decl"][k]
+                }
+            }
+            i = i + 1
+        }
+    }
+}
+
+def _walk(node, rules) {
+    _apply_to_node(node, rules)
+    let i = 0
+    while (i < len(node["children"])) {
+        _walk(node["children"][i], rules)
+        i = i + 1
+    }
+}
+
+def apply_styles(dom_root, rules) {
+    if (dom_root == null) {
+        _bk_fail("BROWSERKIT-STYLE-INVALID-DOM",
+            "apply_styles received a null DOM root",
+            "Pass a parsed DOM tree before applying CSS rules.")
+    }
+    _walk(dom_root, rules)
+    return dom_root
+}

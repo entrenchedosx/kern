@@ -1,0 +1,13 @@
+// line-based file I/O — import("lib/kern/lines_io.kn")
+// read_lines(path), write_lines(path, lines_array [, line_ending])
+
+def read_lines(path) {
+    let raw = read_file(path)
+    if (raw == null) { return null }
+    return split_lines(str(raw))
+}
+
+def write_lines(path, lines, ending) {
+    if (ending == null) { ending = "\n" }
+    return write_file(path, join(lines, ending))
+}

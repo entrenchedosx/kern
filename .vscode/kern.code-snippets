@@ -1,0 +1,97 @@
+{
+  "Function": {
+    "prefix": "def",
+    "body": ["def ${1:name}($2) {", "\t$0", "}"],
+    "description": "Define a function"
+  },
+  "Main loop": {
+    "prefix": "main",
+    "body": ["def main() {", "\t$0", "}", "", "main()"],
+    "description": "Main entry point"
+  },
+  "If statement": {
+    "prefix": "if",
+    "body": ["if ${1:condition} {", "\t$0", "}"],
+    "description": "If block"
+  },
+  "If-Else": {
+    "prefix": "ifelse",
+    "body": ["if ${1:condition} {", "\t$2", "} else {", "\t$0", "}"],
+    "description": "If-else block"
+  },
+  "For range": {
+    "prefix": "for",
+    "body": ["for ${1:i} in range(${2:0}, ${3:10}) {", "\t$0", "}"],
+    "description": "For loop with range"
+  },
+  "For in": {
+    "prefix": "forin",
+    "body": ["for ${1:item} in ${2:array} {", "\t$0", "}"],
+    "description": "For-in loop"
+  },
+  "While loop": {
+    "prefix": "while",
+    "body": ["while ${1:condition} {", "\t$0", "}"],
+    "description": "While loop"
+  },
+  "Class": {
+    "prefix": "class",
+    "body": ["class ${1:ClassName} {", "\tdef ${2:method}(self$3) {", "\t\t$0", "\t}", "}"],
+    "description": "Class definition"
+  },
+  "Import g2d": {
+    "prefix": "g2d",
+    "body": ["let g = import(\"g2d\")", "g.createWindow(800, 600, \"${1:Title}\")", "", "def update() {}", "def draw() {", "\tg.clear(30, 30, 40)", "\t$0", "}", "", "g.run(update, draw)"],
+    "description": "Import g2d and run loop"
+  },
+  "Import sys": {
+    "prefix": "sys",
+    "body": ["let sys = import(\"sys\")", "$0"],
+    "description": "Import sys module"
+  },
+  "Import math": {
+    "prefix": "math",
+    "body": ["let math = import(\"math\")", "$0"],
+    "description": "Import math module"
+  },
+  "Import io": {
+    "prefix": "io",
+    "body": ["let io = import(\"io\")", "$0"],
+    "description": "Import io module"
+  },
+  "Import path": {
+    "prefix": "path",
+    "body": ["let path = import(\"path\")", "$0"],
+    "description": "Import path module"
+  },
+  "Import env": {
+    "prefix": "env",
+    "body": ["let env = import(\"env\")", "$0"],
+    "description": "Import env module"
+  },
+  "Assert equals": {
+    "prefix": "assert_eq",
+    "body": ["assert_eq(${1:actual}, ${2:expected})$0"],
+    "description": "Assert deep equality (for tests)"
+  },
+  "Assert": {
+    "prefix": "assert",
+    "body": ["assert ${1:condition}, \"${2:message}\""],
+    "description": "Assert with optional message"
+  },
+  "Try-Catch": {
+    "prefix": "try",
+    "body": ["try {", "\t$1", "} catch (${2:e}) {", "\t$0", "}"],
+    "description": "Try-catch block"
+  },
+  "Match": {
+    "prefix": "match",
+    "body": ["match ${1:value} {", "\t${2:pattern} => $0", "}"],
+    "description": "Match expression"
+  },
+  "Lambda/Arrow": {
+    "prefix": "fn",
+    "body": ["def (${1:x}) => $0"],
+    "description": "Anonymous function"
+  }
+}

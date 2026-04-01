@@ -1,0 +1,30 @@
+ok = true
+
+// sleep_ms should exist and not crash
+sleep_ms(1)
+
+w = which("cmd")
+if (w == null) {
+    // on non-Windows environments cmd may not exist; try sh.
+    w = which("sh")
+}
+if (w == null) {
+    ok = false
+}
+
+cap = exec_capture("echo KERN_OS_OK")
+if (cap == null || cap.out == null) {
+    ok = false
+}
+
+rc = exec("echo KERN_EXEC_OK")
+if (rc == null) {
+    ok = false
+}
+
+if (ok) {
+    print("os-builtins-ok")
+} else {
+    print("os-builtins-fail")
+}
+

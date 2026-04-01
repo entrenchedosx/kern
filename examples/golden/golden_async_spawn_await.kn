@@ -1,0 +1,16 @@
+// golden example: async/await/spawn syntax + task maps.
+
+@command("compute42")
+async def compute42() {
+    return 42
+}
+
+def main() {
+    let t = spawn compute42
+    let v = await t
+    assert_eq(v, 42)
+    print("ok")
+    return null
+}
+
+main()

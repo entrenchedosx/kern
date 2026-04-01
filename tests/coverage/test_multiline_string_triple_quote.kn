@@ -1,0 +1,13 @@
+let s = """hello
+world"""
+
+if (s == null) {
+    throw Error("multiline string returned null", "TEST-FAIL")
+}
+
+if (len(s) < 5) {
+    throw Error("multiline string too short", "TEST-FAIL")
+}
+
+print("OK: multiline_string_triple_quote")
+

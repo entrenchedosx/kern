@@ -1,0 +1,19 @@
+// maps: literal, keys, access
+let m = { "a": 1, "b": 2, "catch": 3}
+print("m['a'] =", m["a"])
+let k = keys(m)
+print("keys:", len(k))
+for i in range(0, len(k)) {
+    let key = k[i]
+    print(key, "=>", m[key])
+}
+
+
+
+
+
+
+
+
+
+

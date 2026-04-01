@@ -1,0 +1,8 @@
+m = import("concurrency")
+assert_eq(has(m, "spawn"), true)
+assert_eq(has(m, "wait_process"), true)
+t0 = m.monotonic_time()
+m.sleep_ms(1)
+t1 = m.monotonic_time()
+assert_eq(t1 >= t0, true)
+print("OK: test_module_concurrency")

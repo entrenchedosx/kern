@@ -1,0 +1,5 @@
+automation = import("automation")
+
+print("cwd:", automation.cwd())
+print("has exec_capture:", has(automation, "exec_capture"))
+print("has retry_call:", has(automation, "retry_call"))

@@ -1,0 +1,47 @@
+// kern pair/tuple helpers — import("lib/kern/pairs.kn")
+// pair, fst, snd, swap_pair, map_fst, map_snd
+
+def pair(a, b) {
+    return array(a, b)
+}
+
+def fst(p) {
+    if (len(p) < 1) { return null }
+    return p[0]
+}
+
+def snd(p) {
+    if (len(p) < 2) { return null }
+    return p[1]
+}
+
+def swap_pair(p) {
+    if (len(p) < 2) { return copy(p) }
+    return array(p[1], p[0])
+}
+
+def map_fst(p, fn) {
+    if (len(p) < 1) { return p }
+    return array(fn(p[0]), p[1])
+}
+
+def map_snd(p, fn) {
+    if (len(p) < 2) { return p }
+    return array(p[0], fn(p[1]))
+}
+
+def triple(a, b, c) {
+    return array(a, b, c)
+}
+
+def first_of_triple(t) {
+    return len(t) >= 1 ? t[0] : null
+}
+
+def second_of_triple(t) {
+    return len(t) >= 2 ? t[1] : null
+}
+
+def third_of_triple(t) {
+    return len(t) >= 3 ? t[2] : null
+}

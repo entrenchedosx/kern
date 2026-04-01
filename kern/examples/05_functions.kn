@@ -1,0 +1,14 @@
+// functions: def and return
+def add(a, b) {
+    return a + b
+}
+def greet(name) {
+    return str("Hello, ", name)
+}
+print(add(2, 3))
+print(greet("Kern"))
+def factorial(n) {
+    if (n <= 1) { return 1 }
+    return n * factorial(n - 1)
+}
+print("5! =", factorial(5))

@@ -1,0 +1,30 @@
+def main() {
+    let render = import("kern::render")
+    let vision = import("kern::vision")
+    if (render == null || vision == null) {
+        print("kern::render or kern::vision unavailable")
+        return null
+    }
+
+    render.createWindow(320, 180, "probe", false)
+    render.clear("#101010")
+    render.drawRect(40, 30, 90, 60, "#00ff00")
+    render.drawLine(0, 0, 319, 179, "#ff0000")
+    render.drawText(8, 8, "Kern", "#ffffff")
+    let frame = render.present()
+    print("frame:", frame)
+
+    let cap = vision.capture()
+    print("capture:", cap.width, cap.height, cap.frame)
+
+    let p = vision.getPixel(45, 35)
+    print("pixel:", p)
+
+    let found = vision.findColor("#00ff00")
+    print("found:", found.found, found.x, found.y)
+    return null
+}
+
+main()
+
+

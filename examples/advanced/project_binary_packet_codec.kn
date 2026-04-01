@@ -1,0 +1,10 @@
+binary = import("binary")
+
+msg = "KERN"
+bytes = binary.string_to_bytes(msg)
+rt = binary.bytes_to_string(bytes)
+endian = binary.get_endianness()
+
+print("packet bytes:", len(bytes))
+print("roundtrip ok:", rt == msg)
+print("endianness:", endian)

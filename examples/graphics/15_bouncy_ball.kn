@@ -1,0 +1,45 @@
+// bouncy ball (g2d). Requires Raylib. Run from project root.
+let g2d = import("g2d")
+if (g2d == null) {
+    print("g2d not available. Build with Raylib.")
+} else {
+    let w = 800
+    let h = 600
+    g2d.createWindow(w, h, "Bouncy Ball")
+    g2d.setTargetFps(60)
+    let x = 400.0
+    let y = 300.0
+    let vx = 5.0
+    let vy = 4.0
+    let r = 25
+    while (g2d.should_close() == false) {
+        g2d.beginFrame()
+        g2d.clear(40, 44, 52)
+        x = x + vx
+        y = y + vy
+        if (x - r < 0) {
+            vx = -vx
+            x = r
+        }
+        if (x + r > w) {
+            vx = -vx
+            x = w - r
+        }
+        if (y - r < 0) {
+            vy = -vy
+            y = r
+        }
+        if (y + r > h) {
+            vy = -vy
+            y = h - r
+        }
+        g2d.setColor(255, 100, 120)
+        g2d.fillCircle(int(x), int(y), r)
+        g2d.endFrame()
+    }
+    g2d.close()
+    print("Done.")
+}
+
+
+

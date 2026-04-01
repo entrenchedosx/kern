@@ -1,0 +1,38 @@
+// capability-gated process API wrappers.
+
+caps = import("lib/kern/runtime/modern/capabilities.kn")
+
+def run(policy, command) {
+    caps.require(policy, "process.execute")
+    let code = exec(str(command))
+    let r = {}
+    r["stdout"] = ""
+    r["stderr"] = ""
+    r["exit_code"] = int(code)
+    return r
+}
+
+def run_capture(policy, command) {
+    caps.require(policy, "process.execute")
+    let out = exec_capture(str(command))
+    let r = {}
+    r["stdout"] = str(out)
+    r["stderr"] = ""
+    r["exit_code"] = 0
+    return r
+}
+
+def spawn_process(policy, command) {
+    caps.require(policy, "process.execute")
+    return spawn(str(command))
+}
+
+def wait_for(policy, pid) {
+    caps.require(policy, "process.execute")
+    return wait_process(int(pid))
+}
+
+def kill(policy, pid) {
+    caps.require(policy, "process.execute")
+    return kill_process(int(pid))
+}

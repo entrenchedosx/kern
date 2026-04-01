@@ -1,0 +1,22 @@
+// gamekit importer index (convenience)
+
+def use_ecs() { return import("lib/kern/gamekit/ecs/world.kn") }
+def use_ecs_query() { return import("lib/kern/gamekit/ecs/query.kn") }
+def use_input() { return import("lib/kern/gamekit/input/input.kn") }
+def use_actions() { return import("lib/kern/gamekit/input/actions.kn") }
+def use_draw2d() { return import("lib/kern/gamekit/graphics/draw2d.kn") }
+def use_draw3d() { return import("lib/kern/gamekit/graphics/draw3d.kn") }
+def use_camera() { return import("lib/kern/gamekit/graphics/camera.kn") }
+def use_audio() { return import("lib/kern/gamekit/audio/audio.kn") }
+def use_mixer() { return import("lib/kern/gamekit/audio/mixer.kn") }
+def use_ui() { return import("lib/kern/gamekit/ui/widgets.kn") }
+def use_assets() { return import("lib/kern/gamekit/assets/cache.kn") }
+def use_scene() { return import("lib/kern/gamekit/scene/scene.kn") }
+def use_math() { return import("lib/kern/gamekit/math/vector.kn") }
+def use_random() { return import("lib/kern/gamekit/math/random_utils.kn") }
+def use_physics() { return import("lib/kern/gamekit/physics/collision.kn") }
+def use_network() { return import("lib/kern/gamekit/network/socket.kn") }
+def use_tasks() { return import("lib/kern/gamekit/threading/tasks.kn") }
+def use_debug() { return import("lib/kern/gamekit/debug/log.kn") }
+def use_loop() { return import("lib/kern/gamekit/core/game_loop.kn") }
+def use_core() { return import("lib/kern/gamekit/core/runtime.kn") }

@@ -1,0 +1,87 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Kern",
+  "scopeName": "source.kn",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#keywords" },
+    { "include": "#type-keywords" },
+    { "include": "#builtins" },
+    { "include": "#numbers" },
+    { "include": "#operators" },
+    { "include": "#delimiters" },
+    { "include": "#wildcard" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "name": "comment.line.documentation.kn", "match": "///.*$" },
+        { "name": "comment.line.double-slash.kn", "match": "//.*$" },
+        { "name": "comment.block.documentation.kn", "begin": "/\\*\\*", "end": "\\*/" },
+        { "name": "comment.block.kn", "begin": "/\\*", "end": "\\*/" }
+      ]
+    },
+    "keywords": {
+      "patterns": [{
+        "name": "keyword.control.kn",
+        "match": "\\b(let|const|var|def|return|if|elif|else|for|in|range|while|break|continue|try|catch|finally|throw|rethrow|match|case|true|false|null|nil|function|class|import|export|new|this|super|defer|assert|repeat|lambda|and|or|do|step|self)\\b"
+      }]
+    },
+    "type-keywords": {
+      "patterns": [{
+        "name": "storage.type.kn",
+        "match": "\\b(int|float|string|bool|void)\\b"
+      }]
+    },
+    "builtins": {
+      "patterns": [{
+        "name": "support.function.builtin.kn",
+        "match": "\\b(print|sqrt|pow|sin|cos|tan|random|floor|ceil|round|abs|min|max|str|int|float|array|len|push|read_file|write_file|time|inspect|type|dir|keys|values|has|upper|lower|replace|join|split|json_parse|json_stringify|cli_args|copy|freeze|deep_equal|random_choice|range|map|filter|reduce|file_exists|list_dir|listDir|env_get|parse_int|parse_float|default|merge|slice|fileExists|readline|chr|ord|hex|bin|assert_eq|base64_encode|base64_decode|uuid|hash_fnv|csv_parse|csv_stringify|time_format|stack_trace_array|is_nan|is_inf|env_all|escape_regex|cwd|chdir|hostname|cpu_count|temp_dir|realpath|getpid|monotonic_time|file_size|env_set|glob|is_string|is_array|is_map|is_number|is_function|round_to|insert_at|remove_at|sleep|panic|repr|Error|ValueError|TypeError|RuntimeError|OSError|KeyError|stack_trace|alloc|free|mem_copy|mem_set)\\b"
+      }]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.kn",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [{ "name": "constant.character.escape.kn", "match": "\\\\." }]
+        },
+        {
+          "name": "string.quoted.single.kn",
+          "begin": "'",
+          "end": "'",
+          "patterns": [{ "name": "constant.character.escape.kn", "match": "\\\\." }]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        { "name": "constant.numeric.hex.kn", "match": "\\b0[xX][0-9a-fA-F][0-9a-fA-F_]*\\b" },
+        { "name": "constant.numeric.binary.kn", "match": "\\b0[bB][01][01_]*\\b" },
+        { "name": "constant.numeric.time.kn", "match": "\\b[0-9][0-9_]*(\\.[0-9_]*)?([eE][+-]?[0-9]+)?(s|ms|m|h)\\b" },
+        { "name": "constant.numeric.float.kn", "match": "\\b[0-9][0-9_]*\\.[0-9_]*([eE][+-]?[0-9]+)?\\b|\\.([0-9][0-9_]*)([eE][+-]?[0-9]+)?\\b" },
+        { "name": "constant.numeric.kn", "match": "\\b[0-9][0-9_]*\\.?[0-9_]*([eE][+-]?[0-9]+)?\\b" }
+      ]
+    },
+    "operators": {
+      "patterns": [{
+        "name": "keyword.operator.kn",
+        "match": "\\.\\.\\.|\\.\\.|=>|\\|>|[+\\-*/%=!<>]=?|&&|\\|\\||\\^|&|\\||<<|>>|\\*\\*|\\?\\.|\\?\\?|\\?|:"
+      }]
+    },
+    "delimiters": {
+      "patterns": [{
+        "name": "punctuation.definition.kn",
+        "match": "[{}()\\[\\],;.]"
+      }]
+    },
+    "wildcard": {
+      "patterns": [{
+        "name": "variable.parameter.wildcard.kn",
+        "match": "\\b_\\b"
+      }]
+    }
+  }
+}

@@ -1,0 +1,12 @@
+security = import("security")
+
+payload = "{\"service\":\"kern\",\"scope\":\"module-pack\"}"
+sha = security.sha256(payload)
+sig = security.hash_fnv(payload)
+token = security.base64_encode(sha)
+id = security.uuid()
+
+print("manifest id:", id)
+print("sha len:", len(sha))
+print("fnv:", sig)
+print("token prefix:", slice(token, 0, 12))

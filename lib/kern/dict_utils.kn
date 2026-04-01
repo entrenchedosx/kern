@@ -1,0 +1,91 @@
+// kern dict/map utilities — import("lib/kern/dict_utils.kn")
+import "./pairs.kn"
+// get_default, set_default, invert, from_pairs, merge_deep, pick, omit
+
+def get_default(m, key, default_val) {
+    if (has(m, key)) { return m[key] }
+    return default_val
+}
+
+def set_default(m, key, default_val) {
+    if (!has(m, key)) { m[key] = default_val }
+    return m[key]
+}
+
+def invert(m) {
+    let out = {}
+    for k in keys(m) {
+        let v = str(m[k])
+        out[v] = k
+    }
+    return out
+}
+
+def from_pairs(pairs) {
+    let out = {}
+    let i = 0
+    while (i < len(pairs)) {
+        let p = pairs[i]
+        if (len(p) >= 2) { out[p[0]] = p[1] }
+        i = i + 1
+    }
+    return out
+}
+
+def pick(m, keys_arr) {
+    let out = {}
+    let i = 0
+    while (i < len(keys_arr)) {
+        let k = keys_arr[i]
+        if (has(m, k)) { out[k] = m[k] }
+        i = i + 1
+    }
+    return out
+}
+
+def omit(m, keys_arr) {
+    let out = {}
+    for k in keys(m) {
+        let skip = false
+        let j = 0
+        while (j < len(keys_arr)) {
+            if (keys_arr[j] == k) { skip = true }
+            j = j + 1
+        }
+        if (!skip) { out[k] = m[k] }
+    }
+    return out
+}
+
+def keys_sorted(m) {
+    let arr = array()
+    for k in keys(m) { push(arr, k) }
+    return sort(arr)
+}
+
+def merge_shallow(a, b) {
+    let out = {}
+    for k in keys(a) { out[k] = a[k] }
+    for k in keys(b) { out[k] = b[k] }
+    return out
+}
+
+def values_list(m) {
+    let out = array()
+    for k in keys(m) { push(out, m[k]) }
+    return out
+}
+
+def filter_keys(m, pred) {
+    let out = {}
+    for k in keys(m) {
+        if (pred(k)) { out[k] = m[k] }
+    }
+    return out
+}
+
+def map_values(m, fn) {
+    let out = {}
+    for k in keys(m) { out[k] = fn(m[k]) }
+    return out
+}

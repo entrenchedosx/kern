@@ -1,0 +1,61 @@
+// kern sort utilities — import("lib/kern/sort_utils.kn")
+// argsort, sort_by_key, unique_sorted (uses sort, copy)
+
+def argsort(arr) {
+    let indexed = array()
+    let i = 0
+    while (i < len(arr)) {
+        push(indexed, array(arr[i], i))
+        i = i + 1
+    }
+    sort_by(indexed, lambda (a, b) => a[0] < b[0])
+    let out = array()
+    i = 0
+    while (i < len(indexed)) {
+        push(out, indexed[i][1])
+        i = i + 1
+    }
+    return out
+}
+
+def sort_by_key(arr, key_fn) {
+    let with_key = array()
+    let i = 0
+    while (i < len(arr)) {
+        push(with_key, array(key_fn(arr[i]), arr[i]))
+        i = i + 1
+    }
+    sort_by(with_key, lambda (a, b) => a[0] < b[0])
+    let out = array()
+    i = 0
+    while (i < len(with_key)) {
+        push(out, with_key[i][1])
+        i = i + 1
+    }
+    return out
+}
+
+def unique_sorted(arr) {
+    if (len(arr) <= 1) { return copy(arr) }
+    let a = copy(arr)
+    sort(a)
+    let out = array(a[0])
+    let i = 1
+    while (i < len(a)) {
+        if (a[i] != a[i - 1]) { push(out, a[i]) }
+        i = i + 1
+    }
+    return out
+}
+
+def sort_asc(arr) {
+    let a = copy(arr)
+    sort(a)
+    return a
+}
+
+def sort_desc(arr) {
+    let a = copy(arr)
+    sort_by(a, lambda (x, y) => x > y)
+    return a
+}

@@ -1,0 +1,50 @@
+// golden example: modern runtime creation + decorator auto-registration.
+// demonstrates: @command, @event, runtime.create_runtime, commands.run_command, event bus delivery.
+
+@event("on_command", priority=50, stop_on_error=false)
+def log_commands(ctx, payload) {
+    print("[on_command] name=", payload["name"])
+    return null
+}
+
+@command("hello_golden", description="Print hello + arg echo", args=[
+    {"name":"who","type":"string","required":false}
+], inject_ctx=true, aliases=["hi_golden"])
+def hello(ctx, args) {
+    let who = "world"
+    if (has(args, "who")) { who = str(args["who"]) }
+    print("hello", who)
+    return {"ok": true, "who": who}
+}
+
+def main() {
+    // File module under the bundled stdlib tree. This path works:
+    // - from repo root (lib/kern/...)
+    // - from shareable-ide/compiler (compiler/lib/kern/...)
+    let rtmod = import("lib/kern/runtime/modern/module")
+    if (rtmod == null) {
+        print("modern runtime unavailable in this build")
+        return null
+    }
+
+    let runtime = rtmod.create_runtime({})
+    let registry = runtime["commands"]
+    let commands = rtmod["commands"]
+    let bus = runtime["events"]
+    let ctx = runtime["ctx"]
+
+    // invoke primary name.
+    let out1 = commands.run_command(registry, bus, ctx, "hello_golden", {"who": "kern"})
+    assert_eq(out1["ok"], true)
+    assert_eq(out1["value"]["who"], "kern")
+
+    // invoke alias.
+    let out2 = commands.run_command(registry, bus, ctx, "hi_golden", {})
+    assert_eq(out2["ok"], true)
+    assert_eq(out2["value"]["who"], "world")
+
+    print("ok")
+    return null
+}
+
+main()

@@ -1,0 +1,33 @@
+// browserkit/network/cache.kn
+
+_cache_body = {}
+_cache_expiry = {}
+
+def put(url, body, ttl_ms) {
+    let k = str(url)
+    let now = int(monotonic_time() * 1000)
+    _cache_body[k] = body
+    _cache_expiry[k] = now + int(ttl_ms)
+}
+
+def get(url) {
+    let k = str(url)
+    let now = int(monotonic_time() * 1000)
+    let exp = _cache_expiry[k]
+    if (exp == null) { return null }
+    if (now > int(exp)) {
+        _cache_expiry[k] = null
+        _cache_body[k] = null
+        return null
+    }
+    return _cache_body[k]
+}
+
+def contains(url) {
+    return get(url) != null
+}
+
+def clear() {
+    _cache_body = {}
+    _cache_expiry = {}
+}

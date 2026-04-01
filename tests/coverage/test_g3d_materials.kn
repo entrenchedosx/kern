@@ -1,0 +1,17 @@
+let g3 = import("g3d")
+if (g3 == null) {
+    print("skip-g3d")
+} else {
+    id = g3.createObject("cube", 1.0)
+    if (id < 0) {
+        print("materials-fail")
+    } else {
+        g3.setMaterial(id, "flat")
+        g3.setMaterial(id, "lambert")
+        g3.setMaterial(id, "phong")
+        // invalid mode shouldn't crash
+        g3.setMaterial(id, "unknown")
+        print("materials-ok")
+    }
+}
+

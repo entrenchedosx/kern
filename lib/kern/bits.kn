@@ -1,0 +1,54 @@
+// kern bit/number helpers — import("lib/kern/bits.kn")
+// is_power_of_two, next_power_of_two, parity, pop_count (set bits), mask_low
+
+def is_power_of_two(n) {
+    if (n <= 0) { return false }
+    return (n & (n - 1)) == 0
+}
+
+def next_power_of_two(n) {
+    if (n <= 0) { return 1 }
+    let p = 1
+    while (p < n) { p = p * 2 }
+    return p
+}
+
+def parity(n) {
+    if (n < 0) { n = -n }
+    let count = 0
+    while (n > 0) {
+        count = count + (n % 2)
+        n = int(n / 2)
+    }
+    return count % 2
+}
+
+def pop_count(n) {
+    if (n < 0) { n = -n }
+    let count = 0
+    while (n > 0) {
+        count = count + (n % 2)
+        n = int(n / 2)
+    }
+    return count
+}
+
+def mask_low(n, bits) {
+    if (bits <= 0) { return 0 }
+    let m = 1
+    let i = 1
+    while (i < bits) {
+        m = m * 2 + 1
+        i = i + 1
+    }
+    if (n < 0) { n = -n }
+    return n % (m + 1)
+}
+
+def is_even(n) {
+    return n % 2 == 0
+}
+
+def is_odd(n) {
+    return n % 2 != 0
+}

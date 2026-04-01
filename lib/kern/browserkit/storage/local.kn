@@ -1,0 +1,58 @@
+// browserkit storage/local.kn
+// localStorage-like key-value persistence.
+
+db = {}
+db_path = "browserkit_local_storage.json"
+
+def _bk_fail(code, message, hint) {
+    throw Error(code + ": " + message + " | Hint: " + hint, code)
+}
+
+def _load() {
+    if (!fileExists(db_path)) { return }
+    try {
+        let txt = read_file(db_path)
+        if (txt != null && txt != "") {
+            db = json_parse(txt)
+        }
+    } catch (e) {
+        _bk_fail("BROWSERKIT-STORAGE-CORRUPT",
+            "failed to load local storage data: " + error_message(e),
+            "Fix or remove " + db_path + " so storage can be reinitialized.")
+    }
+}
+
+def _save() {
+    write_file(db_path, json_stringify(db))
+}
+
+_load()
+
+def set(key, value) {
+    db[str(key)] = str(value)
+    _save()
+    return true
+}
+
+def get(key) {
+    let k = str(key)
+    if (!has(db, k)) { return null }
+    return db[k]
+}
+
+def remove(key) {
+    let k = str(key)
+    if (!has(db, k)) { return false }
+    db[k] = null
+    _save()
+    return true
+}
+
+def clear() {
+    db = {}
+    _save()
+}
+
+def keys_all() {
+    return keys(db)
+}

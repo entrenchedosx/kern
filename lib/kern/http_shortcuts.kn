@@ -1,0 +1,13 @@
+// tiny SSR helpers — import("lib/kern/http_shortcuts.kn")
+
+def json_response(status, obj) {
+    return http_build_response(status, { "Content-Type": "application/json; charset=utf-8" }, json_stringify(obj))
+}
+
+def text_response(status, text) {
+    return http_build_response(status, { "Content-Type": "text/plain; charset=utf-8" }, text)
+}
+
+def html_response(status, html) {
+    return http_build_response(status, { "Content-Type": "text/html; charset=utf-8" }, html)
+}

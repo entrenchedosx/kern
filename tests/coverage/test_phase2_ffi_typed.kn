@@ -1,0 +1,10 @@
+extern def GetTickCount() : u32 from "kernel32.dll"
+extern def Sleep(int ms) : void from "kernel32.dll"
+
+unsafe {
+  t = GetTickCount()
+  assert_eq(is_int(t), true)
+  Sleep(0)
+}
+
+print("OK: test_phase2_ffi_typed")

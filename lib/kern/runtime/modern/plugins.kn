@@ -1,0 +1,53 @@
+// lightweight plugin runtime with lifecycle hooks.
+
+def create_registry() {
+    return {}
+}
+
+def register_plugin(registry, name, plugin_obj) {
+    registry["plugin:" + str(name)] = plugin_obj
+    return true
+}
+
+def load(registry, name, ctx) {
+    let k = str(name)
+    let pkey = "plugin:" + k
+    let lkey = "loaded:" + k
+    if (!has(registry, pkey)) {
+        throw Error("Plugin not found: " + k, "PLUGIN-NOT-FOUND")
+    }
+    let p = registry[pkey]
+    if (has(registry, lkey) && registry[lkey] == true) {
+        return true
+    }
+    if (has_key(p, "on_load")) { p["on_load"](ctx) }
+    registry[lkey] = true
+    return true
+}
+
+def unload(registry, name, ctx) {
+    let k = str(name)
+    let pkey = "plugin:" + k
+    let lkey = "loaded:" + k
+    if (!has(registry, pkey)) { return false }
+    let p = registry[pkey]
+    if (has(registry, lkey) && registry[lkey] == true) {
+        if (has_key(p, "on_unload")) { p["on_unload"](ctx) }
+        registry[lkey] = false
+    }
+    return true
+}
+
+def list_plugins(registry) {
+    let out = []
+    let ks = keys(registry)
+    let i = 0
+    while (i < len(ks)) {
+        let k = str(ks[i])
+        if (starts_with(k, "plugin:")) {
+            push(out, slice(k, 7, len(k)))
+        }
+        i = i + 1
+    }
+    return out
+}

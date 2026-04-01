@@ -1,0 +1,37 @@
+// kern path helpers — import("lib/kern/path_utils.kn")
+// path_split_ext, path_has_ext, path_stem (uses basename, dirname, path_join)
+
+def path_split_ext(path) {
+    let name = basename(path)
+    let i = len(name) - 1
+    while (i >= 0) {
+        if (name[i] == ".") {
+            return array(slice(name, 0, i), slice(name, i + 1, len(name)))
+        }
+        if (name[i] == "/" or name[i] == "\\") { break }
+        i = i - 1
+    }
+    return array(name, "")
+}
+
+def path_has_ext(path, ext) {
+    let parts = path_split_ext(path)
+    if (len(ext) > 0 and ext[0] == ".") { return parts[1] == slice(ext, 1, len(ext)) }
+    return parts[1] == ext
+}
+
+def path_stem(path) {
+    return path_split_ext(path)[0]
+}
+
+def path_join_all(parts) {
+    if (len(parts) == 0) { return "" }
+    if (len(parts) == 1) { return parts[0] }
+    let out = parts[0]
+    let i = 1
+    while (i < len(parts)) {
+        out = path_join(out, parts[i])
+        i = i + 1
+    }
+    return out
+}

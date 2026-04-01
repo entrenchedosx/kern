@@ -1,0 +1,23 @@
+// capability-gated filesystem API wrappers.
+
+caps = import("lib/kern/runtime/modern/capabilities.kn")
+
+def read(policy, path) {
+    caps.require(policy, "filesystem.read")
+    return read_file(path)
+}
+
+def write(policy, path, content) {
+    caps.require(policy, "filesystem.write")
+    return write_file(path, content)
+}
+
+def exists(policy, path) {
+    caps.require(policy, "filesystem.read")
+    return fileExists(path)
+}
+
+def list(policy, path) {
+    caps.require(policy, "filesystem.read")
+    return listDir(path)
+}

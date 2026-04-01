@@ -1,0 +1,45 @@
+{
+  "name": "kern-language-tools",
+  "displayName": "Kern Language Tools",
+  "description": "Language support for Kern via kern-lsp.",
+  "version": "0.1.0",
+  "publisher": "kern",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:kern"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "kern",
+        "aliases": [
+          "Kern",
+          "kern"
+        ],
+        "extensions": [
+          ".kn"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "configuration": {
+      "title": "Kern LSP",
+      "properties": {
+        "kern.languageServer.path": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to kern_lsp executable. Empty uses auto-discovery."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

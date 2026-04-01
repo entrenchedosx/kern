@@ -1,0 +1,33 @@
+def main() {
+    let render = import("kern::render")
+    let vision = import("kern::vision")
+    if (render == null || vision == null) {
+        print("kern::render or kern::vision unavailable")
+        return null
+    }
+
+    render.createWindow(220, 140, "Color Scan", false)
+    render.clear("#101010")
+    render.drawRect(20, 30, 50, 50, "#ff0000")
+    render.drawRect(110, 30, 60, 60, "#00ff00")
+    render.drawText(12, 8, "scan", "#ffffff")
+    render.present()
+
+    let red = vision.findColor("#ff0000")
+    let green = vision.findColor("#00ff00")
+    let white = vision.findColor("#ffffff")
+
+    print("red:", red.found, red.x, red.y)
+    print("green:", green.found, green.x, green.y)
+    print("white:", white.found, white.x, white.y)
+
+    let px1 = vision.getPixel(25, 35)
+    let px2 = vision.getPixel(115, 35)
+    print("pixel samples:", px1, px2)
+    return null
+}
+
+main()
+
+
+

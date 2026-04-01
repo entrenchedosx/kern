@@ -1,0 +1,8 @@
+m = import("security")
+assert_eq(has(m, "sha256"), true)
+assert_eq(has(m, "uuid"), true)
+h = m.sha256("kern")
+u = m.uuid()
+assert_eq(len(h) > 0, true)
+assert_eq(len(u) > 0, true)
+print("OK: test_module_security")

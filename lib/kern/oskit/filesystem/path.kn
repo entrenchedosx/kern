@@ -1,0 +1,13 @@
+// oskit filesystem/path.kn
+
+def normalize(path) {
+    return str(path)
+}
+
+def join(a, b) {
+    return str(a) + "/" + str(b)
+}
+
+def parent(path) {
+    return "/"
+}

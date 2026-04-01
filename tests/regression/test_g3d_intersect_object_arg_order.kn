@@ -1,0 +1,13 @@
+let g3 = import("g3d")
+
+if (g3 == null) {
+    print("skip-g3d-intersect-order")
+} else {
+    let id = g3.createObject("sphere", 1.0)
+    g3.setPosition(id, 0, 0, 0)
+    let ray = g3.rayFromMouse()
+
+    // correct argument order is (objectId, ray).
+    let hit = g3.intersectObject(id, ray)
+    print("g3d-intersect-order-ok", type(hit))
+}

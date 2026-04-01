@@ -1,0 +1,9 @@
+{
+  "entry": "tests/kernc/multifile/main.kn",
+  "output": "build/Release/tests/kernc_config_app.exe",
+  "include_paths": ["tests/kernc/multifile", "tests/kernc/multifile/lib"],
+  "exclude": ["tests/coverage"],
+  "console": true,
+  "release": true,
+  "optimization": 2
+}

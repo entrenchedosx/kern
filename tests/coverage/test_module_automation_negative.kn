@@ -1,0 +1,6 @@
+m = import("automation")
+
+missing = m.which("__kern_missing_executable_42__")
+assert_eq(missing, null)
+
+print("OK: test_module_automation_negative")

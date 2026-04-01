@@ -1,0 +1,46 @@
+// coverage: map comprehension, invoke+spread, ??=, repeat-while, with + with_cleanup
+
+// 1) map comprehension
+let mc = { x: x * 10 for x in [1, 2, 3] }
+assert_eq(mc[1] == 10, true)
+assert_eq(mc[3] == 30, true)
+
+let mc2 = { x: x for x in [1, 2] if x > 1 }
+assert_eq(len(keys(mc2)), 1)
+assert_eq(mc2[2] == 2, true)
+
+// 2) invoke + spread
+def sum3(a, b, c) {
+    return a + b + c
+}
+let ir = invoke(sum3, [1, 2, 3])
+assert_eq(ir == 6, true)
+let parts = [2, 3]
+let s = sum3(1, ...parts)
+assert_eq(s, 6)
+
+// 3) ??=
+let opt = null
+opt ??= 10
+assert_eq(opt, 10)
+opt ??= 99
+assert_eq(opt, 10)
+
+// 4) repeat-while (runs body then checks condition)
+let rw = 0
+repeat {
+    rw = rw + 1
+} while (rw < 3)
+assert_eq(rw, 3)
+
+// 5) with + with_cleanup (resource map with "close")
+let closed = false
+let resource = {
+    "close": lambda (self) => { closed = true }
+}
+with resource as r {
+    assert_eq(r["close"] != null, true)
+}
+assert_eq(closed, true)
+
+print("OK: test_lang_advanced5")

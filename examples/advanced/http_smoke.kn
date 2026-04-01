@@ -1,0 +1,7 @@
+// quick check that http_get returns data (run: kern.exe examples/http_smoke.kn)
+let u = "https:" + "//example.com"
+let n = len(http_get(u))
+print("http_get bytes=" + str(n))
+if (n < 50) {
+    print("FAIL: expected hundreds of bytes from example.com (rebuild kern; check firewall/proxy).")
+}

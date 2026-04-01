@@ -1,0 +1,52 @@
+def main() {
+    let process = import("kern::process")
+    if (process == null) {
+        print("kern::process module unavailable")
+        return null
+    }
+
+    let rows = process.list()
+    if (len(rows) == 0) {
+        print("no processes found")
+        return null
+    }
+
+    let target = null
+    let h = -1
+    let i = 0
+    while (i < len(rows)) {
+        let cand = rows[i]
+        let hTry = process.open(cand.pid)
+        if (hTry >= 0) {
+            target = cand
+            h = hTry
+            break
+        }
+        i = i + 1
+    }
+
+    if (target == null) {
+        print("no openable process found with current permissions")
+        return null
+    }
+
+    print("target:", target.pid, target.name, "handle=", h)
+    // safe read attempt; may return nil if not readable.
+    let bytes = process.read(h, 0, 16)
+    print("read result type:", type(bytes))
+    if (type(bytes) == "array") {
+        print("read bytes count:", len(bytes))
+    }
+
+    let probe = process.read_u32(h, 0)
+    print("read_u32 type:", type(probe), "value:", probe)
+
+    let meta = process.metadata(h)
+    print("metadata:", meta.pid, meta.name, meta.memory)
+    process.close(h)
+    return null
+}
+
+main()
+
+

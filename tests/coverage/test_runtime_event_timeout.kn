@@ -1,0 +1,33 @@
+runtime_mod = import("lib/kern/runtime/modern/module.kn")
+commands = import("lib/kern/runtime/modern/commands.kn")
+
+let state = {}
+state["slow_calls"] = 0
+state["after"] = 0
+
+@event("on_command", priority=100, timeout_ms=5, stop_on_error=true)
+def slow_listener(ctx, payload) {
+    state["slow_calls"] = int(state["slow_calls"]) + 1
+    sleep_ms(25)
+    return null
+}
+
+@event("on_command", priority=1)
+def after_listener(ctx, payload) {
+    state["after"] = int(state["after"]) + 1
+    return null
+}
+
+@command("timeout_cmd")
+def timeout_cmd(ctx, args) {
+    return "ok"
+}
+
+let rt = runtime_mod.create_runtime({})
+let named = {}
+let res = commands.run_command(rt["commands"], rt["events"], rt["ctx"], "timeout_cmd", named)
+assert_eq(res["ok"], true)
+assert_eq(res["value"], "ok")
+assert_eq(state["slow_calls"], 1)
+assert_eq(state["after"], 0)
+print("ok")

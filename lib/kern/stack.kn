@@ -1,0 +1,29 @@
+// kern stack — import("lib/kern/stack.kn") — LIFO using array
+// stack_new(), stack_push(s, x), stack_pop(s), stack_peek(s), stack_empty(s), stack_size(s)
+
+def stack_new() {
+    return array()
+}
+
+def stack_push(s, x) {
+    push(s, x)
+    return s
+}
+
+def stack_pop(s) {
+    if (len(s) == 0) { throw "stack underflow" }
+    return remove_at(s, len(s) - 1)
+}
+
+def stack_peek(s) {
+    if (len(s) == 0) { return null }
+    return s[len(s) - 1]
+}
+
+def stack_empty(s) {
+    return len(s) == 0
+}
+
+def stack_size(s) {
+    return len(s)
+}

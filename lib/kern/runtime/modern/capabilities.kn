@@ -1,0 +1,43 @@
+// capability policy for safe runtime services.
+
+def create_policy() {
+    let p = {}
+    p["roles"] = {}
+    p["strict"] = true
+    return p
+}
+
+def grant(policy, capability) {
+    policy["cap:" + str(capability)] = true
+    return true
+}
+
+def revoke(policy, capability) {
+    policy["cap:" + str(capability)] = false
+    return true
+}
+
+def has_capability(policy, capability) {
+    let k = "cap:" + str(capability)
+    return has(policy, k) && policy[k] == true
+}
+
+def require(policy, capability) {
+    if (has_capability(policy, capability)) { return true }
+    if (!policy["strict"]) { return true }
+    throw Error("Capability denied: " + str(capability), "CAPABILITY-DENIED")
+}
+
+def list_caps(policy) {
+    let out = []
+    let ks = keys(policy)
+    let i = 0
+    while (i < len(ks)) {
+        let k = str(ks[i])
+        if (starts_with(k, "cap:") && policy[k] == true) {
+            push(out, slice(k, 4, len(k)))
+        }
+        i = i + 1
+    }
+    return out
+}

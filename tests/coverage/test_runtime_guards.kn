@@ -1,0 +1,17 @@
+set_step_limit(0)
+set_max_call_depth(128)
+set_callback_guard(20000)
+
+info = runtime_info()
+assert_eq(has(info, "step_limit"), true)
+assert_eq(has(info, "max_call_depth"), true)
+assert_eq(has(info, "callback_guard"), true)
+
+deterministic_mode(true, 42)
+a = random_int(1, 100000)
+deterministic_mode(true, 42)
+b = random_int(1, 100000)
+assert_eq(a, b)
+
+print("OK: test_runtime_guards")
+

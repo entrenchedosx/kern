@@ -1,0 +1,14 @@
+// parallel arrays -> map — import("lib/kern/zip_dict.kn")
+// zip_to_dict(keys_arr, values_arr) — for [[k,v],...] use dict_utils.from_pairs
+
+def zip_to_dict(ks, vs) {
+    let out = {}
+    let n = len(ks)
+    if (len(vs) < n) { n = len(vs) }
+    let i = 0
+    while (i < n) {
+        out[ks[i]] = vs[i]
+        i = i + 1
+    }
+    return out
+}

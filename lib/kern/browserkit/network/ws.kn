@@ -1,0 +1,85 @@
+// browserkit network/ws.kn
+// lightweight WebSocket-style session abstraction with optional external bridge.
+
+def _bk_fail(code, message, hint) {
+    throw Error(code + ": " + message + " | Hint: " + hint, code)
+}
+
+def _ensure_network_allowed() {
+    let info = runtime_info()
+    if (info != null && has(info, "sandbox") && info["sandbox"]) {
+        _bk_fail("BROWSERKIT-SANDBOX-DENY",
+            "WebSocket bridge blocked while sandbox is enabled",
+            "Run with --no-sandbox for trusted BrowserKit networking.")
+    }
+}
+
+def _mk_socket(url) {
+    let s = {}
+    s["url"] = url
+    s["connected"] = false
+    s["messages_in"] = []
+    s["messages_out"] = []
+    s["error"] = ""
+    s["bridge"] = -1
+    return s
+}
+
+def connect(url) {
+    _ensure_network_allowed()
+    let s = _mk_socket(url)
+    // require a real bridge; never silently fake an echo transport.
+    if (which("websocat") == null) {
+        _bk_fail("BROWSERKIT-NOT-IMPLEMENTED",
+            "websocat bridge is not installed",
+            "Install websocat or provide a platform websocket backend.")
+    }
+    let handle = spawn(["websocat", str(url)])
+    if (handle < 0) {
+        _bk_fail("BROWSERKIT-INIT-FAIL",
+            "failed to launch websocat bridge for " + str(url),
+            "Verify websocat executable and target websocket URL.")
+    }
+    s["connected"] = true
+    s["bridge"] = handle
+    return s
+}
+
+def send(socket, payload) {
+    if (socket == null || !socket["connected"]) {
+        _bk_fail("BROWSERKIT-WS-NOT-CONNECTED",
+            "send called on disconnected websocket session",
+            "Call connect(url) first and keep the returned socket.")
+    }
+    _bk_fail("BROWSERKIT-NOT-IMPLEMENTED",
+        "send() bridge I/O is not implemented for websocket frames",
+        "Implement platform bridge write plumbing or disable BrowserKit websocket send path.")
+}
+
+def poll(socket) {
+    if (socket == null) {
+        _bk_fail("BROWSERKIT-WS-NOT-CONNECTED",
+            "poll called with null websocket session",
+            "Use connect(url) before polling.")
+    }
+    if (!socket["connected"]) {
+        _bk_fail("BROWSERKIT-WS-NOT-CONNECTED",
+            "poll called on disconnected websocket session",
+            "Reconnect before polling for messages.")
+    }
+    if (len(socket["messages_in"]) == 0) { return null }
+    return remove_at(socket["messages_in"], 0)
+}
+
+def close(socket) {
+    if (socket == null) {
+        _bk_fail("BROWSERKIT-WS-NOT-CONNECTED",
+            "close called with null websocket session",
+            "Use connect(url) before closing.")
+    }
+    if (socket["bridge"] >= 0) {
+        kill_process(socket["bridge"])
+    }
+    socket["connected"] = false
+    return true
+}

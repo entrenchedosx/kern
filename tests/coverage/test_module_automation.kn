@@ -1,0 +1,7 @@
+m = import("automation")
+assert_eq(has(m, "exec_capture"), true)
+assert_eq(has(m, "retry_call"), true)
+assert_eq(has(m, "cwd"), true)
+d = m.cwd()
+assert_eq(type(d), "string")
+print("OK: test_module_automation")

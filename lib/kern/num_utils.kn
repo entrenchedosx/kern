@@ -1,0 +1,46 @@
+// kern number utilities — import("lib/kern/num_utils.kn")
+// round_to_n, is_whole, sign_int, div_floor, div_ceil, clamp_int_range
+
+def round_to_n(x, n) {
+    if (n <= 0) { return round(x) }
+    let f = pow(10, n)
+    return round(x * f) / f
+}
+
+def is_whole(x) {
+    return x == floor(x)
+}
+
+def sign_int(x) {
+    if (x > 0) { return 1 }
+    if (x < 0) { return -1 }
+    return 0
+}
+
+def div_floor(a, b) {
+    if (b == 0) { throw "div_floor: division by zero" }
+    return int(floor(a / b))
+}
+
+def div_ceil(a, b) {
+    if (b == 0) { throw "div_ceil: division by zero" }
+    return int(ceil(a / b))
+}
+
+def between(x, lo, hi) {
+    return x >= lo and x <= hi
+}
+
+def in_range_excl(x, lo, hi) {
+    return x >= lo and x < hi
+}
+
+def lerp(a, b, t) {
+    return a + (b - a) * t
+}
+
+def clamp_num(x, lo, hi) {
+    if (x < lo) { return lo }
+    if (x > hi) { return hi }
+    return x
+}

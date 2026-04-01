@@ -1,0 +1,4 @@
+let banner = "0123456789ABCDE"
+let _unused = banner
+let e = json_parse("{\"message\":\"diagnostic range test\",\"code\":\"IMPORT-NOT-FOUND\",\"line\":3,\"column\":5,\"lineEnd\":3,\"columnEnd\":10}")
+throw e

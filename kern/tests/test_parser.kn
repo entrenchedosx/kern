@@ -1,0 +1,8 @@
+// parser/syntax tests: valid programs that should run without error.
+print("test_parser: expressions")
+let a = 1 + 2 * 3
+let b = (1 + 2) * 3
+let c = array(1, 2, array(3, 4))
+let m = { "x": 1, "y": 2 }
+print(a, b, len(c), m["x"])
+print("test_parser: OK")

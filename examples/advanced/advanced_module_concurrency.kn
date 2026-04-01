@@ -1,0 +1,9 @@
+concurrency = import("concurrency")
+
+print("cpu_count:", concurrency.cpu_count())
+t0 = concurrency.monotonic_time()
+concurrency.sleep_ms(1)
+t1 = concurrency.monotonic_time()
+print("delta>=0:", t1 >= t0)
+
+

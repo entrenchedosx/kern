@@ -1,0 +1,17 @@
+// minimal g2d test - target: run flawlessly with zero bugs
+// g.createWindow, g.clear, g.setColor, g.fillRect, g.run(update, draw)
+
+let g = import("g2d")
+def draw() {
+    g.clear(0, 0, 0)
+    g.setColor(255, 0, 0)
+    g.fillRect(100, 100, 200, 150)
+}
+def update() {}
+if (g == null) {
+    print("g2d-missing")
+} else {
+    g.createWindow(800, 600, "Test")
+    g.run(update, draw)
+}
+

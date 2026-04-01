@@ -1,0 +1,38 @@
+// runtime/sync.kn
+// lightweight synchronization primitives for hosted mode.
+
+let _locks = {}
+
+def mutex(name) {
+    let key = str(name)
+    if (!has_key(_locks, key)) { _locks[key] = false }
+    return key
+}
+
+def lock(name) {
+    let key = mutex(name)
+    if (_locks[key]) { return false }
+    _locks[key] = true
+    return true
+}
+
+def unlock(name) {
+    let key = mutex(name)
+    _locks[key] = false
+    return true
+}
+
+def with_lock(name, fn) {
+    if (!lock(name)) { return null }
+    let out = fn()
+    unlock(name)
+    return out
+}
+
+def atomic_add(map_obj, key, delta) {
+    let old = 0
+    if (has_key(map_obj, key)) { old = int(map_obj[key]) }
+    let now = old + int(delta)
+    map_obj[key] = now
+    return now
+}

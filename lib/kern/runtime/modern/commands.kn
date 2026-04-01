@@ -1,0 +1,126 @@
+// command registry with metadata, validation and discovery.
+events_mod = import("lib/kern/runtime/modern/events.kn")
+
+def create_registry() {
+    return {}
+}
+
+def _normalize_meta(meta) {
+    if (meta == null || type(meta) != "map") {
+        let m = {}
+        m["description"] = ""
+        m["args"] = []
+        m["inject_ctx"] = true
+        return m
+    }
+    if (!has(meta, "description")) { meta["description"] = "" }
+    if (!has(meta, "args")) { meta["args"] = [] }
+    if (!has(meta, "inject_ctx")) { meta["inject_ctx"] = true }
+    return meta
+}
+
+def register_command(registry, name, handler, meta) {
+    let key = str(name)
+    let entry = {}
+    entry["name"] = key
+    entry["handler"] = handler
+    entry["meta"] = _normalize_meta(meta)
+    registry["cmd:" + key] = entry
+    return key
+}
+
+def alias_command(registry, alias_name, target_name) {
+    registry["alias:" + str(alias_name)] = str(target_name)
+    return true
+}
+
+def _resolve_name(registry, name) {
+    let k = str(name)
+    if (has(registry, "cmd:" + k)) { return k }
+    if (has(registry, "alias:" + k)) { return registry["alias:" + k] }
+    return ""
+}
+
+def _validate_args(specs, named_args) {
+    let errors = []
+    let i = 0
+    while (i < len(specs)) {
+        let s = specs[i]
+        let arg_name = str(s["name"])
+        let required = has(s, "required") && s["required"] == true
+        if (!has(named_args, arg_name)) {
+            if (has(s, "default")) {
+                named_args[arg_name] = s["default"]
+            } else {
+                if (required) { push(errors, "Missing required argument: " + arg_name) }
+            }
+        } else {
+            if (has(s, "type")) {
+                let want = str(s["type"])
+                let got = type(named_args[arg_name])
+                if (want != "" && got != want) {
+                    push(errors, "Argument '" + arg_name + "' expected type " + want + " but got " + got)
+                }
+            }
+        }
+        i = i + 1
+    }
+    return errors
+}
+
+def list_commands(registry) {
+    let out = []
+    let ks = keys(registry)
+    let i = 0
+    while (i < len(ks)) {
+        let k = str(ks[i])
+        if (starts_with(k, "cmd:")) { push(out, slice(k, 4, len(k))) }
+        i = i + 1
+    }
+    return out
+}
+
+def describe_command(registry, name) {
+    let k = _resolve_name(registry, name)
+    if (k == "") { return null }
+    return registry["cmd:" + k]
+}
+
+def help_text(registry) {
+    let names = list_commands(registry)
+    let lines = ["Available commands:"]
+    let i = 0
+    while (i < len(names)) {
+        let c = registry["cmd:" + names[i]]
+        let d = str(c["meta"]["description"])
+        if (d == "") { push(lines, " - " + names[i]) }
+        else { push(lines, " - " + names[i] + ": " + d) }
+        i = i + 1
+    }
+    return join(lines, "\n")
+}
+
+def run_command(registry, events_bus, ctx, name, named_args) {
+    let k = _resolve_name(registry, name)
+    if (k == "") {
+        throw Error("Unknown command: " + str(name), "COMMAND-NOT-FOUND")
+    }
+    let cmd = registry["cmd:" + k]
+    let meta = cmd["meta"]
+    let errors = _validate_args(meta["args"], named_args)
+    if (len(errors) > 0) {
+        throw Error("Command validation failed: " + join(errors, "; "), "COMMAND-ARG-INVALID")
+    }
+    if (events_bus != null) {
+        let payload = {}
+        payload["name"] = k
+        payload["args"] = named_args
+        events_mod.emit(events_bus, "on_command", ctx, payload)
+    }
+    let out = cmd["handler"](ctx, named_args)
+    ctx["last_command_result"] = out
+    let result = {}
+    result["ok"] = true
+    result["value"] = out
+    return result
+}

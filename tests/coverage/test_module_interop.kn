@@ -1,0 +1,6 @@
+m = import("interop")
+assert_eq(has(m, "ffi_call"), true)
+assert_eq(has(m, "runtime_info"), true)
+info = m.runtime_info()
+assert_eq(has(info, "ffi_enabled"), true)
+print("OK: test_module_interop")

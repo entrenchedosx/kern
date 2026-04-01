@@ -1,0 +1,14 @@
+mem = import("lib/kern/runtime/memory.kn")
+
+let p = mem.alloc_bytes(64)
+if (p == null) { throw "alloc failed" }
+if (!mem.fill(p, 7)) { throw "fill failed" }
+if (!mem.copy_region(p, p, 16)) { throw "copy failed" }
+if (mem.realloc_bytes(p, 96) != p) { throw "realloc failed" }
+if (!mem.free_bytes(p)) { throw "free failed" }
+
+let s = mem.stats()
+if (!has(s, "blocks")) { throw "stats blocks missing" }
+if (!has(s, "bytes")) { throw "stats bytes missing" }
+
+print("test_runtime_memory_module: pass")

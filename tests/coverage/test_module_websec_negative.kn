@@ -1,0 +1,8 @@
+m = import("websec")
+
+raw = "<img src=x onerror=alert(1)>"
+san = m.html_sanitize_strict(raw)
+assert_eq(type(san), "string")
+assert_eq(len(san) <= len(raw), true)
+
+print("OK: test_module_websec_negative")

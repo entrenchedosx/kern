@@ -1,0 +1,317 @@
+// minimal "browser": GameKit window + http_get + plain text (strip_html). Not a real HTML engine.
+// requires: kern built with game/Raylib. Set KERN_LIB to project lib/ for imports.
+// controls: type URL (https:// added if missing), Enter or Go, Backspace, -/= scroll, Esc closes (Raylib).
+
+kit = import("lib/kern/gamekit/module.kn")
+draw = kit.use_draw2d()
+ui = kit.use_ui()
+input = kit.use_input()
+loop = kit.use_loop()
+game = import("game")
+
+// layout (pixels)
+MARGIN = 12
+SIDEBAR_W = 236
+TOOLBAR_H = 76
+FOOTER_H = 26
+FONT_TITLE = 22
+FONT_UI = 15
+FONT_BODY = 15
+LINE_H = 20
+URL_FIELD_H = 28
+
+// build map stepwise: multi-entry { } literals are unreliable in some Kern builds.
+st = {}
+st["url_bar"] = "https://example.com"
+st["current_url"] = ""
+st["status"] = "Ready - Enter or Go to load"
+st["body_lines"] = array("Window opened. Loading first page...")
+st["scroll"] = 0
+st["link_targets"] = array()
+st["boot_fetch"] = true
+
+def main_inner_width() {
+    let w = draw.width() - MARGIN * 2 - SIDEBAR_W
+    if (w < 120) { w = draw.width() - MARGIN * 2 - 40 }
+    return max(120, w)
+}
+
+// approx chars per line for default Raylib font (~8 px per char at FONT_BODY 15).
+def col_width_main() {
+    return max(32, int((main_inner_width() - 20) / 8))
+}
+
+def max_visible_lines() {
+    let h = draw.height() - TOOLBAR_H - FOOTER_H - 52
+    if (h < 80) { h = 400 }
+    return max(5, int(h / LINE_H))
+}
+
+def normalize_text(s) {
+    s = replace(s, "\r", "")
+    s = replace(s, "\t", " ")
+    let guard = 0
+    while (find(s, "\n\n\n") >= 0 && guard < 400) {
+        s = replace(s, "\n\n\n", "\n\n")
+        guard = guard + 1
+    }
+    return trim(s)
+}
+
+def wrap_text(t, col_width) {
+    let lines = array()
+    let raw = split_lines(t)
+    let ri = 0
+    while (ri < len(raw)) {
+        let line = raw[ri]
+        ri = ri + 1
+        if (len(line) == 0) {
+            push(lines, "")
+            continue
+        }
+        let pos = 0
+        while (pos < len(line)) {
+            let end = min(pos + col_width, len(line))
+            push(lines, slice(line, pos, end))
+            pos = end
+        }
+    }
+    return lines
+}
+
+def normalize_url(u) {
+    u = trim(u)
+    if (len(u) == 0) { return "https://example.com" }
+    let low = lower(u)
+    if (!starts_with(low, "http://") && !starts_with(low, "https://")) {
+        return "https://" + u
+    }
+    return u
+}
+
+def dedupe_urls(arr) {
+    let seen = {}
+    let out = array()
+    let i = 0
+    while (i < len(arr)) {
+        let u = arr[i]
+        if (!has(seen, u)) {
+            seen[u] = true
+            push(out, u)
+        }
+        i = i + 1
+    }
+    return out
+}
+
+def extract_title_hint(html) {
+    let m = regex_find_all(html, "<title[^>]*>([^<]*)</title>")
+    if (len(m) >= 1 && len(m[0]) >= 2) {
+        let t = trim(html_unescape(m[0][1]))
+        if (len(t) > 0) { return t }
+    }
+    m = regex_find_all(html, "<TITLE[^>]*>([^<]*)</TITLE>")
+    if (len(m) >= 1 && len(m[0]) >= 2) {
+        let t = trim(html_unescape(m[0][1]))
+        if (len(t) > 0) { return t }
+    }
+    return ""
+}
+
+def fetch_page() {
+    let u = normalize_url(st["url_bar"])
+    st["url_bar"] = u
+    st["status"] = "Loading..."
+    let html = http_get(u)
+    if (len(html) == 0) {
+        st["status"] = "Fetch failed (empty response)"
+        let err_msg = "No data received. Many sites block non-browser clients or require TLS quirks.\n\n"
+        err_msg = err_msg + "Try: https:" + "//example.com or https:" + "//www.rfc-editor.org/rfc/rfc2616.txt\n"
+        err_msg = err_msg + "Use Enter or Go after editing the URL."
+        st["body_lines"] = wrap_text(err_msg, col_width_main())
+        st["link_targets"] = array()
+        st["scroll"] = 0
+        st["current_url"] = ""
+        return
+    }
+    st["current_url"] = u
+    st["status"] = "OK - " + str(len(html)) + " bytes (text view)"
+    let plain = strip_html(html)
+    plain = html_unescape(plain)
+    plain = normalize_text(plain)
+    if (len(plain) == 0) {
+        let hint = extract_title_hint(html)
+        if (len(hint) > 0) {
+            plain = "(No body text after tag removal. Page title: " + hint + ")"
+        } else {
+            plain = "No visible text after removing HTML. Response length " + str(len(html)) + " bytes. Try another URL or open the page in a full browser."
+        }
+    }
+    st["body_lines"] = wrap_text(plain, col_width_main())
+    st["scroll"] = 0
+    let raw_links = regex_find_all(html, "href=[\"']([^\"']+)[\"']")
+    let acc = array()
+    let li = 0
+    while (li < len(raw_links)) {
+        let g = raw_links[li]
+        if (len(g) >= 2) {
+            let href = g[1]
+            let absu = url_resolve(st["current_url"], href)
+            if (len(absu) > 0) { push(acc, absu) }
+        }
+        li = li + 1
+    }
+    st["link_targets"] = dedupe_urls(acc)
+}
+
+def on_start(_app) {
+    // first paint happens before heavy http_get; real load runs in first update.
+}
+
+def app_update(_dt, _app) {
+    if (st["boot_fetch"]) {
+        st["boot_fetch"] = false
+        fetch_page()
+    }
+    let ch = game.input_chars()
+    if (len(ch) > 0) {
+        st["url_bar"] = st["url_bar"] + ch
+    }
+    if (game.key_pressed("BACKSPACE") && len(st["url_bar"]) > 0) {
+        st["url_bar"] = slice(st["url_bar"], 0, len(st["url_bar"]) - 1)
+    }
+    if (game.key_pressed("ENTER")) {
+        fetch_page()
+    }
+    let mv = max_visible_lines()
+    let max_scroll = max(0, len(st["body_lines"]) - mv)
+    if (game.key_pressed("MINUS") && st["scroll"] > 0) {
+        st["scroll"] = st["scroll"] - 3
+    }
+    if (game.key_pressed("EQUAL")) {
+        st["scroll"] = min(max_scroll, st["scroll"] + 3)
+    }
+    if (st["scroll"] > max_scroll) { st["scroll"] = max_scroll }
+    if (st["scroll"] < 0) { st["scroll"] = 0 }
+}
+
+def app_render(_app) {
+    // background
+    draw.clear(16, 18, 26, 255)
+
+    let w = draw.width()
+    let h = draw.height()
+    let go_w = 118
+    let go_x = w - MARGIN - go_w
+    let url_x = MARGIN + 46
+    let url_w = go_x - url_x - 10
+    if (url_w < 80) { url_w = max(80, w - 200) }
+
+    // top chrome bar
+    draw.rect(0, 0, w, TOOLBAR_H, 28, 32, 44, 255)
+    draw.rect(0, TOOLBAR_H - 1, w, 1, 70, 110, 200, 255)
+
+    draw.text("Kern Mini Browser", MARGIN, 10, FONT_TITLE, 240, 245, 255)
+    draw.text("URL", MARGIN, 46, FONT_UI, 160, 175, 195)
+
+    // uRL field (readable contrast)
+    draw.rect(url_x, 42, url_w, URL_FIELD_H, 20, 24, 36, 255)
+    draw.outline_rect(url_x, 42, url_w, URL_FIELD_H, 80, 120, 200, 255)
+    let ub = st["url_bar"]
+    let max_url_chars = max(12, int(url_w / 8) - 1)
+    if (len(ub) > max_url_chars) {
+        let start = max(0, len(ub) - max_url_chars)
+        ub = slice(ub, start, len(ub))
+    }
+    draw.text(ub, url_x + 8, 48, FONT_UI, 230, 235, 250)
+
+    if (ui.button("Go", go_x, 42, go_w, URL_FIELD_H)) {
+        fetch_page()
+    }
+
+    // status under toolbar
+    let sr = 120
+    let sg = 200
+    let sb = 150
+    if (find(st["status"], "failed") >= 0 || find(st["status"], "empty") >= 0) {
+        sr = 240
+        sg = 140
+        sb = 110
+    } else {
+        if (find(st["status"], "Loading") >= 0) {
+            sr = 230
+            sg = 190
+            sb = 100
+        }
+    }
+    draw.text(st["status"], MARGIN, TOOLBAR_H + 6, FONT_UI - 1, sr, sg, sb)
+
+    let content_top = TOOLBAR_H + 28
+    let content_h = h - content_top - FOOTER_H
+    let main_w = main_inner_width()
+    let side_x = w - MARGIN - SIDEBAR_W + 4
+
+    // main reading pane
+    ui.panel(MARGIN, content_top, main_w, content_h, "Page")
+    let text_left = MARGIN + 14
+    let text_top = content_top + 36
+    let total = len(st["body_lines"])
+    let vis = max_visible_lines()
+    let i = st["scroll"]
+    let end_i = min(total, st["scroll"] + vis)
+    while (i < end_i) {
+        let line = st["body_lines"][i]
+        draw.text(line, text_left, text_top + (i - st["scroll"]) * LINE_H, FONT_BODY, 220, 225, 235)
+        i = i + 1
+    }
+
+    if (total == 0) {
+        draw.text("(empty)", text_left, text_top, FONT_BODY, 140, 150, 165)
+    }
+
+    // scroll / position hint
+    let max_s = max(0, total - vis)
+    let hint = "Lines " + str(st["scroll"] + 1) + "-" + str(min(total, st["scroll"] + vis)) + " of " + str(total)
+    if (max_s > 0) {
+        hint = hint + "  (- / = scroll)"
+    }
+    draw.text(hint, text_left, content_top + content_h - 22, 12, 110, 120, 140)
+
+    // links column
+    ui.panel(side_x - 4, content_top, SIDEBAR_W, content_h, "Links")
+    let bx = side_x + 6
+    let by0 = content_top + 34
+    let j = 0
+    let max_links = min(len(st["link_targets"]), int((content_h - 48) / 34))
+    while (j < max_links) {
+        let u = st["link_targets"][j]
+        let label = u
+        if (len(label) > 28) { label = slice(label, 0, 28) + "..." }
+        if (ui.button(label, bx, by0 + j * 34, SIDEBAR_W - 20, 30)) {
+            st["url_bar"] = st["link_targets"][j]
+            fetch_page()
+        }
+        j = j + 1
+    }
+    if (len(st["link_targets"]) == 0) {
+        draw.text("No links", bx, by0, FONT_UI - 2, 120, 130, 150)
+    }
+
+    // footer
+    draw.rect(0, h - FOOTER_H, w, FOOTER_H, 22, 25, 34, 255)
+    draw.text("Type in URL field - Backspace - Enter - Esc closes", MARGIN, h - FOOTER_H + 6, 12, 100, 110, 130)
+    let m = input.mouse_pos()
+    draw.text(str(m.x) + "," + str(m.y), w - 72, h - FOOTER_H + 6, 12, 90, 100, 120)
+}
+
+let win = {}
+win["w"] = 1000
+win["h"] = 700
+win["title"] = "Kern Mini Browser"
+let app = {}
+app["window"] = win
+app["update"] = app_update
+app["render"] = app_render
+app["on_start"] = on_start
+
+loop.run(app)

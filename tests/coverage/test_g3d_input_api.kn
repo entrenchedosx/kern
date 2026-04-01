@@ -1,0 +1,20 @@
+let g3 = import("g3d")
+if (g3 == null) {
+    print("skip-g3d")
+} else {
+    // safe to call even without a window.
+    k = g3.isKeyDown("w")
+    p = g3.isKeyPressed("space")
+    mx = g3.mouseX()
+    my = g3.mouseY()
+    md = g3.isMouseDown("left")
+    r = g3.rayFromMouse()
+    h = g3.intersectObject(999, r)
+
+    if (r != null && h != null) {
+        print("input-api-ok")
+    } else {
+        print("input-api-fail")
+    }
+}
+

@@ -1,0 +1,16 @@
+let g3 = import("g3d")
+g3.createWindow(320, 240, "cb")
+ticks = 0
+def update() {
+    ticks = ticks + 1
+    print("U" + ticks)
+    if (ticks >= 3) { g3.closeWindow() }
+}
+def draw() {
+    print("D" + ticks)
+    g3.setColor(255, 0, 0)
+    g3.drawCube(0.0, 0.5, 0.0, 1.0)
+}
+g3.run("update", "draw")
+print("done")
+

@@ -1,0 +1,23 @@
+let g3 = import("g3d")
+if (g3 == null) {
+    print("skip-g3d")
+} else {
+    a = g3.createObject("cube", 1.0)
+    g3.setPosition(a, 1, 2, 3)
+    g3.setRotation(a, 10, 20, 30)
+    g3.setScale(a, 2, 2, 2)
+    g3.setObjectColor(a, 1, 2, 3)
+    g3.setMaterial(a, "flat")
+
+    okSave = g3.saveScene("tests/coverage/tmp_scene.g3d")
+    g3.clearScene()
+    okLoad = g3.loadScene("tests/coverage/tmp_scene.g3d")
+    n = g3.objectCount()
+    if (okSave && okLoad && n >= 1) {
+        print("scene-io-ok")
+    } else {
+        print("scene-io-fail")
+    }
+}
+
+

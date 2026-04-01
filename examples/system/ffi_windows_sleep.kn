@@ -1,0 +1,12 @@
+extern def Sleep(int ms) : void from "kernel32.dll"
+
+def main() {
+    unsafe {
+        print("Sleep 25ms ...")
+        Sleep(25)
+        print("done")
+    }
+    return null
+}
+
+main()

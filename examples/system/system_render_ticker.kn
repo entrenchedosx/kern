@@ -1,0 +1,27 @@
+def main() {
+    let render = import("kern::render")
+    let vision = import("kern::vision")
+    if (render == null || vision == null) {
+        print("kern::render or kern::vision unavailable")
+        return null
+    }
+
+    render.createWindow(360, 200, "Kern Ticker", false)
+
+    let frame = 0
+    while (frame < 30) {
+        render.clear("#0f1220")
+        render.drawRect(10 + frame, 40, 70, 40, "#3366ff")
+        render.drawLine(0, 0, 359, 199, "#22aa22")
+        render.drawText(10, 10, "frame " + str(frame), "#ffffff")
+        render.present()
+        frame = frame + 1
+        sleep_ms(16)
+    }
+
+    let cap = vision.capture()
+    print("final frame:", cap.frame, "size:", cap.width, cap.height)
+    return null
+}
+
+main()

@@ -1,0 +1,21 @@
+def main() {
+    let net = import("net")
+    if (net == null) {
+        print("net module unavailable in this build")
+        return null
+    }
+    // offline-safe demo: URL parsing and query building (no network required)
+    let u = net.url_parse("https://example.com:443/a/b?x=1&y=two#frag")
+    print("scheme=", u["scheme"])
+    print("host=", u["host"])
+    print("path=", u["path"])
+    let q = {}
+    q["a"] = 1
+    q["b"] = "two"
+    print("query=", net.build_query(q))
+    return null
+}
+
+main()
+
+

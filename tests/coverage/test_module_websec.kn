@@ -1,0 +1,7 @@
+m = import("websec")
+assert_eq(has(m, "html_escape"), true)
+assert_eq(has(m, "html_sanitize_strict"), true)
+s = "<b>x</b><script>alert(1)</script>"
+e = m.html_escape(s)
+assert_eq(e != s, true)
+print("OK: test_module_websec")

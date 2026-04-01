@@ -1,0 +1,6 @@
+m = import("security")
+
+bad = m.is_safe_http_redirect("javascript:alert(1)")
+assert_eq(bad, false)
+
+print("OK: test_module_security_negative")

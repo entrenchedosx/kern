@@ -1,0 +1,13 @@
+// kern prelude — import("lib/kern/prelude.kn") for a small set of "batteries" in one go.
+// pulls in: algo, result, testing, string_utils, math_extra, funtools.
+// for more: dict_utils, list_utils, io_utils, num_utils, stack, queue, table, range_utils,
+// bits, pairs, color, set_utils, cli_utils, log_utils, mem_utils, date_utils, graph_utils, iter_utils, hex_utils,
+// env_utils, path_utils, sort_utils, str_buf,
+// slug, lines_io, bench, safe_json, semver, shell_quote, flow, groupby, url_form, zip_dict.
+
+import("lib/kern/algo.kn")
+import("lib/kern/result.kn")
+import("lib/kern/testing.kn")
+import("lib/kern/string_utils.kn")
+import("lib/kern/math_extra.kn")
+import("lib/kern/funtools.kn")

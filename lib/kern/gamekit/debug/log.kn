@@ -1,0 +1,40 @@
+// gamekit debug + logging helpers
+
+
+def info(msg) { log_info("[gamekit] " + str(msg)) }
+def warn(msg) { log_warn("[gamekit] " + str(msg)) }
+def error(msg) { log_error("[gamekit] " + str(msg)) }
+def debug(msg) { log_debug("[gamekit] " + str(msg)) }
+
+def trace_error(prefix, err_obj) {
+    let msg = prefix + ": " + error_message(err_obj)
+    log_error(msg)
+    let st = stack_trace_array()
+    let i = 0
+    while (i < len(st)) {
+        let f = st[i]
+        let fn_name = has(f, "function") ? f["function"] : "<unknown>"
+        let line_no = has(f, "line") ? f["line"] : 0
+        log_error("  at " + fn_name + " (line " + line_no + ")")
+        i = i + 1
+    }
+}
+
+def assert_true(cond, message) {
+    if (!cond) {
+        throw message
+    }
+}
+
+let _prof = {}
+
+def begin_profile(name) {
+    _prof[name] = monotonic_time()
+}
+
+def end_profile(name) {
+    if (!has(_prof, name)) { return 0.0 }
+    let dt = monotonic_time() - _prof[name]
+    log_debug("[gamekit.profile] " + name + " = " + dt + "s")
+    return dt
+}

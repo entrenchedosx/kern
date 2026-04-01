@@ -1,0 +1,16 @@
+let g = import("g2d")
+
+def draw() {
+    g.clear(0,0,0)
+    g.setColor(255,0,0)
+    g.fillRect(100,100,200,150)
+}
+
+def update() {}
+
+if (g == null) {
+    print("g2d not available. Build with Raylib.")
+} else {
+    g.createWindow(800, 600, "Test")
+    g.run(update, draw)
+}

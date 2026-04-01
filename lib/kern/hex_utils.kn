@@ -1,0 +1,62 @@
+// kern hex/bytes helpers — import("lib/kern/hex_utils.kn")
+// bytes_to_hex, hex_to_bytes, u8_arr_to_hex (uses builtin hex if available; otherwise manual)
+
+def _hex_digit(n) {
+    if (n >= 0 and n <= 9) { return str(n) }
+    if (n == 10) { return "a" }
+    if (n == 11) { return "b" }
+    if (n == 12) { return "c" }
+    if (n == 13) { return "d" }
+    if (n == 14) { return "e" }
+    if (n == 15) { return "f" }
+    return "0"
+}
+
+def _byte_to_hex(b) {
+    let n = int(b)
+    if (n < 0) { n = 0 }
+    if (n > 255) { n = 255 }
+    return _hex_digit(int(n / 16)) + _hex_digit(n % 16)
+}
+
+def bytes_to_hex(arr) {
+    let out = ""
+    let i = 0
+    while (i < len(arr)) {
+        out = out + _byte_to_hex(arr[i])
+        i = i + 1
+    }
+    return out
+}
+
+def _hex_char_val(c) {
+    if (c == "0") { return 0 }
+    if (c == "1") { return 1 }
+    if (c == "2") { return 2 }
+    if (c == "3") { return 3 }
+    if (c == "4") { return 4 }
+    if (c == "5") { return 5 }
+    if (c == "6") { return 6 }
+    if (c == "7") { return 7 }
+    if (c == "8") { return 8 }
+    if (c == "9") { return 9 }
+    if (c == "a" or c == "A") { return 10 }
+    if (c == "b" or c == "B") { return 11 }
+    if (c == "c" or c == "C") { return 12 }
+    if (c == "d" or c == "D") { return 13 }
+    if (c == "e" or c == "E") { return 14 }
+    if (c == "f" or c == "F") { return 15 }
+    return 0
+}
+
+def hex_to_bytes(s) {
+    let out = array()
+    let i = 0
+    while (i + 2 <= len(s)) {
+        let hi = _hex_char_val(s[i])
+        let lo = _hex_char_val(s[i + 1])
+        push(out, hi * 16 + lo)
+        i = i + 2
+    }
+    return out
+}

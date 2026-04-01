@@ -1,0 +1,10 @@
+// smoke test: g3d module loads in standalone EXE (no window).
+let g3 = import(".kern-fix-backups/1774649226064/compiler/lib/kern/gamekit/ecs/world3d")
+if (g3 == null) {
+    print("FAIL: g3d import null")
+} else {
+    print("OK: g3d import")
+}
+
+
+

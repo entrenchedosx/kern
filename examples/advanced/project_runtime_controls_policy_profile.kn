@@ -1,0 +1,13 @@
+rc = import("runtime_controls")
+
+rc.set_step_limit(250000)
+rc.set_max_call_depth(1024)
+rc.set_callback_guard(2000)
+
+info = rc.runtime_info()
+print("policy.debug:", info.debug_mode)
+print("policy.step_limit:", info.step_limit)
+print("policy.max_depth:", info.max_call_depth)
+
+
+

@@ -1,0 +1,64 @@
+runtime_mod = import("lib/kern/runtime/modern/module.kn")
+caps = import("lib/kern/runtime/modern/capabilities.kn")
+events = import("lib/kern/runtime/modern/events.kn")
+commands = import("lib/kern/runtime/modern/commands.kn")
+sched = import("lib/kern/runtime/modern/scheduler.kn")
+async_rt = import("lib/kern/runtime/modern/async_runtime.kn")
+
+let init_args = {}
+init_args["mode"] = "demo"
+let rt = runtime_mod.create_runtime(init_args)
+let ctx = rt["ctx"]
+
+caps.grant(rt["policy"], "filesystem.read")
+caps.grant(rt["policy"], "devices.list")
+
+events.on(rt["events"], "on_command", lambda (_ctx, payload) => {
+    print("event:on_command -> " + payload["name"])
+})
+
+def hello_command(ctx, args) {
+    let who = "world"
+    if (has(args, "name")) { who = args["name"] }
+    print("hello " + str(who) + " from pid " + str(ctx["env"]["pid"]))
+    return {"ok": true, "name": who}
+}
+
+let arg_spec = {}
+arg_spec["name"] = "name"
+arg_spec["type"] = "string"
+arg_spec["required"] = false
+arg_spec["default"] = "world"
+let meta = {}
+meta["description"] = "Greets a user"
+meta["args"] = [arg_spec]
+meta["inject_ctx"] = true
+commands.register_command(rt["commands"], "hello", hello_command, meta)
+
+let cmd_args = {}
+cmd_args["name"] = "kern"
+let result = commands.run_command(rt["commands"], rt["events"], ctx, "hello", cmd_args)
+print("command result ok=" + str(result["ok"]))
+
+let tick_count = {}
+tick_count["n"] = 0
+sched.every(rt["scheduler"], 20, lambda (_ctx, _meta) => {
+    tick_count["n"] = int(tick_count["n"]) + 1
+    print("heartbeat #" + str(tick_count["n"]))
+}, {})
+
+let tid = async_rt.spawn(rt["async"], lambda (_ctx, _meta) => {
+    return 42
+}, {})
+
+let wait_result = async_rt.await_task(rt["async"], rt["events"], ctx, tid, 300)
+print("async task=" + str(wait_result))
+
+let i = 0
+while (i < 3) {
+    sched.step(rt["scheduler"], rt["events"], ctx)
+    sleep_ms(25)
+    i = i + 1
+}
+
+runtime_mod.shutdown(rt)

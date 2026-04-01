@@ -1,0 +1,51 @@
+// gamekit input abstraction over g2d/g3d/game/kern::input
+
+g2 = import("g2d")
+g3 = import("g3d")
+game = import("game")
+si = import("kern::input")
+
+def _upper_key(k) {
+    if (k == null) { return "" }
+    return upper(str(k))
+}
+
+def key_down(key_name) {
+    if (g2 != null) { return g2.isKeyDown(key_name) }
+    if (g3 != null) { return g3.isKeyDown(key_name) }
+    if (game != null) { return game.key_down(_upper_key(key_name)) }
+    if (si != null) {
+        let evs = si.poll()
+        return len(evs) > 0
+    }
+    return false
+}
+
+def key_pressed(key_name) {
+    if (g2 != null) { return g2.isKeyPressed(key_name) }
+    if (g3 != null) { return g3.isKeyPressed(key_name) }
+    if (game != null) { return game.key_pressed(_upper_key(key_name)) }
+    return false
+}
+
+def mouse_pos() {
+    if (g2 != null) { return {"x": g2.mouseX(), "y": g2.mouseY()} }
+    if (g3 != null) { return {"x": g3.mouseX(), "y": g3.mouseY()} }
+    if (game != null) { return {"x": game.mouse_x(), "y": game.mouse_y()} }
+    return {"x": 0, "y": 0}
+}
+
+def mouse_down(button_name) {
+    if (g2 != null) { return g2.isMouseDown(button_name) }
+    if (g3 != null) { return g3.isMouseDown(button_name) }
+    if (game != null) { return game.mouse_down(_upper_key(button_name)) }
+    return false
+}
+
+def mouse_pressed(button_name) {
+    if (g3 != null) {
+        if (button_name == "left") { return g3.isMouseDown("left") }
+    }
+    if (game != null) { return game.mouse_pressed(_upper_key(button_name)) }
+    return false
+}

@@ -1,0 +1,28 @@
+// gamekit audio/mixer.kn
+
+let _channels = {}
+
+def play(audio, channel, id, volume) {
+    let ch = str(channel)
+    _channels[ch] = { "id": id, "volume": float(volume) }
+    audio.play(id, volume)
+}
+
+def stop(audio, channel) {
+    let ch = str(channel)
+    if (!has(_channels, ch)) { return false }
+    let id = _channels[ch]["id"]
+    audio.stop(id)
+    _channels[ch] = null
+    return true
+}
+
+def set_volume(channel, volume) {
+    let ch = str(channel)
+    if (!has(_channels, ch)) { return false }
+    if (_channels[ch] == null) { return false }
+    _channels[ch]["volume"] = float(volume)
+    return true
+}
+
+def snapshot() { return _channels }

@@ -1,0 +1,35 @@
+// safe administrative workflow demo.
+// this is capability-gated and does not perform exploit-style privilege escalation.
+
+runtime_mod = import("lib/kern/runtime/modern/module.kn")
+caps = import("lib/kern/runtime/modern/capabilities.kn")
+fs = import("lib/kern/runtime/modern/system_fs.kn")
+proc = import("lib/kern/runtime/modern/system_process.kn")
+
+def request_admin_capability(policy, approved) {
+    // in real tooling this should be approved by host policy / user consent.
+    if (approved == true) {
+        caps.grant(policy, "filesystem.read")
+        caps.grant(policy, "filesystem.write")
+        caps.grant(policy, "process.execute")
+        return true
+    }
+    return false
+}
+
+let init_args = {}
+init_args["mode"] = "admin-demo"
+let rt = runtime_mod.create_runtime(init_args)
+let granted = request_admin_capability(rt["policy"], true)
+print("admin granted = " + str(granted))
+
+if (granted) {
+    let cwd_text = fs.list(rt["policy"], ".")
+    print("cwd entries = " + str(len(cwd_text)))
+    let out = proc.run_capture(rt["policy"], "echo kern-admin-demo")
+    print("process stdout: " + out["stdout"])
+} else {
+    print("admin capability not granted; sensitive operations are blocked.")
+}
+
+runtime_mod.shutdown(rt)

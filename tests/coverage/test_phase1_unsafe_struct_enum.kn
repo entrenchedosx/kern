@@ -1,0 +1,29 @@
+struct Vec2 {
+  x: float,
+  y: float
+}
+
+enum Color {
+  Red = 1,
+  Green,
+  Blue
+}
+
+assert_eq(type(Vec2), "dictionary")
+assert_eq(type(Color), "dictionary")
+assert_eq(Color.Red, 1)
+assert_eq(Color.Green, 2)
+assert_eq(Color.Blue, 3)
+
+unsafe {
+  p = alloc(8)
+  poke64(p, 123456)
+  v = peek64(p)
+  free(p)
+  assert_eq(v, 123456)
+}
+
+rt = runtime_info()
+assert_eq(has(rt, "allow_unsafe"), true)
+assert_eq(has(rt, "unsafe_depth"), true)
+print("OK: test_phase1_unsafe_struct_enum")

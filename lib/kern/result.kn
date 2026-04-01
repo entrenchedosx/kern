@@ -1,0 +1,73 @@
+// kern Result/Option helpers — import("lib/kern/result.kn")
+// after import, use: ok(value), err(message), is_ok(r), unwrap(r); some(x), none(), is_some(o), unwrap_opt(o).
+
+// result type: ok(value) | err(message)
+def ok(value) {
+    return { "ok": true, "value": value }
+}
+
+def err(message) {
+    return { "ok": false, "error": message }
+}
+
+def is_ok(r) {
+    return has(r, "ok") and r["ok"]
+}
+
+def unwrap(r) {
+    if (has(r, "ok") and r["ok"]) { return r["value"] }
+    if (has(r, "error")) { throw r["error"] }
+    throw "unwrap on err"
+}
+
+def unwrap_or(r, default_val) {
+    if (has(r, "ok") and r["ok"]) { return r["value"] }
+    return default_val
+}
+
+// option type: some(x) | none()
+def some(x) {
+    return { "some": true, "value": x }
+}
+
+def none() {
+    return { "some": false }
+}
+
+def is_some(o) {
+    return has(o, "some") and o["some"]
+}
+
+def unwrap_opt(o) {
+    if (has(o, "some") and o["some"]) { return o["value"] }
+    throw "unwrap_opt on none"
+}
+
+def opt_or(o, default_val) {
+    if (has(o, "some") and o["some"]) { return o["value"] }
+    return default_val
+}
+
+// map_result(r, fn) -> ok(fn(value)) or pass through err
+def map_result(r, fn) {
+    if (has(r, "ok") and r["ok"]) { return ok(fn(r["value"])) }
+    return r
+}
+
+// map_opt(o, fn) -> some(fn(value)) or pass through none
+def map_opt(o, fn) {
+    if (has(o, "some") and o["some"]) { return some(fn(o["value"])) }
+    return o
+}
+
+// and_then(r, fn) -> if ok then fn(value) else r
+def and_then(r, fn) {
+    if (has(r, "ok") and r["ok"]) { return fn(r["value"]) }
+    return r
+}
+
+// or_else(r, fn) -> if err then fn(error) else r
+def or_else(r, fn) {
+    if (has(r, "ok") and !r["ok"]) { return fn(r["error"]) }
+    return r
+}

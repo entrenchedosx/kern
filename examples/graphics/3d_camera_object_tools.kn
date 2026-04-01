@@ -1,0 +1,45 @@
+def main() {
+    let g3 = import("g3d")
+    if (g3 == null) {
+        print("g3d unavailable in this build")
+        return null
+    }
+
+    g3.createWindow(1280, 720, "Kern g3d - Camera/Object Tools")
+    g3.clear(12, 18, 30)
+    g3.setCamera(7, 5, 7, 0, 0, 0)
+    g3.setCameraMode("free")
+    g3.showStats(true)
+    g3.setDebug(true)
+
+    let cube = g3.createObject("cube", 1.6)
+    let sphere = g3.createObject("sphere", 0.9)
+    g3.setPosition(cube, 0, 0.8, 0)
+    g3.setPosition(sphere, 2.5, 0.9, 0)
+    g3.setObjectColor(cube, 255, 120, 120)
+    g3.setObjectColor(sphere, 120, 220, 255)
+
+    print("Press K to destroy sphere, C to print camera")
+
+    let update = lambda () => {
+        if (g3.isKeyPressed("k")) {
+            g3.destroyObject(sphere)
+            print("active objects: " + str(g3.activeObjectCount()))
+        }
+        if (g3.isKeyPressed("c")) {
+            let cam = g3.getCamera()
+            print("cam pos: " + str(cam.px) + ", " + str(cam.py) + ", " + str(cam.pz))
+        }
+    }
+
+    let draw = lambda () => {
+        g3.drawAll()
+    }
+
+    g3.run(update, draw)
+    return null
+}
+
+main()
+
+

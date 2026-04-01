@@ -1,0 +1,39 @@
+def main() {
+    let input = import("kern::input")
+    if (input == null) {
+        print("kern::input module unavailable")
+        return null
+    }
+
+    let onEsc = lambda (ev) => {
+        print("ESC key event ->", ev.type, "key=", ev.key)
+    }
+
+    let onMove = lambda (ev) => {
+        print("mouse move ->", ev.x, ev.y)
+    }
+
+    input.onKey(27, onEsc)
+    input.onMouse("move", onMove)
+
+    print("simulation without permission (expected false):")
+    print("simulateKey:", input.simulateKey(27))
+    print("simulateMouse:", input.simulateMouse(50, 70))
+    print("polled:", input.poll())
+
+    env_set("KERN_ALLOW_INPUT_SIM", "1")
+    print("simulation with permission (expected true):")
+    print("simulateKey:", input.simulateKey(27))
+    print("simulateMouse:", input.simulateMouse(120, 200))
+
+    for i in range(0, 3) {
+        let drained = input.poll()
+        print("tick", i, "drained=", drained)
+        sleep_ms(50)
+    }
+    return null
+}
+
+main()
+
+

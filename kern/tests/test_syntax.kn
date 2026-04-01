@@ -1,0 +1,13 @@
+// syntax test - valid Kern that exercises parser
+let a = 1
+let b = 2
+if (a < b) {
+    print("ok")
+}
+for i in range(0, 2) {
+    print(i)
+}
+def f(x) {
+    return x + 1
+}
+print(f(10))

@@ -1,0 +1,7 @@
+extern def GetTickCount() : u32 from "kernel32.dll"
+
+info = runtime_info()
+assert_eq(has(info, "ffi_enabled"), true)
+assert_eq(info.ffi_enabled, false)
+
+print("OK: test_phase2_ffi_guard")

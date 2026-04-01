@@ -1,0 +1,73 @@
+// kern set utilities (using dict for membership) — import("lib/kern/set_utils.kn")
+// set_from_array, set_has, set_add, set_remove, set_union, set_intersection, set_difference, set_to_array
+
+def set_from_array(arr) {
+    let s = {}
+    let i = 0
+    while (i < len(arr)) {
+        let k = str(arr[i])
+        s[k] = true
+        i = i + 1
+    }
+    return s
+}
+
+def set_has(s, x) {
+    return has(s, str(x))
+}
+
+def set_add(s, x) {
+    s[str(x)] = true
+    return s
+}
+
+def set_remove(s, x) {
+    let k = str(x)
+    let out = {}
+    for key in keys(s) {
+        if (key != k) { out[key] = true }
+    }
+    return out
+}
+
+def set_to_array(s) {
+    let out = array()
+    for k in keys(s) { push(out, k) }
+    return out
+}
+
+def set_union(a, b) {
+    let out = {}
+    for k in keys(a) { out[k] = true }
+    for k in keys(b) { out[k] = true }
+    return out
+}
+
+def set_intersection(a, b) {
+    let out = {}
+    for k in keys(a) {
+        if (has(b, k)) { out[k] = true }
+    }
+    return out
+}
+
+def set_difference(a, b) {
+    let out = {}
+    for k in keys(a) {
+        if (!has(b, k)) { out[k] = true }
+    }
+    return out
+}
+
+def set_size(s) {
+    let n = 0
+    for k in keys(s) { n = n + 1 }
+    return n
+}
+
+def set_is_subset(small, big) {
+    for k in keys(small) {
+        if (!has(big, k)) { return false }
+    }
+    return true
+}

@@ -1,0 +1,45 @@
+// gamekit core runtime helpers
+
+def now_ms() {
+    return int(monotonic_time() * 1000)
+}
+
+def make_struct(type_name, fields) {
+    fields["__type"] = type_name
+    return fields
+}
+
+def type_of(value) {
+    if (value == null) { return "nil" }
+    return type(value)
+}
+
+def is_struct_of(value, type_name) {
+    return value != null && has(value, "__type") && value["__type"] == type_name
+}
+
+def assert_struct(value, type_name) {
+    if (!is_struct_of(value, type_name)) {
+        throw "expected struct " + type_name + ", got " + type_of(value)
+    }
+    return value
+}
+
+def safe_call(fn, fallback_value) {
+    try {
+        return fn()
+    } catch (e) {
+        log_warn("gamekit.core.safe_call: " + error_message(e))
+        return fallback_value
+    }
+}
+
+def clampf(x, lo, hi) {
+    if (x < lo) { return lo }
+    if (x > hi) { return hi }
+    return x
+}
+
+def lerpf(a, b, t) {
+    return a + (b - a) * t
+}

@@ -1,0 +1,40 @@
+def main() {
+    let process = import("kern::process")
+    if (process == null) {
+        print("kern::process module unavailable")
+        return null
+    }
+
+    let rows = process.list()
+    print("total processes:", len(rows))
+
+    let limit = len(rows)
+    if (limit > 10) {
+        limit = 10
+    }
+
+    print("top entries:")
+    for i in range(0, limit) {
+        let p = rows[i]
+        print(i, "pid=", p.pid, "name=", p.name, "memory=", p.memory)
+    }
+
+    if (limit > 0) {
+        let p0 = rows[0]
+        let h = process.open(p0.pid)
+        if (h >= 0) {
+            let meta = process.metadata(h)
+            print("opened pid:", meta.pid, "name:", meta.name, "memory:", meta.memory)
+            process.close(h)
+        } else {
+            print("open failed for pid", p0.pid)
+        }
+    }
+
+    return null
+}
+
+main()
+
+
+

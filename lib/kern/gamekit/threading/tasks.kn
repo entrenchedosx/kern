@@ -1,0 +1,59 @@
+import "./tasks.kn"
+// gamekit cooperative task scheduler
+
+tasks = array()
+next_id = 1
+
+def task_spawn(fn) {
+    let t = {"id": next_id, "done": false, "fn": fn}
+    next_id = next_id + 1
+    push(tasks, t)
+    return t.id
+}
+
+def run_once() {
+    let i = 0
+    while (i < len(tasks)) {
+        let t = tasks[i]
+        if (!t.done) {
+            try {
+                t.fn()
+            } catch (e) {
+                log_error("task " + t.id + " failed: " + error_message(e))
+            }
+            t.done = true
+            tasks[i] = t
+        }
+        i = i + 1
+    }
+}
+
+def pending_count() {
+    let n = 0
+    let i = 0
+    while (i < len(tasks)) {
+        if (!tasks[i].done) { n = n + 1 }
+        i = i + 1
+    }
+    return n
+}
+
+def clear_done() {
+    let out = array()
+    let i = 0
+    while (i < len(tasks)) {
+        if (!tasks[i].done) { push(out, tasks[i]) }
+        i = i + 1
+    }
+    tasks = out
+}
+
+def os_spawn(argv) {
+    if (argv == null || len(argv) == 0) { return -1 }
+    return spawn(argv)
+}
+
+def os_wait(handle, timeout_ms) {
+    if (timeout_ms == null) { timeout_ms = -1 }
+    return wait_process(handle, timeout_ms)
+}

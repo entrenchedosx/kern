@@ -1,0 +1,2 @@
+p = import("lib/kern/browserkit/network/protocols.kn")
+p.open("foo://example")

@@ -1,0 +1,19 @@
+// gamekit ecs/query.kn
+
+def by_component(world, component_name) {
+    let out = []
+    let ids = world.entity_ids()
+    let i = 0
+    while (i < len(ids)) {
+        let id = ids[i]
+        if (world.has(id, component_name)) { push(out, id) }
+        i = i + 1
+    }
+    return out
+}
+
+def first(world, component_name) {
+    let all = by_component(world, component_name)
+    if (len(all) == 0) { return null }
+    return all[0]
+}

@@ -1,0 +1,9 @@
+@command("hello")
+async def hello() {
+    return 7
+}
+
+let t = spawn hello
+let v = await t
+assert_eq(v, 7)
+print("ok")

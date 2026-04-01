@@ -1,0 +1,40 @@
+// browserkit dom/tree.kn
+
+def element(tag) {
+    let n = {}
+    n["type"] = "element"
+    n["tag"] = lower(tag)
+    n["attrs"] = {}
+    n["children"] = []
+    n["text"] = ""
+    n["style"] = {}
+    n["computed_style"] = {}
+    return n
+}
+
+def text_node(value) {
+    let n = {}
+    n["type"] = "text"
+    n["tag"] = "#text"
+    n["attrs"] = {}
+    n["children"] = []
+    n["text"] = value
+    n["style"] = {}
+    n["computed_style"] = {}
+    return n
+}
+
+def append_child(parent, child) {
+    if (parent == null || child == null) { return false }
+    push(parent["children"], child)
+    return true
+}
+
+def set_attr(node, key, value) {
+    node["attrs"][key] = value
+}
+
+def get_attr(node, key) {
+    if (!has(node["attrs"], key)) { return null }
+    return node["attrs"][key]
+}

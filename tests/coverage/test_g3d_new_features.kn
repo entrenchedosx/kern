@@ -1,0 +1,24 @@
+let g3 = import("g3d")
+if (g3 == null) {
+    print("skip-g3d")
+} else {
+    a = g3.createObject("cube", 1.0)
+    b = g3.createObject("sphere", 0.5)
+    infoA = g3.getObject(a)
+    before = g3.activeObjectCount()
+    okDestroy = g3.destroyObject(b)
+    after = g3.activeObjectCount()
+
+    g3.setCamera(4, 4, 4, 0, 0, 0)
+    g3.moveCamera(1, 0, 0)
+    g3.lookAt(0, 1, 0)
+    cam = g3.getCamera()
+    st = g3.status()
+
+    if (infoA != null && okDestroy && before >= 2 && after >= 1 && cam != null && st.activeObjectCount >= 1) {
+        print("g3d-new-ok")
+    } else {
+        print("g3d-new-fail")
+    }
+}
+

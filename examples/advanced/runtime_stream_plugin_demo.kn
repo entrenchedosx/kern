@@ -1,0 +1,32 @@
+runtime_mod = import("lib/kern/runtime/modern/module.kn")
+plugins = import("lib/kern/runtime/modern/plugins.kn")
+streams = import("lib/kern/runtime/modern/streams.kn")
+
+let init_args = {}
+init_args["mode"] = "stream-plugin-demo"
+let rt = runtime_mod.create_runtime(init_args)
+
+def plugin_on_load(ctx) {
+    print("plugin loaded for pid " + str(ctx["env"]["pid"]))
+}
+
+def plugin_on_unload(_ctx) {
+    print("plugin unloaded")
+}
+
+let plugin_obj = {}
+plugin_obj["on_load"] = plugin_on_load
+plugin_obj["on_unload"] = plugin_on_unload
+plugins.register_plugin(rt["plugins"], "network_tools", plugin_obj)
+plugins.load(rt["plugins"], "network_tools", rt["ctx"])
+
+let s = streams.create_stream("text", 8)
+streams.add_transform(s, lambda (chunk) => upper(str(chunk)))
+streams.on_data(s, lambda (chunk) => { print("stream chunk: " + str(chunk)) })
+streams.on_drain(s, lambda (n) => { print("stream drained items=" + str(n)) })
+
+streams.write(s, "hello")
+streams.write(s, "runtime")
+
+plugins.unload(rt["plugins"], "network_tools", rt["ctx"])
+runtime_mod.shutdown(rt)

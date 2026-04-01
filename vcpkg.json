@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "kern",
+  "version-string": "1.0.0",
+  "description": "Kern language — manifest features: game (Raylib, default), native-ide (Qt6 for kern-ide). IDE-only builds use VCPKG_MANIFEST_NO_DEFAULT_FEATURES plus VCPKG_MANIFEST_FEATURES=native-ide.",
+  "dependencies": [],
+  "features": {
+    "game": {
+      "description": "Raylib for g2d/g3d/game builtins",
+      "dependencies": [ "raylib" ]
+    },
+    "native-ide": {
+      "description": "Qt6 (Widgets) for kern/ide/qt-native (kern-ide). default-features false avoids OpenSSL/ICU/SQL stack from full qtbase defaults.",
+      "dependencies": [
+        {
+          "name": "qtbase",
+          "default-features": false,
+          "features": [ "widgets" ]
+        }
+      ]
+    }
+  },
+  "default-features": [ "game" ]
+}

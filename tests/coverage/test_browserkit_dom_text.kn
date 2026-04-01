@@ -1,0 +1,13 @@
+parser = import("lib/kern/browserkit/html/parser.kn")
+query = import("lib/kern/browserkit/dom/query.kn")
+
+doc = parser.parse("<html><body><h1>Example Domain</h1><p>hello</p></body></html>")
+h1 = query.query_one(doc, "h1")
+p = query.query_one(doc, "p")
+
+assert_eq(h1 != null, true)
+assert_eq(p != null, true)
+assert_eq(h1["text"], "Example Domain")
+assert_eq(p["text"], "hello")
+
+print("test_browserkit_dom_text: pass")

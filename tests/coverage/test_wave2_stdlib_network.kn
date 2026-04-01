@@ -1,0 +1,10 @@
+u = url_encode("a b+c")
+d = url_decode(u)
+assert_eq(d, "a b+c")
+
+cfg = toml_parse("name = \"kern\"\nworkers = 4\nenabled = true\n")
+assert_eq(cfg.name, "kern")
+assert_eq(cfg.workers, 4)
+assert_eq(cfg.enabled, true)
+
+print("OK: test_wave2_stdlib_network")

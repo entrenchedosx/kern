@@ -1,0 +1,13 @@
+// windows FFI: declaration is safe at module scope; call requires unsafe { }.
+extern def GetTickCount() : int from "kernel32.dll"
+
+def main() {
+    unsafe {
+        let tick = GetTickCount()
+        assert_eq(is_int(tick), true)
+        print("ffi tick:", tick)
+    }
+    return null
+}
+
+main()

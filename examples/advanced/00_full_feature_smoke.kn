@@ -1,0 +1,11 @@
+// kern smoke example used by build/test scripts.
+// keep this file intentionally minimal and deterministic.
+
+let x = 2
+let y = 3
+
+def add(a, b) {
+    return a + b
+}
+
+print(add(x, y))

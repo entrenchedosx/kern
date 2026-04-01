@@ -1,0 +1,12 @@
+// kern Standard Library - Core utilities
+// this file can be imported or run to verify core builtins exist.
+// builtins are registered in C++ (builtins.hpp); this documents expected API.
+
+// print(...), sqrt, pow, sin, cos, random, random(lo, hi), floor, ceil
+// str, int, float, array, len, read_file/readFile, write_file/writeFile
+// time, inspect, type, dir, push, slice, keys, values, has
+// upper, lower, replace, join, split, round, abs, log
+// fileExists, listDir, sleep, Instance
+// globals: PI, E
+
+print("Kern core library (builtins loaded by VM)")

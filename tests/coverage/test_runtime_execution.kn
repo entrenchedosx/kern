@@ -1,0 +1,4 @@
+// runtime execution coverage
+fn mul(a, b) { return a * b }
+let v = mul(6, 7)
+print(v)

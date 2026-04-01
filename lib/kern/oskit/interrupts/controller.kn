@@ -1,0 +1,32 @@
+// oskit interrupts/controller.kn
+
+idt = import("lib/kern/oskit/interrupts/idt.kn")
+let _masked = {}
+
+def mask(vector) {
+    _masked[int(vector)] = true
+}
+
+def unmask(vector) {
+    _masked[int(vector)] = false
+}
+
+def is_masked(vector) {
+    let v = int(vector)
+    if (!has(_masked, v)) { return false }
+    return _masked[v]
+}
+
+def trigger(vector, frame) {
+    if (is_masked(vector)) { return false }
+    return idt.trigger(vector, frame)
+}
+
+def dispatch_batch(events) {
+    let i = 0
+    while (i < len(events)) {
+        let e = events[i]
+        trigger(e["vector"], e["frame"])
+        i = i + 1
+    }
+}

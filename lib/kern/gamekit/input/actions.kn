@@ -1,0 +1,19 @@
+// gamekit input/actions.kn
+
+let _bindings = {}
+
+def bind(action, key_name) {
+    _bindings[str(action)] = str(key_name)
+}
+
+def key_for(action) {
+    let a = str(action)
+    if (!has_key(_bindings, a)) { return null }
+    return _bindings[a]
+}
+
+def pressed(input_mod, action) {
+    let k = key_for(action)
+    if (k == null) { return false }
+    return input_mod.key_down(k)
+}

@@ -1,0 +1,20 @@
+// oskit drivers/screen.kn
+
+let _lines = []
+
+def clear() {
+    _lines = []
+}
+
+def print(text) {
+    push(_lines, str(text))
+}
+
+def line_count() {
+    return len(_lines)
+}
+
+def get_line(i) {
+    if (i < 0 || i >= len(_lines)) { return null }
+    return _lines[i]
+}

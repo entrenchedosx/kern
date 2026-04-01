@@ -1,0 +1,52 @@
+// coverage for plan: generators, match array, regex, json indent, url, query, toml_stringify, regex_compile
+
+def genPair() {
+    yield [1, 2]
+}
+
+let g = genPair()
+let got = []
+for row in g {
+    push(got, row)
+}
+assert_eq(len(got), 1)
+assert_eq(len(got[0]), 2)
+
+let m = [1, 2, 3]
+match m {
+    case [a, b, c] => {
+        assert_eq(a, 1)
+        assert_eq(b, 2)
+        assert_eq(c, 3)
+    }
+    _ => {
+        assert_eq(0, 1)
+    }
+}
+
+let parts = regex_split("a-b-c", "-")
+assert_eq(len(parts), 3)
+assert_eq(parts[0], "a")
+
+let rx = regex_compile("foo")
+assert_eq(regex_match_pattern(rx, "foobar"), true)
+assert_eq(regex_replace_pattern(rx, "foobar", "X"), "Xbar")
+
+let u = url_parse("https://example.com:8443/path?x=1")
+assert_eq(u.scheme, "https")
+assert_eq(u.host, "example.com")
+assert_eq(u.port, 8443)
+
+let qm = parse_query("a=1&b=two")
+assert_eq(qm.a, "1")
+assert_eq(qm.b, "two")
+
+let tmap = { "name": "kern", "n": 2 }
+let tomls = toml_stringify(tmap)
+assert_eq(regex_match(tomls, "kern"), true)
+
+let jo = { "a": 1, "b": [1, 2] }
+let js = json_stringify(jo, 2)
+assert_eq(len(js) > 10, true)
+
+print("OK: test_plan10_features")

@@ -1,0 +1,32 @@
+print("=== Kern OS Runtime Probe ===")
+print("platform: " + platform())
+print("os_name: " + os_name())
+print("arch: " + arch())
+print("cwd: " + cwd())
+print("pid: " + getpid())
+print("cpu_count: " + cpu_count())
+
+shell = which("cmd")
+if (shell == null) { shell = which("sh") }
+print("shell: " + (shell == null ? "missing" : shell))
+
+r = exec_capture("echo KERN_OS_PROBE_OK")
+print("exec_capture.code = " + r.code)
+print("exec_capture.out = " + r.out)
+
+print("tick loop with sleep_ms:")
+i = 0
+while (i < 3) {
+    print("tick " + i)
+    sleep_ms(100)
+    i = i + 1
+}
+
+print("probe done")
+
+
+
+
+
+
+

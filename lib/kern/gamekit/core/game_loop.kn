@@ -1,0 +1,28 @@
+// gamekit game loop
+
+draw = import("lib/kern/gamekit/graphics/draw2d.kn")
+
+
+def run(app) {
+    if (!has(app, "window")) {
+        app.window = {"w": 1000, "h": 700, "title": "Kern GameKit App"}
+    }
+    let ok = draw.create_window(app.window.w, app.window.h, app.window.title)
+    if (!ok) {
+        print("gamekit.loop: no graphics backend available")
+        return
+    }
+    draw.set_target_fps(60)
+
+    if (has(app, "on_start")) { app.on_start(app) }
+
+    while (draw.is_open()) {
+        let dt = draw.delta_time()
+        if (has(app, "update")) { app.update(dt, app) }
+        draw.clear(16, 20, 34, 255)
+        if (has(app, "render")) { app.render(app) }
+        draw.present()
+    }
+
+    if (has(app, "on_exit")) { app.on_exit(app) }
+}

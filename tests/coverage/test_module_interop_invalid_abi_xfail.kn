@@ -1,0 +1,7 @@
+interop = import("interop")
+
+unsafe {
+  interop.ffi_allow_library("kernel32.dll")
+  // this should fail with unsupported ABI validation.
+  interop.ffi_call("kernel32.dll", "GetTickCount", "u32", "badabi", [])
+}

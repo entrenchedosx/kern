@@ -1,0 +1,67 @@
+# Build
+build/
+BUILD/
+build-ide/
+build-native-ide/
+build-pass2/
+out/
+dist/
+cmake-build-*/
+CMakeUserPresets.json
+*.vcxproj.user
+shareable-ide/
+shareable-kern/
+shareable-kern-to-exe/
+shareable-kern-compiler/
+FINAL/
+kern-ide/build/
+kern-ide/dist/
+vcpkg_installed/
+**/_deps/
+
+# Local example / packager output (regenerate with kern / kern-to-exe)
+examples/dist/
+examples/dist-standalone/
+examples/.kern-to-exe/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node / editor extensions
+node_modules/
+editors/**/node_modules/
+
+# Toolchains / vendored SDKs (do not commit)
+tools/Qt/
+tools/vcpkg/
+tools/**/downloads/
+
+# Local archives
+*.zip
+
+# Native build outputs
+*.exe
+*.dll
+*.lib
+*.pdb
+*.obj
+*.o
+*.a
+*.so
+*.dylib
+
+# IDE / OS
+.vs/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Kern IDE / analyzer local state (optional)
+.kern-ide-state.json
+.kern-last-analysis.json
+.kern-fix-backups/
+project_tree_full.txt

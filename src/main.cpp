@@ -1,0 +1,936 @@
+/* *
+ * kern (Kern) - Main entry point
+ * compiles and runs .kn files or starts the REPL.
+ * modes: kern file.kn | kern --ast file | kern --bytecode file | kern --check file | kern --fmt file
+ */
+
+#include "compiler/lexer.hpp"
+#include "compiler/parser.hpp"
+#include "compiler/codegen.hpp"
+#include "compiler/semantic.hpp"
+#include "compiler/ast.hpp"
+#include "vm/vm.hpp"
+#include "vm/value.hpp"
+#include "vm/builtins.hpp"
+#include "vm/bytecode.hpp"
+#include "errors.hpp"
+#include "import_resolution.hpp"
+#ifdef KERN_BUILD_GAME
+#include "game/game_builtins.hpp"
+#endif
+#include <exception>
+#include <iostream>
+#include <unordered_set>
+#include <variant>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <cctype>
+#include <filesystem>
+#include <thread>
+#include <chrono>
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+using namespace kern;
+
+static void dumpStmt(const Stmt* s, int indent) {
+    if (!s) return;
+    std::string pre(indent, ' ');
+    if (auto* fnDecl = dynamic_cast<const FunctionDeclStmt*>(s)) {
+        std::cout << pre << "FunctionDecl " << fnDecl->name << "(" << fnDecl->params.size() << " params) L" << fnDecl->line << "\n";
+        if (fnDecl->body) dumpStmt(fnDecl->body.get(), indent + 2);
+    } else if (auto* classDecl = dynamic_cast<const ClassDeclStmt*>(s)) {
+        std::cout << pre << "ClassDecl " << classDecl->name << " L" << classDecl->line << "\n";
+        for (const auto& m : classDecl->methods) dumpStmt(m.get(), indent + 2);
+    } else if (auto* varDecl = dynamic_cast<const VarDeclStmt*>(s)) {
+        std::cout << pre << "VarDecl " << varDecl->name << " L" << varDecl->line << "\n";
+    } else if (auto* blockStmt = dynamic_cast<const BlockStmt*>(s)) {
+        std::cout << pre << "Block " << blockStmt->statements.size() << " stmts\n";
+        for (const auto& c : blockStmt->statements) dumpStmt(c.get(), indent + 2);
+    } else if (dynamic_cast<const IfStmt*>(s)) std::cout << pre << "If L" << s->line << "\n";
+    else if (dynamic_cast<const ForRangeStmt*>(s)) std::cout << pre << "ForRange L" << s->line << "\n";
+    else if (dynamic_cast<const ForInStmt*>(s)) std::cout << pre << "ForIn L" << s->line << "\n";
+    else if (dynamic_cast<const WhileStmt*>(s)) std::cout << pre << "While L" << s->line << "\n";
+    else if (dynamic_cast<const ReturnStmt*>(s)) std::cout << pre << "Return L" << s->line << "\n";
+    else if (dynamic_cast<const TryStmt*>(s)) std::cout << pre << "Try L" << s->line << "\n";
+    else if (dynamic_cast<const MatchStmt*>(s)) std::cout << pre << "Match L" << s->line << "\n";
+    else std::cout << pre << "Stmt L" << s->line << "\n";
+}
+
+static void dumpAst(Program* program) {
+    if (!program) return;
+    std::cout << "Program\n";
+    for (const auto& s : program->statements)
+        dumpStmt(s.get(), 2);
+}
+
+static void dumpBytecode(const Bytecode& code, const std::vector<std::string>& constants) {
+    for (size_t i = 0; i < code.size(); ++i) {
+        const auto& inst = code[i];
+        std::cout << (i + 1) << "\t" << opcodeName(inst.op) << formatBytecodeOperandSuffix(inst, constants) << "\n";
+    }
+}
+
+static bool runSource(VM& vm, const std::string& source, const std::string& filename = "") {
+    g_errorReporter.setSource(source);
+    g_errorReporter.setFilename(filename);
+    try {
+        Lexer lexer(source);
+        std::vector<Token> tokens = lexer.tokenize();
+        Parser parser(std::move(tokens));
+        std::unique_ptr<Program> program = parser.parse();
+        CodeGenerator gen;
+        Bytecode code = gen.generate(std::move(program));
+        const std::vector<std::string>& constants = gen.getConstants();
+        std::unordered_set<std::string> declaredGlobals;
+        insertAllBuiltinNamesForAnalysis(declaredGlobals);
+#ifdef KERN_BUILD_GAME
+        for (const std::string& n : getGameBuiltinNames()) declaredGlobals.insert(n);
+#endif
+        declaredGlobals.insert("__import");
+        for (const auto& inst : code) {
+            if (inst.op != Opcode::STORE_GLOBAL) continue;
+            if (inst.operand.index() != 4) continue;
+            size_t idx = std::get<size_t>(inst.operand);
+            if (idx < constants.size()) declaredGlobals.insert(constants[idx]);
+        }
+        for (const auto& inst : code) {
+            if (inst.op != Opcode::LOAD_GLOBAL) continue;
+            if (inst.operand.index() != 4) continue;
+            size_t idx = std::get<size_t>(inst.operand);
+            if (idx >= constants.size()) continue;
+            const std::string& name = constants[idx];
+            if (declaredGlobals.find(name) == declaredGlobals.end())
+                g_errorReporter.reportWarning(inst.line, 0,
+                    "Possible undefined variable '" + name + "'. Did you mean to define it first?",
+                    undefinedGlobalLoadWarningHint(), "ANAL-LOAD-GLOBAL", undefinedGlobalLoadWarningDetail());
+        }
+        vm.setBytecode(code);
+        vm.setStringConstants(gen.getConstants());
+        vm.setValueConstants(gen.getValueConstants());
+        vm.run();
+        return true;
+    } catch (const LexerError& e) {
+        g_errorReporter.reportCompileError(ErrorCategory::SyntaxError, e.line, e.column, e.what(), lexerCompileErrorHint(),
+            "LEX-TOKENIZE", lexerCompileErrorDetail());
+        return false;
+    } catch (const ParserError& e) {
+        std::string msg(e.what());
+        g_errorReporter.reportCompileError(ErrorCategory::SyntaxError, e.line, e.column, msg, parserCompileErrorHint(msg),
+            "PARSE-SYNTAX", parserCompileErrorDetail(msg));
+        return false;
+    } catch (const CodegenError& e) {
+        g_errorReporter.reportCompileError(ErrorCategory::Other, e.line, 0,
+            std::string("Code generation failed: ") + e.what(),
+            "The compiler hit an unsupported AST/operator case while lowering to bytecode.",
+            "CODEGEN-UNSUPPORTED",
+            internalFailureDetail("code generation"));
+        return false;
+    } catch (const VMError& e) {
+        std::vector<StackFrame> stack;
+        for (const auto& f : vm.getCallStack()) {
+            stack.push_back({f.functionName, f.line, f.column});
+        }
+        std::string hint(vmRuntimeErrorHint(e.category, e.code));
+        g_errorReporter.reportRuntimeError(vmErrorCategory(e.category), e.line, e.column, e.what(), stack, hint,
+            vmErrorCodeString(e.category, e.code), vmRuntimeErrorDetail(e.category, e.code),
+            e.lineEnd, e.columnEnd);
+        return false;
+    } catch (const std::exception& e) {
+        g_errorReporter.reportCompileError(ErrorCategory::Other, 0, 0, std::string("Kern stopped: ") + e.what(),
+            "This may be an unexpected error from the runtime or compiler; try reducing the program to a minimal case.",
+            "KERN-STOP-EXC", internalFailureDetail("script execution (std::exception)"));
+        return false;
+    } catch (...) {
+        g_errorReporter.reportCompileError(ErrorCategory::Other, 0, 0, "Kern stopped: unknown exception",
+            "This may be an internal error; try simplifying the code or reporting a minimal reproducer.",
+            "KERN-STOP-UNKNOWN",
+            internalFailureDetail("script execution (non-typed throw)") + "\n"
+            "No exception message was available; enable sanitizers or a debugger if this persists.");
+        return false;
+    }
+}
+
+static void printUsage(const char* prog) {
+    std::cout << "Kern " <<
+#ifdef KERN_VERSION
+        KERN_VERSION
+#else
+        "1.0.0"
+#endif
+        << "\n\nUsage:\n"
+        << "  " << prog << " [options] [script.kn]\n"
+        << "  " << prog << "                    Start REPL (no script).\n\n"
+        << "Options:\n"
+        << "  --version, -v          Show version and exit.\n"
+        << "  --help, -h            Show this help and exit.\n"
+        << "  --check <file>        Compile only; exit 0 if OK.\n"
+        << "  --check [--json] [--strict-types] <file>\n"
+        << "                        Optional flags before or after the path. --json: stdout JSON only (no stderr spam).\n"
+        << "                        --strict-types: run semantic strict typing pass (preview).\n"
+        << "  --lint <file>         Same as --check (lint/syntax check).\n"
+        << "  --fmt <file>          Format script (indent by braces).\n"
+        << "  --ast <file>          Dump AST and exit.\n"
+        << "  --bytecode <file>     Dump bytecode and exit.\n\n"
+        << "  --watch <file>        Re-run script when file changes.\n\n"
+        << "Runtime mode flags (can precede any command):\n"
+        << "  --debug / --release   Toggle runtime guard profile (debug default).\n"
+        << "  --allow-unsafe        Allow raw memory ops globally (without unsafe block).\n"
+        << "  --ffi                 Enable ffi_call builtin.\n"
+        << "  --ffi-allow <dll>     Add DLL allowlist entry for sandboxed ffi_call.\n"
+        << "  --no-sandbox          Disable FFI allowlist sandbox checks.\n\n"
+        << "Commands:\n"
+        << "  " << prog << " test [path]      Run all .kn files under directory recursively (default: tests/coverage).\n"
+        << "  " << prog << " doctor           Print runtime/tooling diagnostics.\n"
+        << "  " << prog << " init             Bootstrap kern.json and src/main.kn.\n"
+        << "  " << prog << " add <dep>        Add dependency to kern.json.\n"
+        << "  " << prog << " remove <dep>     Remove dependency from kern.json.\n"
+        << "  " << prog << " install          Refresh lockfile from manifest.\n\n"
+        << "Modules: import \"math\", \"string\", \"json\", \"g2d\", \"game\", etc.\n"
+        << "Docs: docs/GETTING_STARTED.md\n"
+        << "Testing docs: docs/TESTING.md\n";
+}
+
+static std::string readTextFile(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return "";
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
+static bool writeTextFile(const std::string& path, const std::string& text) {
+    std::ofstream f(path, std::ios::binary);
+    if (!f) return false;
+    f << text;
+    return static_cast<bool>(f);
+}
+
+static std::vector<std::string> parseDependenciesFromManifest(const std::string& s) {
+    std::vector<std::string> deps;
+    const std::string key = "\"dependencies\"";
+    size_t k = s.find(key);
+    if (k == std::string::npos) return deps;
+    size_t lb = s.find('[', k);
+    size_t rb = (lb == std::string::npos) ? std::string::npos : s.find(']', lb);
+    if (lb == std::string::npos || rb == std::string::npos || rb <= lb) return deps;
+    std::string body = s.substr(lb + 1, rb - lb - 1);
+    size_t i = 0;
+    while (i < body.size()) {
+        while (i < body.size() && body[i] != '"') ++i;
+        if (i >= body.size()) break;
+        size_t j = i + 1;
+        while (j < body.size() && body[j] != '"') ++j;
+        if (j >= body.size()) break;
+        std::string dep = body.substr(i + 1, j - i - 1);
+        if (!dep.empty()) deps.push_back(dep);
+        i = j + 1;
+    }
+    return deps;
+}
+
+static std::string buildManifestJson(const std::vector<std::string>& deps) {
+    std::ostringstream out;
+    out << "{\n";
+    out << "  \"name\": \"kern-project\",\n";
+    out << "  \"version\": \"1.0.0\",\n";
+    out << "  \"entry\": \"src/main.kn\",\n";
+    out << "  \"dependencies\": [";
+    for (size_t i = 0; i < deps.size(); ++i) {
+        if (i) out << ", ";
+        out << "\"" << deps[i] << "\"";
+    }
+    out << "]\n";
+    out << "}\n";
+    return out.str();
+}
+
+static bool upsertDependency(const std::string& manifestPath, const std::string& dep, bool removeDep) {
+    std::vector<std::string> deps = parseDependenciesFromManifest(readTextFile(manifestPath));
+    std::vector<std::string> next;
+    bool found = false;
+    for (const auto& d : deps) {
+        if (d == dep) {
+            found = true;
+            if (!removeDep) next.push_back(d);
+        } else {
+            next.push_back(d);
+        }
+    }
+    if (!removeDep && !found) next.push_back(dep);
+    return writeTextFile(manifestPath, buildManifestJson(next));
+}
+
+static bool refreshLockfile(const std::string& lockPath, const std::string& manifestPath) {
+    std::vector<std::string> deps = parseDependenciesFromManifest(readTextFile(manifestPath));
+    std::ostringstream out;
+    out << "{\n  \"lockVersion\": 1,\n  \"dependencies\": [";
+    for (size_t i = 0; i < deps.size(); ++i) {
+        if (i) out << ", ";
+        out << "{\"name\":\"" << deps[i] << "\",\"resolved\":\"local:" << deps[i] << "\"}";
+    }
+    out << "]\n}\n";
+    return writeTextFile(lockPath, out.str());
+}
+
+static int cmdInit() {
+    namespace fs = std::filesystem;
+    fs::path cwd = fs::current_path();
+    fs::path manifest = cwd / "kern.json";
+    fs::path srcDir = cwd / "src";
+    fs::path entry = srcDir / "main.kn";
+    fs::path lock = cwd / "kern.lock";
+    if (!fs::exists(srcDir)) fs::create_directories(srcDir);
+    if (!fs::exists(manifest)) {
+        if (!writeTextFile(manifest.string(), buildManifestJson({}))) {
+            std::cerr << "init: failed to write kern.json\n";
+            return 1;
+        }
+    }
+    if (!fs::exists(entry)) {
+        if (!writeTextFile(entry.string(), "print(\"Hello from Kern\")\n")) {
+            std::cerr << "init: failed to write src/main.kn\n";
+            return 1;
+        }
+    }
+    if (!refreshLockfile(lock.string(), manifest.string())) {
+        std::cerr << "init: failed to write kern.lock\n";
+        return 1;
+    }
+    std::cout << "Initialized Kern project in " << cwd.string() << "\n";
+    return 0;
+}
+
+static int cmdDoctor(const char* prog) {
+    namespace fs = std::filesystem;
+    std::cout << "Kern Doctor\n";
+    std::cout << "  executable: " << prog << "\n";
+    std::cout << "  cwd: " << fs::current_path().string() << "\n";
+    std::cout << "  manifest: " << (fs::exists("kern.json") ? "present" : "missing") << "\n";
+    std::cout << "  lockfile: " << (fs::exists("kern.lock") ? "present" : "missing") << "\n";
+    std::cout << "  tests/coverage: " << (fs::exists("tests/coverage") ? "present" : "missing") << "\n";
+    {
+        const fs::path handbook = fs::current_path() / "docs" / "GETTING_STARTED.md";
+        std::cout << "  docs: ";
+        if (fs::exists(handbook))
+            std::cout << handbook.string() << " (found)\n";
+        else
+            std::cout << "docs/GETTING_STARTED.md not found from cwd (open repo docs/ or set cwd to repo root)\n";
+    }
+#ifdef KERN_BUILD_GAME
+    std::cout << "  build: KERN_BUILD_GAME enabled (g2d/g3d/game paths compiled into this binary when linked)\n";
+#else
+    std::cout << "  build: KERN_BUILD_GAME disabled (no Raylib game bundle in this binary)\n";
+#endif
+    std::cout << "  env: NO_COLOR=1 disables ANSI colors on stderr diagnostics.\n";
+    std::cout << "  env: KERN_VM_TRACE=1 enables verbose VM instruction tracing (very noisy).\n";
+    std::cout << "  env: KERNC_TRACE_IMPORTS logs embedded import resolution to stderr.\n";
+    std::cout << "  tip: kern test [dir] runs .kn files recursively (default tests/coverage).\n";
+    return 0;
+}
+
+static int cmdTest(const std::string& dirPath) {
+    namespace fs = std::filesystem;
+    fs::path p(dirPath.empty() ? "tests/coverage" : dirPath);
+    if (!fs::exists(p)) {
+        std::cerr << "test: path not found: " << p.string() << "\n";
+        return 1;
+    }
+    if (!fs::is_directory(p)) {
+        std::cerr << "test: not a directory: " << p.string() << "\n";
+        return 1;
+    }
+    std::vector<fs::path> files;
+    try {
+        for (const auto& entry :
+             fs::recursive_directory_iterator(p, fs::directory_options::skip_permission_denied)) {
+            if (!entry.is_regular_file() || entry.path().extension() != ".kn") continue;
+            files.push_back(entry.path());
+        }
+    } catch (const fs::filesystem_error& e) {
+        std::cerr << "test: " << e.what() << "\n";
+        return 1;
+    }
+    std::sort(files.begin(), files.end());
+    if (files.empty()) {
+        std::cerr << "test: no .kn files found under " << p.string() << "\n";
+        return 1;
+    }
+    int pass = 0;
+    int fail = 0;
+    for (const auto& path : files) {
+        std::string rel = path.lexically_relative(p).generic_string();
+        const bool expectFail =
+            // explicit expected-failure convention
+            (rel.size() >= 9 && rel.find("_xfail.kn") != std::string::npos) ||
+            // diagnostics tests intentionally trigger failures
+            (rel.rfind("test_diag_", 0) == 0) ||
+            // import-resolution negative coverage
+            (rel == "test_module_loading.kn") ||
+            (rel == "test_browserkit_import_fail_loud.kn") ||
+            // FFI typed tests require --ffi (disabled by default in cmdTest VMs)
+            (rel == "test_phase2_ffi_typed.kn");
+        std::string source = readTextFile(path.string());
+        if (source.empty()) {
+            ++fail;
+            std::cout << "[FAIL] " << rel << " (empty)\n";
+            continue;
+        }
+        VM vm;
+        registerAllBuiltins(vm);
+        registerImportBuiltin(vm);
+        g_errorReporter.resetCounts();
+        bool ok = runSource(vm, source, path.string());
+        if (expectFail ? !ok : ok) {
+            ++pass;
+            std::cout << "[PASS] " << rel << "\n";
+        } else {
+            ++fail;
+            std::cout << "[FAIL] " << rel << "\n";
+        }
+    }
+    std::cout << "\nSummary: pass=" << pass << " fail=" << fail << "\n";
+    return fail == 0 ? 0 : 1;
+}
+
+static int cmdWatch(VM& vm, const std::string& scriptPath) {
+    namespace fs = std::filesystem;
+    fs::path p(scriptPath);
+    if (!fs::exists(p)) {
+        std::cerr << "watch: file not found: " << scriptPath << "\n";
+        return 1;
+    }
+    auto last = fs::last_write_time(p);
+    std::cout << "Watching " << p.string() << " (Ctrl+C to stop)\n";
+    while (true) {
+        std::string source = readTextFile(p.string());
+        g_errorReporter.resetCounts();
+        bool ok = runSource(vm, source, p.string());
+        g_errorReporter.printSummary();
+        std::cout << "[watch] run -> " << (ok ? "ok" : "failed") << "\n";
+        while (true) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(350));
+            auto now = fs::last_write_time(p);
+            if (now != last) {
+                last = now;
+                break;
+            }
+        }
+    }
+}
+
+int main(int argc, char** argv) {
+    const char* prog = argc >= 1 ? argv[0] : "kern";
+    int argBase = 1;
+    RuntimeGuardPolicy runtimeGuards;
+    runtimeGuards.debugMode = true;
+    runtimeGuards.allowUnsafe = false;
+    runtimeGuards.enforcePointerBounds = true;
+    runtimeGuards.ffiEnabled = false;
+    runtimeGuards.sandboxEnabled = true;
+    while (argBase < argc) {
+        std::string flag = argv[argBase];
+        if (flag == "--debug") {
+            runtimeGuards.debugMode = true;
+            ++argBase;
+            continue;
+        }
+        if (flag == "--release") {
+            runtimeGuards.debugMode = false;
+            ++argBase;
+            continue;
+        }
+        if (flag == "--allow-unsafe") {
+            runtimeGuards.allowUnsafe = true;
+            ++argBase;
+            continue;
+        }
+        if (flag == "--deny-unsafe") {
+            runtimeGuards.allowUnsafe = false;
+            ++argBase;
+            continue;
+        }
+        if (flag == "--ffi") {
+            runtimeGuards.ffiEnabled = true;
+            ++argBase;
+            continue;
+        }
+        if (flag == "--no-ffi") {
+            runtimeGuards.ffiEnabled = false;
+            ++argBase;
+            continue;
+        }
+        if (flag == "--no-sandbox") {
+            runtimeGuards.sandboxEnabled = false;
+            ++argBase;
+            continue;
+        }
+        if (flag == "--sandbox") {
+            runtimeGuards.sandboxEnabled = true;
+            ++argBase;
+            continue;
+        }
+        if (flag == "--ffi-allow" && argBase + 1 < argc) {
+            runtimeGuards.ffiLibraryAllowlist.push_back(argv[argBase + 1]);
+            argBase += 2;
+            continue;
+        }
+        break;
+    }
+
+    // Doc-compat compiler passthrough:
+    // Some documentation and tools refer to `kern --config/--target/...` for compiler flows.
+    // The standalone compiler binary is `kernc.exe` (launcher for kern-impl). If we see a compiler
+    // flag as the first non-runtime-guard argument, forward the full argv to kernc and exit.
+    if (argc > argBase) {
+        const std::string first = argv[argBase];
+        const bool isCompilerEntry =
+            first == "--config" || first == "--analyze" || first == "--fix-all" || first == "--undo-fixes" ||
+            first == "--pkg-init" || first == "--pkg-lock" || first == "--pkg-validate" || first == "--target";
+        if (isCompilerEntry) {
+            namespace fs = std::filesystem;
+            fs::path exePath;
+#ifdef _WIN32
+            char buf[MAX_PATH];
+            DWORD n = GetModuleFileNameA(nullptr, buf, MAX_PATH);
+            if (n > 0 && n < MAX_PATH) exePath = fs::path(std::string(buf, n));
+            else exePath = fs::path(prog);
+#else
+            exePath = fs::path(prog);
+#endif
+            fs::path dir = exePath.has_parent_path() ? exePath.parent_path() : fs::current_path();
+#ifdef _WIN32
+            fs::path kernc = dir / "kernc.exe";
+#else
+            fs::path kernc = dir / "kernc";
+#endif
+            std::string kerncPath = kernc.string();
+            // If kernc is not next to kern, fall back to PATH lookup.
+            if (!fs::exists(kernc)) kerncPath = "kernc";
+
+            std::ostringstream cmd;
+            cmd << "\"" << kerncPath << "\"";
+            for (int i = argBase; i < argc; ++i) {
+                cmd << " \"" << argv[i] << "\"";
+            }
+#ifdef _WIN32
+            // Avoid cmd.exe quoting/lookup issues: spawn directly.
+            std::string cmdLine = cmd.str();
+            STARTUPINFOA si{};
+            si.cb = sizeof(si);
+            PROCESS_INFORMATION pi{};
+            // CreateProcess requires a mutable buffer for the command line.
+            std::vector<char> mutableCmd(cmdLine.begin(), cmdLine.end());
+            mutableCmd.push_back('\0');
+            BOOL ok = CreateProcessA(
+                nullptr,
+                mutableCmd.data(),
+                nullptr, nullptr,
+                TRUE,
+                0,
+                nullptr,
+                nullptr,
+                &si,
+                &pi
+            );
+            if (!ok) {
+                std::cerr << "error: failed to launch kernc for compiler mode passthrough\n";
+                return 1;
+            }
+            WaitForSingleObject(pi.hProcess, INFINITE);
+            DWORD exitCode = 1;
+            (void)GetExitCodeProcess(pi.hProcess, &exitCode);
+            CloseHandle(pi.hThread);
+            CloseHandle(pi.hProcess);
+            return static_cast<int>(exitCode);
+#else
+            return std::system(cmd.str().c_str());
+#endif
+        }
+    }
+    if (argc > argBase) {
+        std::string arg = argv[argBase];
+        if (arg == "--version" || arg == "-v") {
+            std::string ver = "1.0.0";
+#ifdef KERN_VERSION
+            ver = KERN_VERSION;
+#else
+            std::ifstream vf("VERSION");
+            if (vf) {
+                std::string line;
+                if (std::getline(vf, line)) {
+                    while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || std::isspace(static_cast<unsigned char>(line.back())))) line.pop_back();
+                    if (!line.empty()) ver = line;
+                }
+            }
+#endif
+            std::cout << "Kern " << ver << std::endl;
+            return 0;
+        }
+        if (arg == "--help" || arg == "-h") {
+            printUsage(prog);
+            return 0;
+        }
+        if (arg == "test") {
+            return cmdTest(argc > argBase + 1 ? argv[argBase + 1] : "");
+        }
+        if (arg == "doctor") {
+            return cmdDoctor(prog);
+        }
+        if (arg == "init") {
+            return cmdInit();
+        }
+        if (arg == "add" && argc > argBase + 1) {
+            if (!upsertDependency("kern.json", argv[argBase + 1], false)) {
+                std::cerr << "add: failed to update kern.json\n";
+                return 1;
+            }
+            (void)refreshLockfile("kern.lock", "kern.json");
+            std::cout << "Added dependency: " << argv[argBase + 1] << "\n";
+            return 0;
+        }
+        if (arg == "remove" && argc > argBase + 1) {
+            if (!upsertDependency("kern.json", argv[argBase + 1], true)) {
+                std::cerr << "remove: failed to update kern.json\n";
+                return 1;
+            }
+            (void)refreshLockfile("kern.lock", "kern.json");
+            std::cout << "Removed dependency: " << argv[argBase + 1] << "\n";
+            return 0;
+        }
+        if (arg == "install") {
+            if (!refreshLockfile("kern.lock", "kern.json")) {
+                std::cerr << "install: failed to refresh kern.lock\n";
+                return 1;
+            }
+            std::cout << "Dependencies locked from kern.json\n";
+            return 0;
+        }
+    }
+
+    VM vm;
+    registerAllBuiltins(vm);
+    registerImportBuiltin(vm);
+    vm.setRuntimeGuards(runtimeGuards);
+    if (runtimeGuards.debugMode) {
+        vm.setStepLimit(5'000'000);
+        vm.setMaxCallDepth(2048);
+        vm.setCallbackStepGuard(250'000);
+    } else {
+        vm.setStepLimit(0);
+        vm.setMaxCallDepth(8192);
+        vm.setCallbackStepGuard(0);
+    }
+    std::vector<std::string> args;
+    for (int i = 0; i < argc; ++i) args.push_back(argv[i]);
+    vm.setCliArgs(std::move(args));
+
+    if (argc > argBase + 1 && std::string(argv[argBase]) == "--ast") {
+        std::string path = argv[argBase + 1];
+        std::ifstream f(path);
+        if (!f) {
+            g_errorReporter.setFilename(path);
+            g_errorReporter.reportCompileError(ErrorCategory::FileError, 0, 0,
+                "Could not open file: " + path, "Check that the file exists and is readable.", "FILE-OPEN",
+                fileOpenErrorDetail());
+            return 1;
+        }
+        std::stringstream buf;
+        buf << f.rdbuf();
+        g_errorReporter.setSource(buf.str());
+        g_errorReporter.setFilename(path);
+        try {
+            Lexer lexer(buf.str());
+            std::vector<Token> tokens = lexer.tokenize();
+            Parser parser(std::move(tokens));
+            std::unique_ptr<Program> program = parser.parse();
+            dumpAst(program.get());
+            return 0;
+        } catch (const LexerError& e) {
+            g_errorReporter.reportCompileError(ErrorCategory::SyntaxError, e.line, e.column, e.what(), lexerCompileErrorHint(),
+                "LEX-TOKENIZE", lexerCompileErrorDetail());
+            g_errorReporter.printSummary();
+            return 1;
+        } catch (const ParserError& e) {
+            std::string msg(e.what());
+            g_errorReporter.reportCompileError(ErrorCategory::SyntaxError, e.line, e.column, msg, parserCompileErrorHint(msg),
+                "PARSE-SYNTAX", parserCompileErrorDetail(msg));
+            g_errorReporter.printSummary();
+            return 1;
+        } catch (const std::exception& e) {
+            g_errorReporter.reportCompileError(ErrorCategory::Other, 0, 0, std::string("AST dump failed: ") + e.what(),
+                "This may be an internal compiler error; try simplifying the file.", "INTERNAL-AST",
+                internalFailureDetail("`kern --ast` (parse → AST dump)"));
+            g_errorReporter.printSummary();
+            return 1;
+        } catch (...) {
+            g_errorReporter.reportCompileError(ErrorCategory::Other, 0, 0, "AST dump failed: unknown exception",
+                "This may be an internal compiler error; try simplifying the file.", "INTERNAL-AST-UNKNOWN",
+                internalFailureDetail("`kern --ast` (non-typed throw)"));
+            g_errorReporter.printSummary();
+            return 1;
+        }
+    }
+
+    if (argc > argBase + 1 && std::string(argv[argBase]) == "--bytecode") {
+        std::string path = argv[argBase + 1];
+        std::ifstream f(path);
+        if (!f) {
+            g_errorReporter.setFilename(path);
+            g_errorReporter.reportCompileError(ErrorCategory::FileError, 0, 0,
+                "Could not open file: " + path, "Check that the file exists and is readable.", "FILE-OPEN",
+                fileOpenErrorDetail());
+            return 1;
+        }
+        std::stringstream buf;
+        buf << f.rdbuf();
+        g_errorReporter.setSource(buf.str());
+        g_errorReporter.setFilename(path);
+        try {
+            Lexer lexer(buf.str());
+            std::vector<Token> tokens = lexer.tokenize();
+            Parser parser(std::move(tokens));
+            std::unique_ptr<Program> program = parser.parse();
+            CodeGenerator gen;
+            Bytecode code = gen.generate(std::move(program));
+            dumpBytecode(code, gen.getConstants());
+            return 0;
+        } catch (const LexerError& e) {
+            g_errorReporter.reportCompileError(ErrorCategory::SyntaxError, e.line, e.column, e.what(), lexerCompileErrorHint(),
+                "LEX-TOKENIZE", lexerCompileErrorDetail());
+            g_errorReporter.printSummary();
+            return 1;
+        } catch (const ParserError& e) {
+            std::string msg(e.what());
+            g_errorReporter.reportCompileError(ErrorCategory::SyntaxError, e.line, e.column, msg, parserCompileErrorHint(msg),
+                "PARSE-SYNTAX", parserCompileErrorDetail(msg));
+            g_errorReporter.printSummary();
+            return 1;
+        } catch (const std::exception& e) {
+            g_errorReporter.reportCompileError(ErrorCategory::Other, 0, 0, std::string("Bytecode dump failed: ") + e.what(),
+                "This may be an internal compiler error; try simplifying the file.", "INTERNAL-BYTECODE",
+                internalFailureDetail("`kern --bytecode` (codegen)"));
+            g_errorReporter.printSummary();
+            return 1;
+        } catch (...) {
+            g_errorReporter.reportCompileError(ErrorCategory::Other, 0, 0, "Bytecode dump failed: unknown exception",
+                "This may be an internal compiler error; try simplifying the file.", "INTERNAL-BYTECODE-UNKNOWN",
+                internalFailureDetail("`kern --bytecode` (non-typed throw)"));
+            g_errorReporter.printSummary();
+            return 1;
+        }
+    }
+
+    if (argc > argBase + 1 && std::string(argv[argBase]) == "--watch") {
+        std::string path = argv[argBase + 1];
+        return cmdWatch(vm, path);
+    }
+
+    // check / --lint: compile only, no run (for CI and IDE)
+    if (argc > argBase + 1 && (std::string(argv[argBase]) == "--check" || std::string(argv[argBase]) == "--lint")) {
+        bool json = false;
+        bool strictTypes = false;
+        std::string path;
+        for (int i = argBase + 1; i < argc; ++i) {
+            std::string a = argv[i];
+            if (a == "--json") json = true;
+            else if (a == "--strict-types") strictTypes = true;
+            else if (!a.empty() && a[0] == '-') {
+                std::cerr << "Unknown --check flag: " << a << "\n";
+                return 1;
+            } else if (path.empty()) path = std::move(a);
+            else {
+                std::cerr << "Unexpected extra argument for --check: " << a << "\n";
+                return 1;
+            }
+        }
+        if (path.empty()) {
+            std::cerr << "--check: missing file path\n";
+            return 1;
+        }
+
+        namespace fs = std::filesystem;
+        std::error_code ec;
+        fs::path fpath(path);
+        std::string pathResolved = path;
+        if (fs::exists(fpath, ec)) {
+            fs::path can = fs::weakly_canonical(fpath, ec);
+            if (!ec) pathResolved = can.string();
+        }
+
+        struct SuppressHumanDiagnosticsGuard {
+            ErrorReporter& rep;
+            bool prev;
+            SuppressHumanDiagnosticsGuard(ErrorReporter& r, bool on) : rep(r), prev(r.suppressHumanItemPrint()) {
+                if (on) rep.setSuppressHumanItemPrint(true);
+            }
+            ~SuppressHumanDiagnosticsGuard() { rep.setSuppressHumanItemPrint(prev); }
+        } guard(g_errorReporter, json);
+
+        std::ifstream f(pathResolved);
+        if (!f) {
+            g_errorReporter.setFilename(pathResolved);
+            g_errorReporter.reportCompileError(ErrorCategory::FileError, 0, 0,
+                "Could not open file: " + pathResolved, "Check that the file exists and is readable.", "FILE-OPEN",
+                fileOpenErrorDetail());
+            if (json) std::cout << g_errorReporter.toJson() << std::endl;
+            else g_errorReporter.printSummary();
+            return 1;
+        }
+        std::stringstream buf;
+        buf << f.rdbuf();
+        std::string source = buf.str();
+        g_errorReporter.setSource(source);
+        g_errorReporter.setFilename(pathResolved);
+        try {
+            Lexer lexer(source);
+            std::vector<Token> tokens = lexer.tokenize();
+            Parser parser(std::move(tokens));
+            std::unique_ptr<Program> program = parser.parse();
+            CodeGenerator gen;
+            (void)gen.generate(std::move(program));
+            (void)applySemanticDiagnosticsToReporter(source, pathResolved, strictTypes);
+            if (json) std::cout << g_errorReporter.toJson() << std::endl;
+            else g_errorReporter.printSummary();
+            return g_errorReporter.errorCount() > 0 ? 1 : 0;
+        } catch (const LexerError& e) {
+            g_errorReporter.reportCompileError(ErrorCategory::SyntaxError, e.line, e.column, e.what(), lexerCompileErrorHint(),
+                "LEX-TOKENIZE", lexerCompileErrorDetail());
+            if (json) std::cout << g_errorReporter.toJson() << std::endl;
+            else g_errorReporter.printSummary();
+            return 1;
+        } catch (const ParserError& e) {
+            std::string msg(e.what());
+            g_errorReporter.reportCompileError(ErrorCategory::SyntaxError, e.line, e.column, msg, parserCompileErrorHint(msg),
+                "PARSE-SYNTAX", parserCompileErrorDetail(msg));
+            if (json) std::cout << g_errorReporter.toJson() << std::endl;
+            else g_errorReporter.printSummary();
+            return 1;
+        } catch (const std::exception& e) {
+            g_errorReporter.reportCompileError(ErrorCategory::Other, 0, 0, std::string("compile failed: ") + e.what(),
+                "This may be an internal compiler error; try simplifying the surrounding code.", "INTERNAL-COMPILE",
+                internalFailureDetail("`kern --check` (lex/parse/codegen)"));
+            if (json) std::cout << g_errorReporter.toJson() << std::endl;
+            else g_errorReporter.printSummary();
+            return 1;
+        } catch (...) {
+            g_errorReporter.reportCompileError(ErrorCategory::Other, 0, 0, "compile failed: unknown exception",
+                "This may be an internal compiler error; try simplifying the surrounding code.", "INTERNAL-COMPILE-UNKNOWN",
+                internalFailureDetail("`kern --check` (non-typed throw)"));
+            if (json) std::cout << g_errorReporter.toJson() << std::endl;
+            else g_errorReporter.printSummary();
+            return 1;
+        }
+    }
+
+    // fmt: format source (indent by brace level)
+    if (argc > argBase + 1 && std::string(argv[argBase]) == "--fmt") {
+        std::string path = argv[argBase + 1];
+        std::ifstream f(path);
+        if (!f) {
+            std::cerr << "fmt: could not open " << path << std::endl;
+            return 1;
+        }
+        std::stringstream buf;
+        buf << f.rdbuf();
+        std::string source = buf.str();
+        int indent = 0;
+        const int indentStep = 2;
+        std::string out;
+        std::string line;
+        std::istringstream is(source);
+        while (std::getline(is, line)) {
+            size_t start = 0;
+            while (start < line.size() && (line[start] == ' ' || line[start] == '\t')) ++start;
+            std::string stripped = line.substr(start);
+            for (char c : stripped) {
+                if (c == '}' && indent >= indentStep) indent -= indentStep;
+            }
+            if (!stripped.empty()) {
+                out += std::string(indent, ' ');
+                out += stripped;
+            }
+            for (char c : stripped) {
+                if (c == '{') indent += indentStep;
+                else if (c == '}' && indent >= indentStep) indent -= indentStep;
+            }
+            out += '\n';
+        }
+        std::ofstream of(path);
+        if (!of) { std::cerr << "fmt: could not write " << path << std::endl; return 1; }
+        of << out;
+        return 0;
+    }
+
+    if (argc > argBase) {
+        std::string path = argv[argBase];
+        std::ifstream f(path);
+        if (!f) {
+            g_errorReporter.setFilename(path);
+            g_errorReporter.reportCompileError(ErrorCategory::FileError, 0, 0,
+                "Could not open file: " + path, "Check that the file exists and is readable.", "FILE-OPEN",
+                fileOpenErrorDetail());
+            return 1;
+        }
+        std::stringstream buf;
+        buf << f.rdbuf();
+        bool ok = runSource(vm, buf.str(), path);
+        g_errorReporter.printSummary();
+        if (!ok) return 1;
+        int scriptExit = vm.getScriptExitCode();
+        if (scriptExit >= 0) return (scriptExit > 255 ? 255 : scriptExit);
+        return 0;
+    }
+
+    // rEPL
+    std::cout << "Kern. Type expressions or statements. help | clear | history | search <q> | exit" << std::endl;
+    std::string line;
+    std::vector<std::string> history;
+    while (true) {
+        std::cout << "> ";
+        if (!std::getline(std::cin, line)) break;
+        if (line.empty()) continue;
+        if (!line.empty() && line.back() == '\\') {
+            std::string block = line.substr(0, line.size() - 1);
+            while (true) {
+                std::cout << ". ";
+                std::string next;
+                if (!std::getline(std::cin, next)) break;
+                if (!next.empty() && next.back() == '\\') block += "\n" + next.substr(0, next.size() - 1);
+                else { block += "\n" + next; break; }
+            }
+            line = std::move(block);
+        }
+        if (line == "exit" || line == "quit") break;
+        if (line == "help" || line == ".help") {
+            std::cout << "  help / .help  — show this\n  clear / .clear — clear screen\n  history        — show command history\n  search <text>  — search history\n  exit / quit    — exit REPL\n  Example: let x = 5   print(x)   print(2+3)\n  Modules: let m = import(\"math\"); print(m.sqrt(4))\n";
+            continue;
+        }
+        if (line == "history" || line == ".history") {
+            for (size_t i = 0; i < history.size(); ++i) std::cout << (i + 1) << ": " << history[i] << "\n";
+            continue;
+        }
+        if (line.rfind("search ", 0) == 0) {
+            std::string needle = line.substr(7);
+            for (const auto& h : history) if (h.find(needle) != std::string::npos) std::cout << h << "\n";
+            continue;
+        }
+        if (line == "clear" || line == ".clear") {
+#ifdef _WIN32
+            std::system("cls");
+#else
+            std::system("clear");
+#endif
+            continue;
+        }
+        history.push_back(line);
+        g_errorReporter.resetCounts();
+        runSource(vm, line);
+        g_errorReporter.printSummary();
+    }
+    return 0;
+}

@@ -1,0 +1,29 @@
+let a = array("z", "a", "m")
+let b = sorted(a)
+assert_eq(len(b), 3)
+assert_eq(b[0], "a")
+assert_eq(a[0], "z")
+
+let e = enumerate(array("x", "y"), 10)
+assert_eq(len(e), 2)
+assert_eq(e[0][0], 10)
+assert_eq(e[0][1], "x")
+assert_eq(e[1][0], 11)
+
+let p = partition("a=b=c", "=")
+assert_eq(len(p), 3)
+assert_eq(p[0], "a")
+assert_eq(p[1], "=")
+assert_eq(p[2], "b=c")
+
+let q = partition("nosep", ":")
+assert_eq(q[0], "nosep")
+assert_eq(q[1], "")
+assert_eq(q[2], "")
+
+assert_eq(is_int(3), true)
+assert_eq(is_int(3.0), false)
+assert_eq(is_float(3.0), true)
+assert_eq(is_float(3), false)
+
+print("OK: test_builtin_extras")

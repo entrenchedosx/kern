@@ -1,0 +1,20 @@
+// oskit kernel/core.kn
+
+screen = import("lib/kern/oskit/drivers/screen.kn")
+port = import("lib/kern/oskit/cpu/port.kn")
+
+def panic(msg) {
+    let m = "KERNEL PANIC: " + str(msg)
+    screen.print(m)
+    port.write(1016, 33) // marker byte for panic path
+    throw m
+}
+
+def assert_k(cond, msg) {
+    if (!cond) { panic(msg) }
+}
+
+def boot_banner() {
+    screen.clear()
+    screen.print("Kern OSKIT kernel boot")
+}

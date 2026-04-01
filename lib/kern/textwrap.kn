@@ -1,0 +1,32 @@
+// kern textwrap (Python textwrap) — import("lib/kern/textwrap.kn")
+// adds: wrap, shorten, fill
+
+def wrap(s, width) {
+    if (width <= 0) { return array(s) }
+    let lines = array()
+    let words = split(s, " ")
+    let current = ""
+    for w in words {
+        if (len(current) == 0) {
+            current = w
+        } else {
+            if (len(current) + 1 + len(w) <= width) { current = current + " " + w }
+            else {
+                push(lines, current)
+                current = w
+            }
+        }
+    }
+    if (len(current) > 0) { push(lines, current) }
+    return lines
+}
+
+def shorten(s, width) {
+    if (len(s) <= width) { return s }
+    if (width <= 3) { return slice(s, 0, width) }
+    return slice(s, 0, width - 3) + "..."
+}
+
+def fill(s, width) {
+    return join(wrap(s, width), "\n")
+}

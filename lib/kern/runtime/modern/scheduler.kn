@@ -1,0 +1,87 @@
+// cooperative scheduler for delayed and repeating tasks.
+
+def create_scheduler() {
+    let s = {}
+    s["tasks"] = []
+    s["next_id"] = 1
+    s["now_ms"] = int(monotonic_time() * 1000)
+    return s
+}
+
+def _make_task(id, due_ms, interval_ms, repeat_flag, handler, meta) {
+    let t = {}
+    t["id"] = id
+    t["due_ms"] = due_ms
+    t["interval_ms"] = interval_ms
+    t["repeat"] = repeat_flag
+    t["handler"] = handler
+    t["meta"] = meta
+    t["cancelled"] = false
+    return t
+}
+
+def after(s, delay_ms, handler, meta) {
+    let id = s["next_id"]
+    s["next_id"] = id + 1
+    let t = _make_task(id, int(monotonic_time() * 1000) + int(delay_ms), 0, false, handler, meta)
+    push(s["tasks"], t)
+    return id
+}
+
+def every(s, interval_ms, handler, meta) {
+    let id = s["next_id"]
+    s["next_id"] = id + 1
+    let iv = int(interval_ms)
+    let t = _make_task(id, int(monotonic_time() * 1000) + iv, iv, true, handler, meta)
+    push(s["tasks"], t)
+    return id
+}
+
+def cancel(s, id) {
+    let i = 0
+    while (i < len(s["tasks"])) {
+        if (int(s["tasks"][i]["id"]) == int(id)) {
+            s["tasks"][i]["cancelled"] = true
+            return true
+        }
+        i = i + 1
+    }
+    return false
+}
+
+def step(s, events_bus, ctx) {
+    let now = int(monotonic_time() * 1000)
+    s["now_ms"] = now
+    let i = 0
+    while (i < len(s["tasks"])) {
+        let t = s["tasks"][i]
+        if (!t["cancelled"] && now >= int(t["due_ms"])) {
+            try {
+                t["handler"](ctx, t["meta"])
+            } catch (err) {
+                if (events_bus != null) {
+                    let err_payload = {}
+                    err_payload["error"] = err
+                    err_payload["task_id"] = t["id"]
+                    emit(events_bus, "on_error", ctx, err_payload)
+                }
+            }
+            if (t["repeat"]) {
+                t["due_ms"] = now + int(t["interval_ms"])
+            } else {
+                t["cancelled"] = true
+            }
+            s["tasks"][i] = t
+        }
+        i = i + 1
+    }
+    // compact cancelled tasks.
+    let kept = []
+    i = 0
+    while (i < len(s["tasks"])) {
+        if (!s["tasks"][i]["cancelled"]) { push(kept, s["tasks"][i]) }
+        i = i + 1
+    }
+    s["tasks"] = kept
+    return len(kept)
+}

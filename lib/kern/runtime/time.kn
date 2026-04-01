@@ -1,0 +1,29 @@
+// runtime/time.kn
+// time budget and scheduling helpers.
+
+def now_ms() { return int(monotonic_time() * 1000) }
+
+def budget(start_ms, max_ms) {
+    return (now_ms() - int(start_ms)) <= int(max_ms)
+}
+
+def sleep_until(target_ms) {
+    while (now_ms() < int(target_ms)) {
+        sleep(1)
+    }
+}
+
+def every(interval_ms, state, key, fn) {
+    let k = str(key)
+    let n = now_ms()
+    if (!has_key(state, k)) {
+        state[k] = n
+        return false
+    }
+    if ((n - int(state[k])) >= int(interval_ms)) {
+        state[k] = n
+        fn()
+        return true
+    }
+    return false
+}

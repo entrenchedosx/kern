@@ -1,0 +1,173 @@
+// browserkit ui/window_tabs.kn
+// window + tab navigation, history, and page loading.
+
+http = import("lib/kern/browserkit/network/http.kn")
+loader = import("lib/kern/browserkit/network/loader.kn")
+html = import("lib/kern/browserkit/html/parser.kn")
+cssp = import("lib/kern/browserkit/css/parser.kn")
+style = import("lib/kern/browserkit/css/style_engine.kn")
+layout = import("lib/kern/browserkit/render/layout.kn")
+jsrt = import("lib/kern/browserkit/js_engine/runtime.kn")
+
+def _bk_fail(code, message, hint) {
+    throw Error(code + ": " + message + " | Hint: " + hint, code)
+}
+
+def create(width, height) {
+    let w = {}
+    w["width"] = int(width)
+    w["height"] = int(height)
+    w["tabs"] = []
+    w["active_tab"] = -1
+    return w
+}
+
+def _mk_tab(url) {
+    let t = {}
+    t["url"] = url
+    t["history"] = [url]
+    t["history_index"] = 0
+    t["dom"] = null
+    t["css_rules"] = []
+    t["html"] = ""
+    t["status"] = "idle"
+    t["error"] = ""
+    return t
+}
+
+def _collect_tag_texts(node, tag_name, out) {
+    if (node == null) { return }
+    if (node["type"] == "element" && lower(node["tag"]) == lower(tag_name)) {
+        let buf = ""
+        let i = 0
+        while (i < len(node["children"])) {
+            let c = node["children"][i]
+            if (c["type"] == "text") { buf = buf + c["text"] + "\n" }
+            i = i + 1
+        }
+        if (trim(buf) != "") { push(out, buf) }
+    }
+    let j = 0
+    while (j < len(node["children"])) {
+        _collect_tag_texts(node["children"][j], tag_name, out)
+        j = j + 1
+    }
+}
+
+def _extract_css_blocks(dom_root) {
+    let out = []
+    _collect_tag_texts(dom_root, "style", out)
+    return out
+}
+
+def _extract_script_blocks(dom_root) {
+    let out = []
+    _collect_tag_texts(dom_root, "script", out)
+    return out
+}
+
+def _load_into_tab(tab, viewport_w) {
+    tab["status"] = "loading"
+    let r = http.get(tab["url"], {})
+    if (r["ok"]) {
+        tab["html"] = r["body"]
+        let dom_root = html.parse(tab["html"])
+        tab["dom"] = dom_root
+
+        let css_rules = []
+        let blocks = _extract_css_blocks(tab["dom"])
+        let i = 0
+        while (i < len(blocks)) {
+            let rules = cssp.parse(blocks[i])
+            let j = 0
+            while (j < len(rules)) {
+                push(css_rules, rules[j])
+                j = j + 1
+            }
+            i = i + 1
+        }
+
+        let load_i = 0
+        while (load_i < loader.pending_count()) {
+            loader.process_one()
+            load_i = load_i + 1
+        }
+
+        let scripts = _extract_script_blocks(tab["dom"])
+        if (len(scripts) > 0) {
+            let ctx = jsrt.create_context(tab["dom"])
+            let si = 0
+            while (si < len(scripts)) {
+                jsrt.run_script_lines(ctx, split(scripts[si], "\n"))
+                si = si + 1
+            }
+            // allow delayed callbacks queued by script DSL.
+            jsrt.tick(ctx, 1)
+        }
+
+        tab["css_rules"] = css_rules
+        style.apply_styles(tab["dom"], css_rules)
+        layout.layout_tree(tab["dom"], viewport_w)
+        tab["status"] = "ready"
+        return tab
+    }
+    tab["status"] = "error"
+    let err_msg = has(r, "error") ? r["error"] : "request failed"
+    tab["error"] = err_msg
+    return tab
+}
+
+def tab_open(win, url) {
+    let t = _mk_tab(url)
+    _load_into_tab(t, win["width"])
+    push(win["tabs"], t)
+    win["active_tab"] = len(win["tabs"]) - 1
+    return win["active_tab"]
+}
+
+def active_tab(win) {
+    if (win["active_tab"] < 0) { return null }
+    if (win["active_tab"] >= len(win["tabs"])) {
+        _bk_fail("BROWSERKIT-WINDOW-STATE-INVALID",
+            "active_tab index is out of range for current tab list",
+            "Reset active_tab to a valid index or reopen tabs.")
+    }
+    return win["tabs"][win["active_tab"]]
+}
+
+def navigate(win, url) {
+    let t = active_tab(win)
+    if (t == null) { return false }
+    t["url"] = url
+    push(t["history"], url)
+    t["history_index"] = len(t["history"]) - 1
+    _load_into_tab(t, win["width"])
+    return true
+}
+
+def back(win) {
+    let t = active_tab(win)
+    if (t == null) { return false }
+    if (t["history_index"] <= 0) { return false }
+    t["history_index"] = t["history_index"] - 1
+    t["url"] = t["history"][t["history_index"]]
+    _load_into_tab(t, win["width"])
+    return true
+}
+
+def forward(win) {
+    let t = active_tab(win)
+    if (t == null) { return false }
+    if (t["history_index"] >= len(t["history"]) - 1) { return false }
+    t["history_index"] = t["history_index"] + 1
+    t["url"] = t["history"][t["history_index"]]
+    _load_into_tab(t, win["width"])
+    return true
+}
+
+def reload(win) {
+    let t = active_tab(win)
+    if (t == null) { return false }
+    _load_into_tab(t, win["width"])
+    return true
+}

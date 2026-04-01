@@ -1,0 +1,136 @@
+// kern string utilities — import("lib/kern/string_utils.kn")
+// contains(s, sub), lines(s), words(s), trim_each(arr), count_sub(s, sub)
+
+def contains(s, sub) {
+    if (len(sub) == 0) { return true }
+    let n = len(s)
+    let m = len(sub)
+    if (m > n) { return false }
+    let i = 0
+    while (i <= n - m) {
+        if (slice(s, i, i + m) == sub) { return true }
+        i = i + 1
+    }
+    return false
+}
+
+def lines(s) {
+    return split_lines(s)
+}
+
+def words(s) {
+    return split(s, " ")
+}
+
+def trim_each(arr) {
+    let out = array()
+    let i = 0
+    while (i < len(arr)) {
+        let v = arr[i]
+        if (type(v) == "string") { push(out, trim(v)) }
+        else { push(out, v) }
+        i = i + 1
+    }
+    return out
+}
+
+def count_sub(s, sub) {
+    if (len(sub) == 0) { return len(s) + 1 }
+    let n = len(s)
+    let m = len(sub)
+    if (m > n) { return 0 }
+    let count = 0
+    let i = 0
+    while (i <= n - m) {
+        if (slice(s, i, i + m) == sub) {
+            count = count + 1
+            i = i + m
+        }
+        else { i = i + 1 }
+    }
+    return count
+}
+
+def remove_prefix(s, prefix) {
+    if (len(prefix) == 0) { return s }
+    if (len(s) < len(prefix)) { return s }
+    if (slice(s, 0, len(prefix)) == prefix) { return slice(s, len(prefix), len(s)) }
+    return s
+}
+
+def remove_suffix(s, suffix) {
+    if (len(suffix) == 0) { return s }
+    if (len(s) < len(suffix)) { return s }
+    let start = len(s) - len(suffix)
+    if (slice(s, start, len(s)) == suffix) { return slice(s, 0, start) }
+    return s
+}
+
+def split_n(s, sep, n) {
+    let parts = split(s, sep)
+    if (n <= 0 or len(parts) <= n) { return parts }
+    let rest = slice(parts, n, len(parts))
+    let last = join(rest, sep)
+    return slice(parts, 0, n) + array(last)
+}
+
+def pad_center(s, width, fill) {
+    if (len(s) >= width) { return s }
+    if (len(fill) == 0) { fill = " " }
+    let pad = width - len(s)
+    let left = int(pad / 2)
+    let right = pad - left
+    return repeat_str(fill, left) + s + repeat_str(fill, right)
+}
+
+def is_empty(s) {
+    return len(s) == 0
+}
+
+def first_line(s) {
+    let idx = 0
+    while (idx < len(s)) {
+        if (s[idx] == "\n") { return slice(s, 0, idx) }
+        idx = idx + 1
+    }
+    return s
+}
+
+def last_line(s) {
+    let idx = len(s) - 1
+    while (idx >= 0) {
+        if (s[idx] == "\n") { return slice(s, idx + 1, len(s)) }
+        idx = idx - 1
+    }
+    return s
+}
+
+def replace_all(s, from_sub, to_sub) {
+    if (len(from_sub) == 0) { return s }
+    let out = ""
+    let i = 0
+    let n = len(s)
+    let m = len(from_sub)
+    while (i < n) {
+        if (i + m <= n and slice(s, i, i + m) == from_sub) {
+            out = out + to_sub
+            i = i + m
+        }
+        else {
+            out = out + s[i]
+            i = i + 1
+        }
+    }
+    return out
+}
+
+def repeat_str(s, n) {
+    if (n <= 0) { return "" }
+    let out = ""
+    let i = 0
+    while (i < n) {
+        out = out + s
+        i = i + 1
+    }
+    return out
+}

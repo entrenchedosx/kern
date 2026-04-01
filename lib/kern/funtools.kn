@@ -1,0 +1,81 @@
+// kern functools (Python functools) — import("lib/kern/funtools.kn")
+// adds: partial, memoize, compose
+
+def partial(f, a) {
+    return lambda (b) => f(a, b)
+}
+
+def partial2(f, a, b) {
+    return lambda (c) => f(a, b, c)
+}
+
+def memoize(f) {
+    let cache = {}
+    return lambda (x) => {
+        let k = str(x)
+        if (has(cache, k)) { return cache[k] }
+        let v = f(x)
+        cache[k] = v
+        return v
+    }
+}
+
+def compose(f, g) {
+    return lambda (x) => f(g(x))
+}
+
+def compose3(f, g, h) {
+    return lambda (x) => f(g(h(x)))
+}
+
+// once(f) – returns a function that calls f only the first time, then returns cached result
+def once(f) {
+    let cache = {}
+    let key = "__result"
+    return lambda (x) => {
+        if (has(cache, key)) { return cache[key] }
+        let v = f(x)
+        cache[key] = v
+        return v
+    }
+}
+
+// pipe(x, f1, f2, ...) – apply f1(x), then f2(...), etc. (two-arg version for two funcs)
+def pipe2(x, f, g) {
+    return g(f(x))
+}
+def pipe3(x, f, g, h) {
+    return h(g(f(x)))
+}
+
+// tap(x, fn) – call fn(x) for side effect (e.g. print), then return x. Great in pipelines: x |> tap(print) |> next
+def tap(x, fn) {
+    fn(x)
+    return x
+}
+
+// trace(x) – print "trace: " + str(x), return x. Use in pipelines to inspect: value |> trace |> process
+def trace(x) {
+    print("trace:", x)
+    return x
+}
+def trace_label(x, label) {
+    print(label + ":", x)
+    return x
+}
+
+def identity(x) {
+    return x
+}
+
+def constant(c) {
+    return lambda (x) => c
+}
+
+def apply(f, args) {
+    if (len(args) == 0) { return f() }
+    if (len(args) == 1) { return f(args[0]) }
+    if (len(args) == 2) { return f(args[0], args[1]) }
+    if (len(args) == 3) { return f(args[0], args[1], args[2]) }
+    throw "apply: up to 3 args supported"
+}

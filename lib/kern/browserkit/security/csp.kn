@@ -1,0 +1,25 @@
+// browserkit/security/csp.kn
+
+_policy = { "default-src": ["self"], "img-src": ["self"], "script-src": ["self"] }
+
+def set_directive(name, list_values) {
+    _policy[str(name)] = list_values
+}
+
+def get_directive(name) {
+    let k = str(name)
+    let v = _policy[k]
+    if (v == null) { return [] }
+    return v
+}
+
+def allows(name, origin) {
+    let vals = get_directive(name)
+    let i = 0
+    while (i < len(vals)) {
+        if (vals[i] == "*" || vals[i] == str(origin)) { return true }
+        if (vals[i] == "self" && str(origin) == "self") { return true }
+        i = i + 1
+    }
+    return false
+}

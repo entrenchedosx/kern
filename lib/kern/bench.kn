@@ -1,0 +1,16 @@
+// simple timing — import("lib/kern/bench.kn")
+// timed(fn) — seconds (monotonic delta); timed_ms(fn) — milliseconds
+
+def timed(task) {
+    let t0 = monotonic_time()
+    let r = task()
+    let t1 = monotonic_time()
+    return { "result": r, "seconds": t1 - t0 }
+}
+
+def timed_ms(task) {
+    let t0 = monotonic_time()
+    let r = task()
+    let t1 = monotonic_time()
+    return { "result": r, "ms": (t1 - t0) * 1000 }
+}

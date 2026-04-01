@@ -1,0 +1,10 @@
+// uRL/file slug — import("lib/kern/slug.kn")
+// slug(s) — lowercase, non-alphanumeric runs -> single '-', trim '-'
+
+def slug(s) {
+    let t = trim(lower(str(s)))
+    if (len(t) == 0) { return "" }
+    t = regex_replace(t, "[^a-z0-9]+", "-")
+    t = regex_replace(t, "^-+|-+$", "")
+    return t
+}

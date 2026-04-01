@@ -1,0 +1,18 @@
+let render = import("kern::render")
+let vision = import("kern::vision")
+
+if (render == null || vision == null) {
+    print("skip-system-color-parse-invalid")
+} else {
+    render.createWindow(48, 48, "parse-test", false)
+
+    // these invalid color strings shouldn't crash the runtime.
+    render.clear("#zzzzzz")
+    render.drawRect(2, 2, 8, 8, "#nothex")
+    render.present()
+
+    let hit = vision.findColor("#badbad")
+    let px = vision.getPixel(3, 3)
+
+    print("color-parse-resilience", type(hit), type(px))
+}

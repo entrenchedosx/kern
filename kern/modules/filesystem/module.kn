@@ -1,0 +1,19 @@
+// kern filesystem module (canonical path: kern/modules/filesystem/module.kn)
+
+def readText(path) {
+    return read_file(path)
+}
+
+def writeText(path, content) {
+    return write_file(path, content)
+}
+
+def exists(path) {
+    return fileExists(path)
+}
+
+def appendText(path, content) {
+    let old = ""
+    if (fileExists(path)) { old = read_file(path) }
+    return write_file(path, old + content)
+}

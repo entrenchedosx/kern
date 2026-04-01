@@ -1,0 +1,10 @@
+binary = import("binary")
+memory = import("memory")
+
+unsafe {
+  p = memory.alloc(8)
+  binary.write_le32(p, 287454020)
+  v = binary.read_le32(p)
+  print("read_le32:", v)
+  memory.free(p)
+}

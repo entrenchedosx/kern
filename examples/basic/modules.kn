@@ -1,0 +1,5 @@
+let m = import("math")
+print(m != null)
+print(m.sqrt(16))
+
+

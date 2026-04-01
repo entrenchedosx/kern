@@ -1,0 +1,84 @@
+// generic stream abstraction with buffering, transforms, and backpressure.
+
+def create_stream(name, max_buffer) {
+    let s = {}
+    s["name"] = str(name)
+    s["max_buffer"] = int(max_buffer)
+    s["paused"] = false
+    s["buffer"] = []
+    s["on_data"] = []
+    s["on_drain"] = []
+    s["transforms"] = []
+    return s
+}
+
+def on_data(stream, handler) {
+    push(stream["on_data"], handler)
+    return true
+}
+
+def on_drain(stream, handler) {
+    push(stream["on_drain"], handler)
+    return true
+}
+
+def add_transform(stream, handler) {
+    push(stream["transforms"], handler)
+    return true
+}
+
+def pause(stream) {
+    stream["paused"] = true
+    return true
+}
+
+def resume(stream) {
+    stream["paused"] = false
+    flush(stream)
+    return true
+}
+
+def write(stream, chunk) {
+    if (stream["paused"]) { return false }
+    if (len(stream["buffer"]) >= int(stream["max_buffer"])) {
+        return false
+    }
+    let out = chunk
+    let i = 0
+    while (i < len(stream["transforms"])) {
+        out = stream["transforms"][i](out)
+        i = i + 1
+    }
+    push(stream["buffer"], out)
+    flush(stream)
+    return true
+}
+
+def flush(stream) {
+    if (stream["paused"]) { return 0 }
+    let delivered = 0
+    while (len(stream["buffer"]) > 0) {
+        let chunk = stream["buffer"][0]
+        let rest = []
+        let i = 1
+        while (i < len(stream["buffer"])) {
+            push(rest, stream["buffer"][i])
+            i = i + 1
+        }
+        stream["buffer"] = rest
+        let j = 0
+        while (j < len(stream["on_data"])) {
+            stream["on_data"][j](chunk)
+            j = j + 1
+        }
+        delivered = delivered + 1
+    }
+    if (delivered > 0) {
+        let k = 0
+        while (k < len(stream["on_drain"])) {
+            stream["on_drain"][k](delivered)
+            k = k + 1
+        }
+    }
+    return delivered
+}

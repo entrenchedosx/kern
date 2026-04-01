@@ -1,0 +1,22 @@
+let g3 = import("g3d")
+if (g3 == null) {
+    print("skip-g3d")
+} else {
+    a = g3.createObject("cube", 2.0)
+    b = g3.createObject("sphere", 0.9)
+    g3.setPosition(a, 0, 1, 0)
+    g3.setPosition(b, 0.5, 1, 0)
+
+    hit1 = g3.objectIntersects(a, b)
+    d1 = g3.objectDistance(a, b)
+
+    g3.setPosition(b, 10, 1, 0)
+    hit2 = g3.objectIntersects(a, b)
+
+    if (hit1 && !hit2 && d1 > 0) {
+        print("g3d-collision-ok")
+    } else {
+        print("g3d-collision-fail")
+    }
+}
+

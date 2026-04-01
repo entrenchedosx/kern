@@ -1,0 +1,56 @@
+{
+  "default_feature_set": "stable",
+  "feature_sets": {
+    "stable": {
+      "description": "Production-safe defaults",
+      "enabled": [
+        "core_language",
+        "stdlib_v1",
+        "import_graph_v1",
+        "kernc_native",
+        "analyzer_v1"
+      ],
+      "disabled": [
+        "typed_ir_pipeline",
+        "semantic_strict",
+        "kernel_target_v1",
+        "wasm_backend_preview"
+      ]
+    },
+    "preview": {
+      "description": "Pre-release features with migration notes",
+      "enabled": [
+        "core_language",
+        "stdlib_v1",
+        "typed_ir_pipeline",
+        "semantic_engine_v1",
+        "kernel_target_v1",
+        "browserkit_v1",
+        "gamekit_v1",
+        "oskit_v1"
+      ],
+      "disabled": [
+        "wasm_backend_preview"
+      ]
+    },
+    "experimental": {
+      "description": "Research-grade features",
+      "enabled": [
+        "core_language",
+        "typed_ir_pipeline",
+        "semantic_engine_v1",
+        "kernel_target_v1",
+        "wasm_backend_preview",
+        "macro_attributes_v1"
+      ],
+      "disabled": []
+    }
+  },
+  "features": {
+    "typed_ir_pipeline": { "tier": "preview", "owner": "src/ir/*" },
+    "semantic_engine_v1": { "tier": "preview", "owner": "src/compiler/semantic.*" },
+    "kernel_target_v1": { "tier": "preview", "owner": "src/backend/cpp_backend.cpp" },
+    "wasm_backend_preview": { "tier": "experimental", "owner": "src/backend/*" },
+    "macro_attributes_v1": { "tier": "experimental", "owner": "src/compiler/parser.cpp" }
+  }
+}

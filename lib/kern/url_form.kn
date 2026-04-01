@@ -1,0 +1,16 @@
+// application/x-www-form-urlencoded builder — import("lib/kern/url_form.kn")
+// build_query_string(map) — sorted keys, url_encode key and value
+
+def build_query_string(m) {
+    let ks = keys(m)
+    sort(ks)
+    let parts = array()
+    let i = 0
+    while (i < len(ks)) {
+        let k = ks[i]
+        let pair = url_encode(k) + "=" + url_encode(str(m[k]))
+        push(parts, pair)
+        i = i + 1
+    }
+    return join(parts, "&")
+}

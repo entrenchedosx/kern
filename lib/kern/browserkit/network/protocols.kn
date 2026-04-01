@@ -1,0 +1,35 @@
+// browserkit network/protocols.kn
+// custom protocol handlers (extensibility).
+
+handlers = {}
+
+def _bk_fail(code, message, hint) {
+    throw Error(code + ": " + message + " | Hint: " + hint, code)
+}
+
+def register(scheme, handler) {
+    handlers[lower(str(scheme))] = handler
+}
+
+def can_handle(url) {
+    let p = split(str(url), "://")
+    if (len(p) < 2) { return false }
+    let scheme = lower(p[0])
+    return has(handlers, scheme)
+}
+
+def open(url) {
+    let p = split(str(url), "://")
+    if (len(p) < 2) {
+        _bk_fail("BROWSERKIT-PROTOCOL-INVALID",
+            "invalid URL without scheme: " + str(url),
+            "Use a URL like scheme://resource.")
+    }
+    let scheme = lower(p[0])
+    if (!has(handlers, scheme)) {
+        _bk_fail("BROWSERKIT-UNSUPPORTED-PROTOCOL",
+            "no handler registered for scheme '" + scheme + "'",
+            "Register a handler first via browserkit.network.protocols.register().")
+    }
+    return handlers[scheme](url)
+}

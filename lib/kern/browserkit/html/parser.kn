@@ -1,0 +1,80 @@
+// browserkit html/parser.kn
+// basic HTML parser -> DOM tree (elements, attrs, nesting, text nodes).
+
+dom = import("lib/kern/browserkit/dom/tree.kn")
+
+def _trim(s) { return trim(str(s)) }
+
+def _parse_attrs(tag_src, node) {
+    let parts = split(tag_src, " ")
+    let i = 1
+    while (i < len(parts)) {
+        let p = _trim(parts[i])
+        if (p == "") { i = i + 1; continue }
+        let eq = split(p, "=")
+        if (len(eq) >= 2) {
+            let k = lower(_trim(eq[0]))
+            let v = join(slice(eq, 1), "=")
+            v = replace(v, "\"", "")
+            v = replace(v, "'", "")
+            node["attrs"][k] = v
+        } else {
+            node["attrs"][lower(p)] = "true"
+        }
+        i = i + 1
+    }
+}
+
+def parse(source) {
+    let root = dom.element("document")
+    let stack = [root]
+
+    let chunks = split(str(source), "<")
+    let ci = 0
+    while (ci < len(chunks)) {
+        let chunk = chunks[ci]
+        if (ci == 0) {
+            let txt0 = _trim(chunk)
+            if (txt0 != "") { dom.append_child(root, dom.text_node(txt0)) }
+            ci = ci + 1
+            continue
+        }
+
+        let pair = split(chunk, ">")
+        let head = _trim(pair[0])
+        let tail = ""
+        if (len(pair) > 1) { tail = join(slice(pair, 1), ">") }
+
+        if (head == "") { ci = ci + 1; continue }
+
+        if (starts_with(head, "!")) {
+            ci = ci + 1
+            continue
+        }
+
+        if (starts_with(head, "/")) {
+            if (len(stack) > 1) { remove_at(stack, len(stack) - 1) }
+        } else {
+            let self_close = ends_with(head, "/")
+            if (self_close) { head = _trim(slice(head, 0, len(head) - 1)) }
+            let parts = split(head, " ")
+            let tag = lower(_trim(parts[0]))
+            let n = dom.element(tag)
+            _parse_attrs(head, n)
+            let parent = stack[len(stack) - 1]
+            dom.append_child(parent, n)
+            if (!self_close) { push(stack, n) }
+        }
+
+        let txt = _trim(tail)
+        if (txt != "") {
+            let parent2 = stack[len(stack) - 1]
+            dom.append_child(parent2, dom.text_node(txt))
+            if (has(parent2, "text")) { parent2["text"] = parent2["text"] + txt }
+        }
+
+        ci = ci + 1
+    }
+
+    return root
+}

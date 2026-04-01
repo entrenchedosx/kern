@@ -1,0 +1,184 @@
+// browserkit network/http.kn
+// hTTP/HTTPS client with headers/cookies/redirect policy wrappers.
+
+net = import("net")
+
+cookie_jar = {}
+
+def _bk_fail(code, message, hint) {
+    throw Error(code + ": " + message + " | Hint: " + hint, code)
+}
+
+def _ensure_network_allowed(kind) {
+    let info = runtime_info()
+    if (info != null && has(info, "sandbox") && info["sandbox"]) {
+        _bk_fail("BROWSERKIT-SANDBOX-DENY",
+            kind + " blocked while sandbox is enabled",
+            "Run with --no-sandbox for trusted BrowserKit network operations.")
+    }
+}
+
+def _mk_result() {
+    let r = {}
+    r["ok"] = false
+    r["status"] = -1
+    r["headers"] = {}
+    r["body"] = ""
+    r["error"] = ""
+    r["url"] = ""
+    return r
+}
+
+def parse_url(url) {
+    let out = {}
+    out["scheme"] = "http"
+    out["host"] = ""
+    out["path"] = "/"
+    out["port"] = 80
+    out["origin"] = ""
+
+    let s = str(url)
+    let parts = split(s, "://")
+    if (len(parts) >= 2) {
+        out["scheme"] = lower(parts[0])
+        s = parts[1]
+    }
+    let slash = split(s, "/")
+    let hostport = slash[0]
+    if (len(slash) > 1) {
+        out["path"] = "/" + join(slice(slash, 1), "/")
+    }
+    let hp = split(hostport, ":")
+    out["host"] = hp[0]
+    if (len(hp) > 1) {
+        out["port"] = int(hp[1])
+    } else {
+        if (out["scheme"] == "https") { out["port"] = 443 }
+        else { out["port"] = 80 }
+    }
+    out["origin"] = out["scheme"] + "://" + out["host"] + ":" + out["port"]
+    return out
+}
+
+def resolve_dns(host) {
+    _ensure_network_allowed("DNS resolution")
+    let out = {}
+    out["ok"] = false
+    out["host"] = host
+    out["resolved"] = ""
+    out["error"] = ""
+    try {
+        let cmd = "nslookup " + host
+        let txt = exec_capture(cmd)
+        out["ok"] = true
+        out["resolved"] = txt
+    } catch (e) {
+        out["error"] = error_message(e)
+    }
+    return out
+}
+
+def _cookie_header_for(host) {
+    if (!has(cookie_jar, host)) { return "" }
+    let pairs = []
+    for k in keys(cookie_jar[host]) {
+        push(pairs, k + "=" + cookie_jar[host][k])
+    }
+    return join(pairs, "; ")
+}
+
+def set_cookie(host, key, value) {
+    if (!has(cookie_jar, host)) { cookie_jar[host] = {} }
+    cookie_jar[host][key] = value
+}
+
+def get_cookies(host) {
+    if (!has(cookie_jar, host)) { return {} }
+    return copy(cookie_jar[host])
+}
+
+def _http_get_builtin(url) {
+    let res = _mk_result()
+    res["url"] = url
+    if (net == null || !has(net, "http_get")) {
+        _bk_fail("BROWSERKIT-NOT-IMPLEMENTED",
+            "net.http_get runtime binding is unavailable",
+            "Build/run with networking builtins enabled.")
+    }
+    try {
+        res["body"] = net.http_get(url)
+        res["ok"] = true
+        res["status"] = 200
+    } catch (e) {
+        res["error"] = error_message(e)
+    }
+    return res
+}
+
+def get(url, options) {
+    if (url == null || str(url) == "") {
+        _bk_fail("BROWSERKIT-HTTP-INVALID-URL",
+            "HTTP GET received an empty URL",
+            "Pass a non-empty URL string.")
+    }
+    if (options == null) { options = {} }
+    let u = parse_url(url)
+    if (u["host"] == "") {
+        _bk_fail("BROWSERKIT-HTTP-INVALID-URL",
+            "HTTP GET URL has no host: " + str(url),
+            "Use an absolute URL like http://host/path.")
+    }
+    let out = _http_get_builtin(url)
+    out["request"] = {}
+    out["request"]["method"] = "GET"
+    out["request"]["headers"] = has(options, "headers") ? options["headers"] : {}
+    out["request"]["cookies"] = _cookie_header_for(u["host"])
+    out["url_info"] = u
+    out["redirects_followed"] = has(options, "redirects") ? options["redirects"] : 0
+    return out
+}
+
+def post(url, data, options) {
+    _ensure_network_allowed("HTTP POST")
+    if (url == null || str(url) == "") {
+        _bk_fail("BROWSERKIT-HTTP-INVALID-URL",
+            "HTTP POST received an empty URL",
+            "Pass a non-empty URL string.")
+    }
+    if (options == null) { options = {} }
+    let up = parse_url(url)
+    if (up["host"] == "") {
+        _bk_fail("BROWSERKIT-HTTP-INVALID-URL",
+            "HTTP POST URL has no host: " + str(url),
+            "Use an absolute URL like http://host/path.")
+    }
+    let out = _mk_result()
+    out["url"] = url
+    out["request"] = {}
+    out["request"]["method"] = "POST"
+    out["request"]["data"] = data
+    out["request"]["headers"] = has(options, "headers") ? options["headers"] : {}
+    out["request"]["cookies"] = _cookie_header_for(up["host"])
+
+    // current runtime has net.http_get only; POST requires external curl bridge.
+    if (which("curl") == null) {
+        _bk_fail("BROWSERKIT-NOT-IMPLEMENTED",
+            "HTTP POST bridge requires curl but curl was not found",
+            "Install curl or add native net.post runtime support.")
+    }
+    let payload = str(data)
+    let cmd = "curl -s -X POST --data " + quote(payload) + " " + quote(url)
+    try {
+        let body = exec_capture(cmd)
+        out["ok"] = true
+        out["status"] = 200
+        out["body"] = body
+    } catch (e) {
+        out["error"] = error_message(e)
+    }
+    return out
+}
+
+def quote(s) {
+    return "\"" + replace(str(s), "\"", "\\\"") + "\""
+}

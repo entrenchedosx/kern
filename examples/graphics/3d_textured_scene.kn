@@ -1,0 +1,49 @@
+let g3 = import("g3d")
+
+g3.createWindow(1000, 700, "Kern g3d - Textured Scene")
+g3.clear(12, 18, 28)
+g3.setProjection("perspective")
+g3.setFov(60)
+g3.setCamera(8.0, 6.0, 8.0, 0.0, 0.0, 0.0)
+g3.setCameraMode("orbit")
+g3.showStats(true)
+g3.setDebug(true)
+
+let floor = g3.createObject("plane", 26.0, 26.0)
+let box = g3.createObject("cube", 1.8)
+let orb = g3.createObject("sphere", 0.8)
+
+g3.setPosition(floor, 0.0, 0.0, 0.0)
+g3.setPosition(box, -1.8, 0.9, 0.0)
+g3.setPosition(orb, 2.2, 0.9, 0.0)
+
+g3.setObjectColor(floor, 90, 90, 90)
+g3.setObjectColor(box, 255, 255, 255)
+g3.setObjectColor(orb, 130, 210, 255)
+
+g3.setMaterial(box, "lambert")
+g3.setMaterial(orb, "phong")
+g3.setAmbientLight(38, 38, 50)
+g3.addDirectionalLight(0.6, -1.0, -0.4, 255, 244, 220, 1.1)
+g3.addPointLight(2.2, 2.8, 1.8, 140, 180, 255, 0.9)
+
+// built-in generated checker texture so this demo works without external files
+g3.setTexture(box, "@checker")
+
+let t = 0.0
+def update() {
+    t = t + 1.0
+    if (t >= 360.0) { t = 0.0 }
+    g3.setRotation(box, t, t * 0.6, 0.0)
+}
+
+def draw() {
+    g3.drawAll()
+}
+
+g3.run(update, draw)
+
+
+
+
+

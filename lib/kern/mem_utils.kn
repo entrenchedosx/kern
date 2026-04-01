@@ -1,0 +1,37 @@
+// kern memory helpers — import("lib/kern/mem_utils.kn")
+// read_u8, write_u8, read_u32, write_u32, read_bytes, write_bytes, copy_region, zero_region
+
+def read_u8(ptr, offset) {
+    return peek8(ptr + offset)
+}
+
+def write_u8(ptr, offset, v) {
+    poke8(ptr + offset, v)
+    return v
+}
+
+def read_u32(ptr, offset) {
+    return peek32(ptr + offset)
+}
+
+def write_u32(ptr, offset, v) {
+    poke32(ptr + offset, v)
+    return v
+}
+
+def read_bytes(ptr, offset, n) {
+    return bytes_read(ptr + offset, n)
+}
+
+def write_bytes(ptr, offset, arr) {
+    bytes_write(ptr + offset, arr)
+    return len(arr)
+}
+
+def copy_region(ptr, src_offset, dst_offset, n) {
+    mem_copy(ptr + dst_offset, ptr + src_offset, n)
+}
+
+def zero_region(ptr, offset, n) {
+    mem_set(ptr + offset, 0, n)
+}

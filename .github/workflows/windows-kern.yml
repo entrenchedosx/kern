@@ -1,0 +1,58 @@
+# build Kern on Windows with bundled vcpkg + static Raylib; run fast .kn smoke tests.
+name: Windows Kern
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: windows-kern-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-smoke:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache vcpkg installed tree
+        uses: actions/cache@v4
+        with:
+          path: tools/vcpkg/installed
+          key: vcpkg-installed-${{ runner.os }}-x64-windows-static-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-installed-${{ runner.os }}-x64-windows-static-
+
+      - name: Bootstrap vcpkg
+        shell: cmd
+        run: |
+          cd tools\vcpkg
+          call bootstrap-vcpkg.bat
+
+      - name: Install Raylib (static)
+        shell: cmd
+        run: |
+          tools\vcpkg\vcpkg.exe install raylib:x64-windows-static --triplet x64-windows-static
+
+      - name: Configure CMake
+        shell: cmd
+        run: |
+          cmake -B build -G "Visual Studio 17 2022" -A x64 ^
+            -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\tools\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static ^
+            -DKERN_BUILD_NATIVE_IDE=OFF ^
+            -DKERN_BUILD_GAME=ON ^
+            -DKERN_PREFER_STATIC_RAYLIB=ON
+
+      - name: Build kern and kernc
+        shell: cmd
+        run: cmake --build build --config Release --target kern kernc --parallel 4
+
+      - name: Smoke tests (.kn)
+        shell: cmd
+        run: |
+          build\Release\kern.exe test tests\coverage
+          build\Release\kern.exe examples\g3d_import_smoke.kn

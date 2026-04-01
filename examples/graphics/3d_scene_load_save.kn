@@ -1,0 +1,47 @@
+def main() {
+    let g3 = import("g3d")
+    if (g3 == null) {
+        print("g3d unavailable in this build")
+        return null
+    }
+
+    g3.createWindow(1000, 700, "Kern g3d - Save/Load Scene")
+    g3.clear(10, 16, 28)
+    g3.setCamera(8.0, 6.0, 8.0, 0.0, 0.0, 0.0)
+    g3.setCameraMode("orbit")
+    g3.setDebug(true)
+    g3.showStats(true)
+
+    let a = g3.createObject("cube", 1.4)
+    let b = g3.createObject("sphere", 0.9)
+    let c = g3.createObject("cylinder", 0.5, 2.0)
+
+    g3.setPosition(a, -2.0, 0.8, 0.0)
+    g3.setPosition(b, 0.5, 0.9, 0.0)
+    g3.setPosition(c, 2.5, 0.0, 0.0)
+
+    g3.setObjectColor(a, 255, 120, 120)
+    g3.setObjectColor(b, 120, 220, 255)
+    g3.setObjectColor(c, 170, 170, 255)
+    g3.setTexture(a, "@checker")
+    g3.setMaterial(a, "lambert")
+
+    let scenePath = "scene_demo.g3d"
+    let ok = g3.saveScene(scenePath)
+    if (ok) {
+        print("scene-saved")
+    }
+
+    g3.clearScene()
+    g3.loadScene(scenePath)
+
+    let update = lambda () => { return null }
+    let draw = lambda () => { g3.drawAll() }
+    g3.run(update, draw)
+    return null
+}
+
+main()
+
+
+

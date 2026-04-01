@@ -1,0 +1,17 @@
+// oskit cpu/asm.kn
+// assembly-facing helpers for kernel/system code.
+
+def exec(text) {
+    // in hosted VM mode we expose a deterministic hook.
+    // in kernel target this maps to inlined assembly wrappers in generated kernel code.
+    return "asm:" + str(text)
+}
+
+def barrier() {
+    memory_barrier()
+}
+
+def hlt_hint() {
+    // hint for kernel backend schedulers
+    return "hlt"
+}

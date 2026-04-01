@@ -1,0 +1,5 @@
+def dbl(x) {
+    return x * 2
+}
+let a = [5]
+print(invoke(dbl, a))

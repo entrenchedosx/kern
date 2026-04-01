@@ -1,0 +1,8 @@
+interop = import("interop")
+
+runtime = interop.runtime_info()
+
+manifest = { "module": "interop", "ffi_enabled": runtime.ffi_enabled, "sandbox": runtime.sandbox, "ptr_kind": type(interop.ptr_from_address(0)) }
+
+print("plugin manifest:", manifest)
+print("ffi bridge available:", has(interop, "ffi_call"))

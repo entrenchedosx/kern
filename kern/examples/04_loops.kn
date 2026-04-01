@@ -1,0 +1,12 @@
+// for with range(), and while
+print("for i in range(0, 5):")
+for i in range(0, 5) {
+    print(i)
+}
+print("while countdown:")
+let k = 3
+while (k > 0) {
+    print(k)
+    k = k - 1
+}
+print("Done.")

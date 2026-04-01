@@ -1,0 +1,16 @@
+automation = import("automation")
+concurrency = import("concurrency")
+runtime_controls = import("runtime_controls")
+
+runtime_controls.set_step_limit(200000)
+runtime_controls.set_max_call_depth(512)
+
+start = concurrency.monotonic_time()
+tool = automation.which("cmd")
+print("cmd_found:", tool != null)
+
+status = automation.exec("echo kern-task-orchestrator")
+print("exec_status:", status)
+
+elapsed = concurrency.monotonic_time() - start
+print("elapsed>=0:", elapsed >= 0)
