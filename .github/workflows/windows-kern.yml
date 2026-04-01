@@ -41,7 +41,8 @@ jobs:
       - name: Install Raylib (static)
         shell: cmd
         run: |
-          _vcpkg\vcpkg.exe install raylib:x64-windows-static --triplet x64-windows-static
+          rem Manifest mode (repo has vcpkg.json). Install declared deps for the static triplet.
+          _vcpkg\vcpkg.exe install --triplet x64-windows-static --x-manifest-root=%GITHUB_WORKSPACE% --x-install-root=%GITHUB_WORKSPACE%\_vcpkg\installed
 
       - name: Configure CMake
         shell: cmd
