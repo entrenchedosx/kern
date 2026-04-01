@@ -14,10 +14,15 @@ concurrency:
 jobs:
   build-and-smoke:
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Cached tree must NOT live under the vcpkg clone dir, or `git clone _vcpkg` fails when
+      # only `_vcpkg/installed` exists from cache (no vcpkg.exe).
       - name: Cache vcpkg installed tree
         uses: actions/cache@v4
         with:
@@ -29,11 +34,11 @@ jobs:
       - name: Fetch + bootstrap vcpkg
         shell: cmd
         run: |
-          if exist _vcpkg\\vcpkg.exe (
+          if exist vcpkg\vcpkg.exe (
             echo vcpkg already present
           ) else (
-            git clone https://github.com/microsoft/vcpkg.git _vcpkg
-            cd _vcpkg
+            git clone https://github.com/microsoft/vcpkg.git vcpkg
+            cd vcpkg
             call bootstrap-vcpkg.bat
             cd ..
           )
@@ -42,13 +47,13 @@ jobs:
         shell: cmd
         run: |
           rem Manifest mode (repo has vcpkg.json). Install declared deps for the static triplet.
-          _vcpkg\vcpkg.exe install --triplet x64-windows-static --x-manifest-root=%GITHUB_WORKSPACE% --x-install-root=%GITHUB_WORKSPACE%\_vcpkg\installed
+          "%GITHUB_WORKSPACE%\vcpkg\vcpkg.exe" install --triplet x64-windows-static --x-manifest-root="%GITHUB_WORKSPACE%" --x-install-root="%GITHUB_WORKSPACE%\_vcpkg\installed"
 
       - name: Configure CMake
         shell: cmd
         run: |
           cmake -B build -G "Visual Studio 17 2022" -A x64 ^
-            -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\_vcpkg\scripts\buildsystems\vcpkg.cmake ^
+            -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake ^
             -DVCPKG_TARGET_TRIPLET=x64-windows-static ^
             -DKERN_BUILD_NATIVE_IDE=OFF ^
             -DKERN_BUILD_GAME=ON ^

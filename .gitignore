@@ -17,6 +17,8 @@ FINAL/
 kern-ide/build/
 kern-ide/dist/
 vcpkg_installed/
+# CI / local clone next to repo root (see .github/workflows/windows-kern.yml)
+/vcpkg/
 **/_deps/
 
 # Local example / packager output (regenerate with kern / kern-to-exe)
