@@ -1913,8 +1913,15 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("log_debug", 102);
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
         std::string out;
-        if (vm) for (const auto& f : vm->getCallStack()) {
-            if (!out.empty()) out += "\n";
+        if (!vm) return Value::fromString("");
+        const size_t depth = vm->getCallStackDepth();
+        const auto cs = vm->getCallStackSlice();
+        if (depth > cs.size())
+            out += "  ... (" + std::to_string(depth - cs.size()) + " outer frame(s) omitted)\n";
+        bool first = true;
+        for (const auto& f : cs) {
+            if (!first) out += "\n";
+            first = false;
             out += "  at " + f.functionName + " line " + std::to_string(f.line);
         }
         return Value::fromString(out);
@@ -3588,10 +3595,21 @@ inline void registerAllBuiltins(VM& vm) {
     });
     setGlobalFn("time_format", 252);
 
-    // stack_trace_array() – current call stack as array of {name, line}
+    // stack_trace_array() – current call stack as array of {name, line} (innermost kMaxCallStackSnapshotFrames)
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
         std::vector<ValuePtr> arr;
-        if (vm) for (const auto& f : vm->getCallStack()) {
+        if (!vm) return Value::fromArray(std::move(arr));
+        const size_t depth = vm->getCallStackDepth();
+        const auto cs = vm->getCallStackSlice();
+        if (depth > cs.size()) {
+            std::unordered_map<std::string, ValuePtr> marker;
+            marker["name"] = std::make_shared<Value>(Value::fromString(
+                "(" + std::to_string(depth - cs.size()) + " outer frame(s) omitted)"));
+            marker["line"] = std::make_shared<Value>(Value::fromInt(0));
+            marker["column"] = std::make_shared<Value>(Value::fromInt(0));
+            arr.push_back(std::make_shared<Value>(Value::fromMap(std::move(marker))));
+        }
+        for (const auto& f : cs) {
             std::unordered_map<std::string, ValuePtr> m;
             m["name"] = std::make_shared<Value>(Value::fromString(f.functionName));
             m["line"] = std::make_shared<Value>(Value::fromInt(f.line));
@@ -3986,7 +4004,8 @@ inline void registerAllBuiltins(VM& vm) {
         if (args[0] && (args[0]->type == Value::Type::INT || args[0]->type == Value::Type::FLOAT)) {
             lim = args[0]->type == Value::Type::INT ? std::get<int64_t>(args[0]->data) : static_cast<int64_t>(std::get<double>(args[0]->data));
         }
-        if (lim < 16) lim = 16;
+        if (lim < 0) lim = 0;
+        if (lim > 0 && lim < 16) lim = 16;
         vm->setMaxCallDepth(static_cast<size_t>(lim));
         return Value::fromInt(static_cast<int64_t>(vm->getMaxCallDepth()));
     });

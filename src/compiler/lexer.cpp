@@ -3,6 +3,7 @@
  */
 
 #include "lexer.hpp"
+#include "source_encoding.hpp"
 #include <cctype>
 #include <sstream>
 #include <string>
@@ -360,6 +361,12 @@ void Lexer::lineComment() {
 
 std::vector<Token> Lexer::tokenize() {
     tokens_.clear();
+    stripUtf8Bom(source_);
+    if (hasUtf16Bom(source_)) {
+        throw LexerError(
+            "Source looks like UTF-16 (BOM at start). Save the file as UTF-8 (prefer UTF-8 without BOM).",
+            1, 1);
+    }
     if (source_.size() > kMaxSourceBytes) {
         throw LexerError(
             std::string("Source exceeds maximum size (") + std::to_string(kMaxSourceBytes / (1024u * 1024u)) + " MiB)",

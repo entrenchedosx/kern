@@ -132,7 +132,7 @@ static bool runSource(VM& vm, const std::string& source, const std::string& file
         return false;
     } catch (const VMError& e) {
         std::vector<StackFrame> stack;
-        for (const auto& f : vm.getCallStack()) {
+        for (const auto& f : vm.getCallStackSlice()) {
             stack.push_back({f.functionName, f.line, f.column});
         }
         std::string hint(vmRuntimeErrorHint(e.category, e.code));
@@ -616,6 +616,8 @@ int main(int argc, char** argv) {
     registerAllBuiltins(vm);
     registerImportBuiltin(vm);
     vm.setRuntimeGuards(runtimeGuards);
+    // VM.hpp default is 1024; CLI scripts use higher caps so deep user stacks work in debug/release.
+    // Stress tests that need a specific limit should call set_max_call_depth(...) in .kn (see tests/stress).
     if (runtimeGuards.debugMode) {
         vm.setStepLimit(5'000'000);
         vm.setMaxCallDepth(2048);

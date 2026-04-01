@@ -8,6 +8,7 @@
 #include "bytecode.hpp"
 #include "value.hpp"
 #include "script_code.hpp"
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 #include <unordered_map>
@@ -23,6 +24,8 @@ struct VMStackFrame {
     int line = 0;
     int column = 0;
 };
+
+inline constexpr size_t kMaxCallStackSnapshotFrames = 256;
 
 class VMError : public std::runtime_error {
 public:
@@ -60,8 +63,16 @@ public:
     const std::vector<std::string>& getCliArgs() const { return cliArgs_; }
     /* * call a value (function or builtin) with args. Used by map/filter/reduce. Returns result.*/
     ValuePtr callValue(ValuePtr callee, std::vector<ValuePtr> args);
-    /* * get current call stack (function name + line) for error reporting.*/
+    /* * get current call stack (function name + line). Full depth — prefer getCallStackSlice for reporting.*/
     std::vector<VMStackFrame> getCallStack() const { return callStack_; }
+    size_t getCallStackDepth() const { return callStack_.size(); }
+    std::vector<VMStackFrame> getCallStackSlice(size_t maxFrames = kMaxCallStackSnapshotFrames) const {
+        if (maxFrames == 0 || callStack_.empty()) return {};
+        if (callStack_.size() <= maxFrames) return callStack_;
+        return std::vector<VMStackFrame>(
+            callStack_.end() - static_cast<std::ptrdiff_t>(maxFrames),
+            callStack_.end());
+    }
     /* * run another script's bytecode in this VM (for import). Saves/restores main script state.*/
     void runSubScript(Bytecode code, std::vector<std::string> stringConstants, std::vector<Value> valueConstants);
     /* * script-requested exit code (set by exit_code(n) builtin). -1 = not set.*/

@@ -8,23 +8,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.1] - 2026-04-01
+
 ### Changed
 
 - Documentation: simplified to a lean public set (`README.md`, `RELEASE.md`, `docs/GETTING_STARTED.md`, `docs/TESTING.md`, `docs/TROUBLESHOOTING.md`) and removed internal/extra markdown docs.
 - `run_all_tests.ps1` now scans `examples/` **recursively** (matches `basic/`, `graphics/`, etc.).
-- `docs/TESTING.md`: corrected path to `tests\kernc\run_kernc_tests.ps1`; documented `-Kernc` (alias `-Splc`).
+- `docs/TESTING.md`: corrected path to `tests\kernc\run_kernc_tests.ps1`; documented `-Kernc` (alias `-Splc`); documented stress suite including **`-Aggressive`**.
 - `docs/STRESS_TESTS_PLAN.md`: replaced with a pointer to `tests/coverage/` and `tests/run_all_coverage_kn.ps1`.
 - `docs/TROUBLESHOOTING.md`: added VM reserved-opcode and example-runner notes.
 
 ### Fixed
 
 - **Standalone EXE build (`kernc -o`) on Windows:** generated `CMakeLists.txt` now includes `http_get_winhttp.cpp` and links `winhttp`/`wininet`, matching the main `kern` target (fixes unresolved `kernHttpGetWinHttp` when building `kernc_standalone`).
+- **Diagnostics:** runtime tracebacks cap printed frames and redundant snippets for deep stacks; **`stack_trace` / `stack_trace_array`** and **`attachTracebackToError`** use bounded snapshots (**256** innermost frames). CLI documents that **`kern`** overrides default max call depth (see `main.cpp`).
+
+### Added
+
+- **Stress suite (`tests/stress/`):** adversarial `.kn` samples, `run_stress_suite.ps1` (uses `Start-Process` for reliable exit codes on Windows), UTF-8 BOM / UTF-16 BOM lexer checks, generated long `??` / unary inputs, oversized source rejection, and a **VM max call-depth** run that must exit non-zero; **`-Aggressive`** scales generators, verifies depth failure under **`--release`**, and runs the other stress scripts end-to-end.
+- **VM:** when `maxCallDepth_ > 0` (default 1024), **tail-call frame reuse is disabled** so recursion depth limits cannot be bypassed; `maxCallDepth_ == 0` means unlimited (and restores tail-call reuse). **`getCallStackSlice()`** for bounded reporting. **Lexer:** UTF-8 BOM strip + explicit **UTF-16 BOM** rejection via `source_encoding.hpp`.
+- **Diagnostics:** lexer/parser/file-open detail lines use ASCII `-` bullets so Windows consoles do not show mojibake (e.g. `ΓÇó`); shared limits in `diagnostics/traceback_limits.hpp`.
 
 ### Security / robustness
 
-- **Lexer:** reject sources over **48 MiB** and token streams over **8M tokens** with a clear `LexerError`.
+- **Lexer:** reject sources over **48 MiB** and token streams over **8M tokens** with a clear `LexerError`; skip a leading **UTF-8 BOM** so Windows-saved sources tokenize cleanly.
 - **Parser:** null-coalescing (`??`) parsed **left-associatively** without recursion (matches common semantics and avoids stack overflow on long chains); repeated unary `!`/`-`/`*` folded iteratively.
-- **`tests/stress/`:** adversarial scripts + `run_stress_suite.ps1` (long `??` / unary generators, oversized file check).
 
 ---
 

@@ -85,7 +85,7 @@ static bool runSource(VM& vm, const std::string& source) {
         return false;
     } catch (const VMError& e) {
         std::vector<StackFrame> stack;
-        for (const auto& f : vm.getCallStack()) {
+        for (const auto& f : vm.getCallStackSlice()) {
             stack.push_back({f.functionName, f.line, f.column});
         }
         std::string hint(vmRuntimeErrorHint(e.category, e.code));

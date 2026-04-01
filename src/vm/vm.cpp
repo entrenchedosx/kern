@@ -548,13 +548,15 @@ void VM::runInstruction(const Instruction& inst) {
                     go->exhausted = false;
                     push(std::make_shared<Value>(Value::fromGenerator(std::move(go))));
                 } else {
-                    if (callFrames_.size() >= maxCallDepth_) {
+                    if (maxCallDepth_ > 0 && callFrames_.size() >= maxCallDepth_) {
                         throw VMError("Maximum call depth exceeded (" + std::to_string(maxCallDepth_) + ")", inst.line, 0, 1);
                     }
                     // tail-call check must use the caller's bytecode/ip_. Switching code_ for fn->script first
                     // would read the wrong instruction (cross-script calls: e.g. callback from module -> main).
                     bool tailCall = (ip_ + 1 < code_.size() && code_[ip_ + 1].op == Opcode::RETURN)
                         && !deferStack_.empty() && deferStack_.back().empty();
+                    // When maxCallDepth_ is enforced, do not reuse frames: tail recursion would bypass the limit.
+                    if (maxCallDepth_ > 0) tailCall = false;
                     // if function was defined in an imported script, switch to its bytecode for the call
                     if (fn->script) {
                         codeFrameStack_.push_back(std::make_tuple(std::move(code_), std::move(stringConstants_), std::move(valueConstants_)));
@@ -1171,9 +1173,19 @@ void VM::attachTracebackToError(ValuePtr val) {
     if (!val || val->type != Value::Type::MAP) return;
     auto& m = std::get<std::unordered_map<std::string, ValuePtr>>(val->data);
     if (m.find("traceback") != m.end()) return;
+    const size_t depth = callStack_.size();
+    const auto slice = getCallStackSlice(kMaxCallStackSnapshotFrames);
     std::vector<ValuePtr> arr;
-    arr.reserve(callStack_.size());
-    for (const auto& f : callStack_) {
+    arr.reserve(slice.size() + 1);
+    if (depth > slice.size()) {
+        std::unordered_map<std::string, ValuePtr> marker;
+        marker["name"] = std::make_shared<Value>(Value::fromString(
+            "(" + std::to_string(depth - slice.size()) + " outer frame(s) omitted)"));
+        marker["line"] = std::make_shared<Value>(Value::fromInt(0));
+        marker["column"] = std::make_shared<Value>(Value::fromInt(0));
+        arr.push_back(std::make_shared<Value>(Value::fromMap(std::move(marker))));
+    }
+    for (const auto& f : slice) {
         std::unordered_map<std::string, ValuePtr> fm;
         fm["name"] = std::make_shared<Value>(Value::fromString(f.functionName));
         fm["line"] = std::make_shared<Value>(Value::fromInt(f.line));
@@ -1193,7 +1205,7 @@ void VM::initBuiltins() {
 
 ValuePtr VM::callValue(ValuePtr callee, std::vector<ValuePtr> args) {
     if (!callee) return std::make_shared<Value>(Value::nil());
-    if (callFrames_.size() >= maxCallDepth_)
+    if (maxCallDepth_ > 0 && callFrames_.size() >= maxCallDepth_)
         throw VMError("Maximum call depth exceeded (" + std::to_string(maxCallDepth_) + ")", 0, 0, 1);
     // exception-safe snapshot so failed callbacks can't corrupt VM control-flow stacks.
     Bytecode savedCodeState = code_;

@@ -189,7 +189,7 @@ static bool compileAndRunImportedSource(VM* v, const std::string& displayPath, c
     } catch (const VMError& e) {
         ErrorReporterImportScope scope(g_errorReporter, displayPath, source);
         std::vector<StackFrame> stack;
-        for (const auto& f : v->getCallStack())
+        for (const auto& f : v->getCallStackSlice())
             stack.push_back({f.functionName, f.line, f.column});
         std::string hint(vmRuntimeErrorHint(e.category, e.code));
         g_errorReporter.reportRuntimeError(vmErrorCategory(e.category), e.line, e.column, e.what(), stack, hint,

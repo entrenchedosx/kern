@@ -144,9 +144,9 @@ inline std::string vmRuntimeErrorDetail(int category, int code = static_cast<int
 
 inline std::string lexerCompileErrorDetail() {
     return "Tokenization failed before parsing could start. Typical causes:\n"
-           "  • A string literal is missing its closing quote, or uses an invalid escape.\n"
-           "  • A numeric literal is malformed or exceeds what the implementation can represent.\n"
-           "  • A stray byte or character is not valid in Kern source (encoding or copy-paste artifact).\n"
+           "  - A string literal is missing its closing quote, or uses an invalid escape.\n"
+           "  - A numeric literal is malformed or exceeds what the implementation can represent.\n"
+           "  - A stray byte or character is not valid in Kern source (encoding or copy-paste artifact).\n"
            "Fix the reported line first; later errors often disappear once the lexer can scan past it.";
 }
 
@@ -155,19 +155,19 @@ inline std::string parserCompileErrorDetail(const std::string& msg) {
         "The parser could not build an abstract syntax tree from the token stream. The caret points at the first "
         "token that does not fit the grammar at that position.\n";
     if (msg.find("'return' is only allowed") != std::string::npos) {
-        out += "  • `return` only ends the current function body. At file or class scope, structure control flow "
+        out += "  - `return` only ends the current function body. At file or class scope, structure control flow "
                "with if/else, or move logic into a `def`.\n";
     }
-    out += "  • Match delimiters: ( ), { }, [ ].\n"
-           "  • Check commas between arguments, and that statements end cleanly before the next top-level construct.";
+    out += "  - Match delimiters: ( ), { }, [ ].\n"
+           "  - Check commas between arguments, and that statements end cleanly before the next top-level construct.";
     return out;
 }
 
 inline std::string fileOpenErrorDetail() {
     return "The runtime could not open this path for reading. Confirm:\n"
-           "  • The path is spelled correctly (case-sensitive on some platforms).\n"
-           "  • You are using the intended working directory (or pass a path relative to the script).\n"
-           "  • The file exists and your user has read permission.";
+           "  - The path is spelled correctly (case-sensitive on some platforms).\n"
+           "  - You are using the intended working directory (or pass a path relative to the script).\n"
+           "  - The file exists and your user has read permission.";
 }
 
 inline std::string internalFailureDetail(const std::string& context) {

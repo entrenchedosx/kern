@@ -33,7 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\release_go_no_go.ps1
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tests\stress\run_stress_suite.ps1
+powershell -ExecutionPolicy Bypass -File .\tests\stress\run_stress_suite.ps1 -Aggressive
 ```
 
-Generates large `??` chains, long unary prefixes, and an oversized source file to verify the compiler fails safely (no native stack blowups, bounded source size).
+Checks UTF-8 BOM acceptance and UTF-16 BOM rejection, generates large `??` chains, long unary prefixes, and an oversized source file to verify the compiler fails safely (no native stack blowups, bounded source size). The default run includes a VM max-depth overflow script; **`-Aggressive`** uses larger generators, confirms the same script fails under **`--release`**, and runs the other stress `.kn` files to completion.
 

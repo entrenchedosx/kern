@@ -3,6 +3,7 @@
  */
 
 #include "errors.hpp"
+#include "diagnostics/traceback_limits.hpp"
 #include <iostream>
 #include <sstream>
 #include <algorithm>
@@ -200,13 +201,17 @@ void ErrorReporter::print(const ReportedItem& item) const {
     } else {
         // runtime: Python-style traceback + per-frame source when available -----
         out << colorBlue("Traceback (most recent call last):") << "\n";
-        for (size_t i = 0; i < item.stackTrace.size(); ++i) {
-            const auto& f = item.stackTrace[i];
+        const auto& st = item.stackTrace;
+        const size_t n = st.size();
+        auto printFrame = [&](size_t i, bool withSnippet) {
+            const auto& f = st[i];
             out << colorDim("  File ");
             out << "\"" << colorGreen(filePart) << "\"";
             out << colorDim(", line ") << colorCyan(std::to_string(f.line));
             out << colorDim(", in ") << (f.functionName.empty() ? "<module>" : f.functionName);
             out << "\n";
+
+            if (!withSnippet) return;
 
             int col = f.column > 0 ? f.column : 1;
             if (f.line > 0 && !sourceLines_.empty()) {
@@ -224,6 +229,17 @@ void ErrorReporter::print(const ReportedItem& item) const {
                     out << colorRed("^") << "\n";
                 }
             }
+        };
+
+        if (n <= kTracebackMaxFramesPrinted) {
+            for (size_t i = 0; i < n; ++i) printFrame(i, true);
+        } else {
+            // First head frame only gets source snippet (rest are usually redundant repeats).
+            for (size_t i = 0; i < kTracebackHeadFrames; ++i) printFrame(i, i == 0);
+            const size_t omitted = n - kTracebackHeadFrames - kTracebackTailFrames;
+            out << colorDim("  ... ") << omitted << colorDim(" stack frame(s) omitted (deep call stack) ...\n");
+            // Last tail frame: show snippet so the failing line is visible.
+            for (size_t i = n - kTracebackTailFrames; i < n; ++i) printFrame(i, i + 1 == n);
         }
         out << colorRed(categoryName(item.category)) << ": " << item.message << "\n";
 
@@ -341,12 +357,31 @@ std::string ErrorReporter::toJson() const {
         out << "\"code\":\"" << escapeJson(it.errorCode) << "\",";
         out << "\"detail\":\"" << escapeJson(it.detail) << "\"";
         if (!it.stackTrace.empty()) {
+            const auto& st = it.stackTrace;
+            const size_t n = st.size();
             out << ",\"stack\":[";
-            for (size_t j = 0; j < it.stackTrace.size(); ++j) {
-                const auto& sf = it.stackTrace[j];
-                if (j) out << ",";
-                out << "{\"function\":\"" << escapeJson(sf.functionName) << "\","
-                    << "\"line\":" << sf.line << ",\"column\":" << sf.column << "}";
+            if (n <= kTracebackMaxFramesPrinted) {
+                for (size_t j = 0; j < n; ++j) {
+                    const auto& sf = st[j];
+                    if (j) out << ",";
+                    out << "{\"function\":\"" << escapeJson(sf.functionName) << "\","
+                        << "\"line\":" << sf.line << ",\"column\":" << sf.column << "}";
+                }
+            } else {
+                size_t jout = 0;
+                for (size_t j = 0; j < kTracebackHeadFrames; ++j, ++jout) {
+                    if (jout) out << ",";
+                    const auto& sf = st[j];
+                    out << "{\"function\":\"" << escapeJson(sf.functionName) << "\","
+                        << "\"line\":" << sf.line << ",\"column\":" << sf.column << "}";
+                }
+                out << ",{\"_truncated\":true,\"omitted\":" << (n - kTracebackHeadFrames - kTracebackTailFrames) << "}";
+                for (size_t j = n - kTracebackTailFrames; j < n; ++j) {
+                    out << ",";
+                    const auto& sf = st[j];
+                    out << "{\"function\":\"" << escapeJson(sf.functionName) << "\","
+                        << "\"line\":" << sf.line << ",\"column\":" << sf.column << "}";
+                }
             }
             out << "]";
         }
