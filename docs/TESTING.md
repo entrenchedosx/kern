@@ -2,7 +2,7 @@
 
 ## Full example sweep
 
-From repo root:
+From repo root (recurses under `examples/` — `basic/`, `graphics/`, etc.):
 
 ```powershell
 .\run_all_tests.ps1 -Exe ".\build\Release\kern.exe" -Examples ".\examples"
@@ -10,9 +10,13 @@ From repo root:
 
 ## Kern compiler-focused tests
 
+From repo root (uses `build\Release\kernc.exe` by default):
+
 ```powershell
-.\tests\kern\run_kernc_tests.ps1 -Splc ".\build\Release\kern.exe" -Root "."
+.\tests\kernc\run_kernc_tests.ps1 -Kernc ".\build\Release\kernc.exe" -Root "."
 ```
+
+`-Splc` is accepted as an alias for `-Kernc` (legacy name).
 
 ## Useful options
 

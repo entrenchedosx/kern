@@ -1,4 +1,7 @@
-# Stress tests request
+Stress and edge-case programs are maintained under **`tests/coverage/`** and **`tests/regression/`**. Run the full suite with:
 
-User requested stress and edge-case programs under `tests/stress/` and a runner script. This requires Agent mode to create non-markdown files.
+```powershell
+.\tests\run_all_coverage_kn.ps1
+```
 
+See [TESTING.md](TESTING.md).

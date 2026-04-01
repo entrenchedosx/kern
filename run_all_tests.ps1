@@ -52,7 +52,8 @@ if (-not (Test-Path $Examples)) {
     exit 1
 }
 
-$files = Get-ChildItem -Path $Examples -Filter "*.kn" -File -ErrorAction SilentlyContinue | Sort-Object Name
+# examples are organized in subfolders (basic/, golden/, …); recurse so batch runs stay useful.
+$files = Get-ChildItem -Path $Examples -Filter "*.kn" -File -Recurse -ErrorAction SilentlyContinue | Sort-Object FullName
 if (-not $files -or $files.Count -eq 0) {
     Write-Error "No .kn files found in $Examples"
     exit 1

@@ -31,3 +31,11 @@
 
 - Build with game/graphics support enabled, then rebuild and re-run tests.
 
+## VM / bytecode edge cases
+
+The VM defines reserved opcodes such as `NEW_INSTANCE`, `INVOKE_METHOD`, and `LOAD_THIS` for possible future class dispatch. The **compiler does not emit them** in normal builds. If you see `Opcode not implemented` at runtime, the bytecode did not come from this compiler pipeline (or you are on a mismatched toolchain).
+
+## `run_all_tests.ps1` finds no scripts
+
+`run_all_tests.ps1` walks **`examples/` recursively**. Run it from the repo root and pass `-Examples` if your tree lives elsewhere.
+

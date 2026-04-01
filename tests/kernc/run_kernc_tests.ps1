@@ -1,15 +1,17 @@
 [CmdletBinding()]
 param(
-    [string]$Splc = "",
+    # Path to kernc.exe (kern-impl on Windows). -Splc is a legacy alias.
+    [Alias('Splc')]
+    [string]$Kernc = "",
     [string]$Root = ""
 )
 
 $ErrorActionPreference = "Stop"
 if ([string]::IsNullOrWhiteSpace($Root)) { $Root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\..")) }
-if ([string]::IsNullOrWhiteSpace($Splc)) {
-    $Splc = Join-Path $Root "build\Release\kernc.exe"
+if ([string]::IsNullOrWhiteSpace($Kernc)) {
+    $Kernc = Join-Path $Root "build\Release\kernc.exe"
 }
-if (-not (Test-Path $Splc)) { throw "kernc.exe not found: $Splc" }
+if (-not (Test-Path $Kernc)) { throw "kernc.exe not found: $Kernc" }
 
 # standalone kern links against Kern sources; use repo cwd so relative paths in configs/tools match, and subprocesses inherit it.
 Push-Location $Root
@@ -21,7 +23,7 @@ New-Item -ItemType Directory -Force -Path ([System.IO.Path]::GetDirectoryName($o
 if (Test-Path $outExe) { Remove-Item $outExe -Force }
 
 Write-Host "[kern-test] compile multifile project"
-& $Splc $multifileMain -o $outExe --release --opt 2 --console
+& $Kernc $multifileMain -o $outExe --release --opt 2 --console
 if ($LASTEXITCODE -ne 0) { throw "multifile compile failed" }
 if (-not (Test-Path $outExe)) {
     # on some Windows hosts, file materialization can lag briefly after kern returns.
@@ -66,7 +68,7 @@ try {
 
 Write-Host "[kern-test] config-driven build"
 $cfg = Join-Path $Root "tests\kernc\kernconfig_multifile.json"
-& $Splc --config $cfg
+& $Kernc --config $cfg
 if ($LASTEXITCODE -ne 0) { throw "config build failed" }
 
 Write-Host "[kern-test] cycle detection"
@@ -74,7 +76,7 @@ $cycleMain = Join-Path $Root "tests\kernc\cycle\a.kn"
 $cycleOut = Join-Path $Root "build\Release\tests\kernc_cycle.exe"
 $prevEa = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
-& $Splc $cycleMain -o $cycleOut --release --opt 2 --console 2>&1 | Out-Null
+& $Kernc $cycleMain -o $cycleOut --release --opt 2 --console 2>&1 | Out-Null
 $cycleExit = $LASTEXITCODE
 $ErrorActionPreference = $prevEa
 if ($cycleExit -eq 0) { throw "cycle detection should fail with non-zero exit" }
@@ -86,24 +88,24 @@ $origText = Get-Content -Path $fixMain -Raw
 $dryReport = Join-Path $Root "build\Release\tests\kernc_fixall_dryrun.json"
 $applyReport = Join-Path $Root "build\Release\tests\kernc_fixall_apply.json"
 
-& $Splc --fix-all $fixRoot --dry-run --report-json $dryReport
+& $Kernc --fix-all $fixRoot --dry-run --report-json $dryReport
 if (-not (Test-Path $dryReport)) { throw "fix-all dry-run did not emit report" }
 
-& $Splc --fix-all $fixRoot --report-json $applyReport
+& $Kernc --fix-all $fixRoot --report-json $applyReport
 if (-not (Test-Path $applyReport)) { throw "fix-all apply did not emit report" }
 $afterText = Get-Content -Path $fixMain -Raw
 
 $reportJson = Get-Content -Path $applyReport -Raw | ConvertFrom-Json
 $backupRoot = [string]$reportJson.backupRoot
 if (-not [string]::IsNullOrWhiteSpace($backupRoot)) {
-    & $Splc --undo-fixes $backupRoot
+    & $Kernc --undo-fixes $backupRoot
     if ($LASTEXITCODE -ne 0) { throw "undo-fixes failed" }
     $restored = Get-Content -Path $fixMain -Raw
     if ($restored -ne $origText) { throw "undo-fixes did not restore original fixture" }
 }
 
 Write-Host "[kern-test] analyzer + pointer syntax smoke"
-$analysisJson = & $Splc --analyze $fixRoot --json
+$analysisJson = & $Kernc --analyze $fixRoot --json
 if (-not $analysisJson) { throw "analyze mode emitted no JSON payload" }
 $kernExe = Join-Path $Root "build\Release\kern.exe"
 if (Test-Path $kernExe) {
@@ -116,11 +118,11 @@ Write-Host "[kern-test] package workflow smoke"
 $pkgRoot = Join-Path $Root "tests\kernc\pkgdemo"
 if (Test-Path $pkgRoot) { Remove-Item $pkgRoot -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $pkgRoot | Out-Null
-& $Splc --pkg-init $pkgRoot
+& $Kernc --pkg-init $pkgRoot
 if ($LASTEXITCODE -ne 0) { throw "pkg-init failed" }
-& $Splc --pkg-lock $pkgRoot
+& $Kernc --pkg-lock $pkgRoot
 if ($LASTEXITCODE -ne 0) { throw "pkg-lock failed" }
-& $Splc --pkg-validate $pkgRoot
+& $Kernc --pkg-validate $pkgRoot
 if ($LASTEXITCODE -ne 0) { throw "pkg-validate failed" }
 
 Write-Host "[kern-test] PASS"

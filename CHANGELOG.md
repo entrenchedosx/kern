@@ -11,6 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - Documentation: simplified to a lean public set (`README.md`, `RELEASE.md`, `docs/GETTING_STARTED.md`, `docs/TESTING.md`, `docs/TROUBLESHOOTING.md`) and removed internal/extra markdown docs.
+- `run_all_tests.ps1` now scans `examples/` **recursively** (matches `basic/`, `graphics/`, etc.).
+- `docs/TESTING.md`: corrected path to `tests\kernc\run_kernc_tests.ps1`; documented `-Kernc` (alias `-Splc`).
+- `docs/STRESS_TESTS_PLAN.md`: replaced with a pointer to `tests/coverage/` and `tests/run_all_coverage_kn.ps1`.
+- `docs/TROUBLESHOOTING.md`: added VM reserved-opcode and example-runner notes.
+
+### Fixed
+
+- **Standalone EXE build (`kernc -o`) on Windows:** generated `CMakeLists.txt` now includes `http_get_winhttp.cpp` and links `winhttp`/`wininet`, matching the main `kern` target (fixes unresolved `kernHttpGetWinHttp` when building `kernc_standalone`).
 
 ---
 

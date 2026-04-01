@@ -201,7 +201,8 @@ bool buildStandaloneExe(const CppBackendResult& input, const SplConfig& config, 
     cm << ")\n";
     cm << "target_include_directories(kernc_standalone PRIVATE \"" << w << "/src\" \"" << w << "\")\n";
     cm << "if(WIN32)\n";
-    cm << "  target_link_libraries(kernc_standalone PRIVATE psapi)\n";
+    cm << "  target_sources(kernc_standalone PRIVATE \"" << w << "/src/vm/http_get_winhttp.cpp\")\n";
+    cm << "  target_link_libraries(kernc_standalone PRIVATE psapi winhttp wininet)\n";
     cm << "endif()\n";
     if (!config.console) {
         cm << "if(MSVC)\n";
