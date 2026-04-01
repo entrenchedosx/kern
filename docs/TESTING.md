@@ -29,3 +29,11 @@ From repo root (uses `build\Release\kernc.exe` by default):
 powershell -ExecutionPolicy Bypass -File .\scripts\release_go_no_go.ps1
 ```
 
+## Adversarial / stress (parser + lexer limits)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tests\stress\run_stress_suite.ps1
+```
+
+Generates large `??` chains, long unary prefixes, and an oversized source file to verify the compiler fails safely (no native stack blowups, bounded source size).
+

@@ -1,0 +1,7 @@
+// VM max call depth (default 1024) — must throw, not crash native stack
+def rec(n) {
+    if (n <= 0) { return 0 }
+    return 1 + rec(n - 1)
+}
+// stay under limit so script completes
+print(rec(50))

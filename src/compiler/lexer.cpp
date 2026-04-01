@@ -5,8 +5,13 @@
 #include "lexer.hpp"
 #include <cctype>
 #include <sstream>
+#include <string>
 
 namespace kern {
+
+// guard against adversarial / accidental huge inputs exhausting memory or the C++ stack downstream.
+static constexpr size_t kMaxSourceBytes = 48u * 1024u * 1024u;
+static constexpr size_t kMaxTokenCount = 8u * 1024u * 1024u;
 
 std::unordered_map<std::string, TokenType> Lexer::keywords_ = {
     {"let", TokenType::LET},
@@ -103,22 +108,30 @@ bool Lexer::match(char c) {
 }
 
 void Lexer::addToken(TokenType type) {
+    if (tokens_.size() >= kMaxTokenCount)
+        throw LexerError("Too many tokens (limit for safety)", line_, column_);
     tokens_.emplace_back(type, source_.substr(start_, current_ - start_), line_, column_);
 }
 
 void Lexer::addToken(TokenType type, int64_t value) {
+    if (tokens_.size() >= kMaxTokenCount)
+        throw LexerError("Too many tokens (limit for safety)", line_, column_);
     Token t(type, source_.substr(start_, current_ - start_), line_, column_);
     t.value = value;
     tokens_.push_back(t);
 }
 
 void Lexer::addToken(TokenType type, double value) {
+    if (tokens_.size() >= kMaxTokenCount)
+        throw LexerError("Too many tokens (limit for safety)", line_, column_);
     Token t(type, source_.substr(start_, current_ - start_), line_, column_);
     t.value = value;
     tokens_.push_back(t);
 }
 
 void Lexer::addToken(TokenType type, const std::string& value) {
+    if (tokens_.size() >= kMaxTokenCount)
+        throw LexerError("Too many tokens (limit for safety)", line_, column_);
     Token t(type, source_.substr(start_, current_ - start_), line_, column_);
     t.value = value;
     tokens_.push_back(t);
@@ -347,6 +360,11 @@ void Lexer::lineComment() {
 
 std::vector<Token> Lexer::tokenize() {
     tokens_.clear();
+    if (source_.size() > kMaxSourceBytes) {
+        throw LexerError(
+            std::string("Source exceeds maximum size (") + std::to_string(kMaxSourceBytes / (1024u * 1024u)) + " MiB)",
+            1, 1);
+    }
     while (!isAtEnd()) {
         start_ = current_;
         scanToken();

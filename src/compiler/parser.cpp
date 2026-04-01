@@ -959,8 +959,11 @@ ExprPtr Parser::assignment() {
 
 ExprPtr Parser::coalesce() {
     ExprPtr left = parsePrecedence(2);
-    while (match(TokenType::COALESCE))
-        left = std::make_unique<CoalesceExpr>(std::move(left), coalesce());
+    // left-associative chain (matches JS/C#); iterative avoids stack overflow on huge `a ?? b ?? …` inputs.
+    while (match(TokenType::COALESCE)) {
+        ExprPtr right = parsePrecedence(2);
+        left = std::make_unique<CoalesceExpr>(std::move(left), std::move(right));
+    }
     return left;
 }
 
@@ -998,11 +1001,14 @@ ExprPtr Parser::unary() {
         advance();
         return std::make_unique<AwaitExpr>(unary());
     }
-    if (match(TokenType::NOT) || match(TokenType::MINUS) || match(TokenType::STAR)) {
-        TokenType op = previous().type;
-        return std::make_unique<UnaryExpr>(op, unary());
-    }
-    return postfix();
+    // fold repeated prefix ops so adversarial `!!!!…x` cannot blow the C++ stack.
+    std::vector<TokenType> prefixOps;
+    while (match(TokenType::NOT) || match(TokenType::MINUS) || match(TokenType::STAR))
+        prefixOps.push_back(previous().type);
+    ExprPtr expr = postfix();
+    for (auto it = prefixOps.rbegin(); it != prefixOps.rend(); ++it)
+        expr = std::make_unique<UnaryExpr>(*it, std::move(expr));
+    return expr;
 }
 
 ExprPtr Parser::postfix() {

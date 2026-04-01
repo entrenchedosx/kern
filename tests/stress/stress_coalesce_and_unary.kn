@@ -1,0 +1,9 @@
+// long null-coalescing + unary chains (parser must stay iterative)
+let a = null
+let b = null
+let c = 7
+let v = a ?? b ?? c
+// many unary ops (folded in parser)
+let n = !!!!!!!!!!!!true
+print(v)
+print(n)

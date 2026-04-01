@@ -20,6 +20,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **Standalone EXE build (`kernc -o`) on Windows:** generated `CMakeLists.txt` now includes `http_get_winhttp.cpp` and links `winhttp`/`wininet`, matching the main `kern` target (fixes unresolved `kernHttpGetWinHttp` when building `kernc_standalone`).
 
+### Security / robustness
+
+- **Lexer:** reject sources over **48 MiB** and token streams over **8M tokens** with a clear `LexerError`.
+- **Parser:** null-coalescing (`??`) parsed **left-associatively** without recursion (matches common semantics and avoids stack overflow on long chains); repeated unary `!`/`-`/`*` folded iteratively.
+- **`tests/stress/`:** adversarial scripts + `run_stress_suite.ps1` (long `??` / unary generators, oversized file check).
+
 ---
 
 ## [1.0.0] - 2025-03-07
