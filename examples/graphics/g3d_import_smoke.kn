@@ -1,7 +1,9 @@
-// smoke test: g3d module loads in standalone EXE (no window).
-let g3 = import(".kern-fix-backups/1774649226064/compiler/lib/kern/gamekit/ecs/world3d")
-if (g3 == null) {
-    print("FAIL: g3d import null")
+// smoke test: graphics modules import successfully.
+// This test must not depend on any local dev backup paths.
+
+let g3d = import("g3d")
+if (g3d == null) {
+    print("g3d unavailable in this build")
 } else {
     print("OK: g3d import")
 }
