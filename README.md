@@ -25,7 +25,7 @@ cmake --build build --config Release --target kern kern_repl kernc
 Run a script:
 
 ```powershell
-.\build\Release\kern.exe .\examples\hello.kn
+.\build\Release\kern.exe .\examples\basic\01_hello_world.kn
 ```
 
 ## Windows portable builds

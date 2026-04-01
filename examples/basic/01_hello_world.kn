@@ -1,3 +1,2 @@
-print "hamza is noob"
-print "print"
-
+// first program: statements run at the top level (no main() required)
+print("Hello, Kern")

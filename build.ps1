@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Kern automated build and packaging â€“ BUILD directory, kern.exe, kern-ide.exe, installer.
 .DESCRIPTION
@@ -246,8 +246,8 @@ Kern Build Output
   installer\         - kern_installer.exe (if NSIS was used)
 
 Run from this folder (or set KERN_LIB to this folder):
-  .\bin\kern.exe .\examples\hello_world.kn
-  .\bin\kern.exe .\examples\05_functions.kn -o .\examples\dist\functions.exe
+  .\bin\kern.exe .\examples\basic\01_hello_world.kn
+  .\bin\kern.exe .\examples\basic\05_functions.kn -o .\examples\dist\functions.exe
 "@ | Set-Content (Join-Path $BuildOut "README.txt") -Encoding UTF8
 
 Write-Host "=== Build Complete ===" -ForegroundColor Cyan

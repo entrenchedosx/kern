@@ -6,33 +6,41 @@ Run from the **repository root** so `lib/` and relative paths resolve.
 .\build\Release\kern.exe examples\basic\01_hello_world.kn
 ```
 
-Or use the packaged compiler:
+Or use a packaged compiler:
 
 ```powershell
 .\shareable-ide\compiler\kern.exe examples\basic\01_hello_world.kn
 ```
 
-Set **`KERN_LIB`** to this repo’s `lib` folder when examples use imports under `lib/kern/` (many advanced samples do).
+Set **`KERN_LIB`** to this repo’s `lib` folder when examples import under `lib/kern/` (many advanced samples do).
 
-## Layout (quality tiers)
+## Suggested learning path
+
+1. **`basic/`** — syntax, stdlib, small scripts. Start with `01_hello_world.kn`, then follow **[basic/README.md](basic/README.md)**.
+2. **`golden/`** — modern runtime, async, events (curated “best current” samples). See **[golden/README.md](golden/README.md)**.
+3. **`graphics/`** — 2D/3D when you have a game-enabled build. See **[graphics/README.md](graphics/README.md)**.
+4. **`system/`** — OS/FFI/process samples; some Windows-only. See **[system/README.md](system/README.md)**.
+5. **`advanced/`** — BrowserKit, GameKit, large demos. See **[advanced/README.md](advanced/README.md)**.
+
+## Layout (folders)
 
 | Folder | Purpose |
 |--------|---------|
-| `golden/` | Best starting points: modern runtime, async, flagship demos |
 | `basic/` | Language basics: syntax, stdlib, small scripts |
-| `graphics/` | `g3d`, `g2d`, `2dgraphics`, Raylib-backed samples (e.g. `graphics/pong.kn`) |
-| `system/` | OS-facing modules (`kern::process`, `kern::input`, FFI, oskit) |
-| `advanced/` | BrowserKit, GameKit, HTTP, projects, large smoke tests |
+| `golden/` | Curated demos: modern runtime, async, events |
+| `graphics/` | `g2d`, `g3d`, games (Raylib-backed when enabled) |
+| `system/` | Processes, input, FFI, oskit |
+| `advanced/` | BrowserKit, GameKit, HTTP, project-style scripts |
 
-## Golden examples (recommended)
-
-Short index: **[golden/README.md](golden/README.md)**.
+## Golden examples (recommended after basics)
 
 ```powershell
 .\shareable-ide\compiler\kern.exe examples\golden\golden_modern_runtime_commands_events.kn
 .\shareable-ide\compiler\kern.exe examples\golden\golden_async_spawn_await.kn
 .\shareable-ide\compiler\kern.exe examples\golden\golden_event_runtime_dashboard.kn
 ```
+
+Index: **[golden/README.md](golden/README.md)**.
 
 ## Validate all examples (CI-style)
 

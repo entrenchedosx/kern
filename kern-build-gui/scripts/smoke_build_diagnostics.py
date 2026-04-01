@@ -42,9 +42,9 @@ def main() -> int:
     # kern link step expects a real repo layout; cwd must be the Kern repository root.
     work = repo / "build" / "_kern_gui_smoke"
     work.mkdir(parents=True, exist_ok=True)
-    entry = repo / "examples" / "05_functions.kn"
+    entry = repo / "examples" / "basic" / "05_functions.kn"
     if not entry.is_file():
-        print("SKIP: examples/05_functions.kn missing", file=sys.stderr)
+        print("SKIP: examples/basic/05_functions.kn missing", file=sys.stderr)
         return 0
     out_exe = work / "smoke_out.exe"
     diag = work / "diag.json"

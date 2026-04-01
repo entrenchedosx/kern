@@ -420,7 +420,7 @@ static int emitError(const std::string& message, bool json) {
 }
 
 static int emitEntryNotFoundError(const std::string& entry, bool json) {
-    const char* hint = "Pass an existing .kn file, e.g. examples/05_functions.kn or examples/3d_textured_scene.kn";
+    const char* hint = "Pass an existing .kn file, e.g. examples/basic/05_functions.kn or examples/graphics/3d_textured_scene.kn";
     if (json) {
         std::cout << "{\"ok\":false,\"error\":\"entry file not found: " << entry << "\",\"hint\":\"" << hint << "\"}\n";
     } else {

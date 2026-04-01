@@ -14,7 +14,7 @@ If you need graphics/game modules, build with `KERN_BUILD_GAME=ON`. For Windows 
 ## Run
 
 ```powershell
-.\build\Release\kern.exe .\examples\hello.kn
+.\build\Release\kern.exe .\examples\basic\01_hello_world.kn
 ```
 
 REPL:

@@ -1,31 +1,27 @@
+// minimal g2d window: shapes + text, auto-closes after a few seconds
 let g2d = import("g2d")
 if (g2d == null) {
     print("g2d unavailable in this build")
 } else {
     let time = import("time")
-    g2d.createWindow(640, 360, "Graphics Demo")
-    g2d.setTargetFps(60)
-    // Keep pumping frames so the window stays responsive.
-    // Close after a short demo period, or when the user closes the window.
-    let t0 = int(time.monotonic_time() * 1000)
-    while (g2d.should_close() == false) {
-        let t = int(time.monotonic_time() * 1000) - t0
-        if (t > 5000) { break }
-        g2d.beginFrame()
-        g2d.setColor(255, 255, 255)
-        g2d.clear(20, 20, 20)
-        g2d.fillRect(50, 50, 120, 80)
-        g2d.drawCircle(260, 120, 40)
-        g2d.drawText("Test text", 50, 170)
-        g2d.endFrame()
+    if (time == null) {
+        print("time module unavailable in this build")
+    } else {
+        g2d.createWindow(640, 360, "Graphics Demo")
+        g2d.setTargetFps(60)
+        // keep pumping frames so the window stays responsive
+        let t0 = int(time.monotonic_time() * 1000)
+        while (g2d.should_close() == false) {
+            let t = int(time.monotonic_time() * 1000) - t0
+            if (t > 5000) { break }
+            g2d.beginFrame()
+            g2d.setColor(255, 255, 255)
+            g2d.clear(20, 20, 20)
+            g2d.fillRect(50, 50, 120, 80)
+            g2d.drawCircle(260, 120, 40)
+            g2d.drawText("Test text", 50, 170)
+            g2d.endFrame()
+        }
+        g2d.close()
     }
-    g2d.close()
 }
-
-
-
-
-
-
-
-

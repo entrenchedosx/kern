@@ -1,6 +1,6 @@
 # Golden examples
 
-Start here for **curated**, up-to-date samples that match current Kern syntax and the modern runtime.
+Start here for **curated**, up-to-date samples that match current Kern syntax and the modern runtime. For a full **learning order** (basic → golden → graphics → …), see **[../README.md](../README.md)**.
 
 Run from the **repository root** (so `lib/` resolves):
 

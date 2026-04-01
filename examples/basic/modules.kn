@@ -1,3 +1,4 @@
+// tiny smoke test: stdlib math import
 let m = import("math")
 print(m != null)
 print(m.sqrt(16))

@@ -73,7 +73,7 @@ Then run `build/Release/kern.exe examples/graphics/graphics_demo.kn` (or your sc
 
 4. **Test**
    - Run the test suite (see `docs/TESTING.md`).
-   - Smoke-test: `kern --version`, `kern --help`, `kern examples/hello.kn`, `kern` (REPL: exit), and if built with game: `kern examples/test_graphics.kn`.
+   - Smoke-test: `kern --version`, `kern --help`, `kern examples/basic/01_hello_world.kn`, `kern` (REPL: exit), and if built with game: `kern examples/graphics/graphics_demo.kn`.
 
 5. **Package**
    - Create archives (e.g. `kern-1.0.0-win64.zip`, `kern-1.0.0-linux64.tar.gz`) containing:
@@ -113,8 +113,8 @@ Then run `build/Release/kern.exe examples/graphics/graphics_demo.kn` (or your sc
 - [ ] `VERSION` file set.
 - [ ] `kern --version` and `kern_version()` match.
 - [ ] `kern --help` lists all options.
-- [ ] Core examples run: hello.kn, 00_full_feature_smoke.kn.
-- [ ] With Raylib: graphics_test.kn or test_graphics.kn runs.
+- [ ] Core examples run: `examples/basic/01_hello_world.kn`, `examples/advanced/00_full_feature_smoke.kn`.
+- [ ] With Raylib: `examples/graphics/graphics_demo.kn` (or another graphics sample) runs.
 - [ ] REPL starts and exits with `exit`/`quit`.
 - [ ] `kern --check file.kn` exits 0 for valid script.
 - [ ] Docs: README, RELEASE.md, TROUBLESHOOTING up to date.
