@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [1.0.6] - 2026-04-02
 
+### Fixed
+
+- **CMake / macOS:** embed `version_info.rc` only on **Windows** so Apple Clang and other non-MSVC toolchains do not try to compile the PE resource file (unblocks Release workflow macOS/Linux packaging).
+
 ### Added
 
 - **CLI:** `kern docs` (documentation paths + MkDocs hint) and `kern build` (CMake build instructions).

@@ -42,12 +42,16 @@ list(GET _kern_version_parts 0 KERN_VERSION_MAJOR)
 list(GET _kern_version_parts 1 KERN_VERSION_MINOR)
 list(GET _kern_version_parts 2 KERN_VERSION_PATCH)
 set(KERN_VERSION_BUILD 0)
-configure_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/version_info.rc.in"
-  "${CMAKE_BINARY_DIR}/version_info.rc"
-  @ONLY
-)
-set(KERN_VERSION_RESOURCE "${CMAKE_BINARY_DIR}/version_info.rc")
+# Windows PE version resource only (Apple Clang / Unix toolchains must not compile .rc).
+set(KERN_WIN32_RESOURCES "")
+if(WIN32)
+  configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/version_info.rc.in"
+    "${CMAKE_BINARY_DIR}/version_info.rc"
+    @ONLY
+  )
+  list(APPEND KERN_WIN32_RESOURCES "${CMAKE_BINARY_DIR}/version_info.rc")
+endif()
 
 # Default ON so kern.exe includes game + g2d when Raylib is available (no extra flags needed)
 option(KERN_BUILD_GAME "Build kern_game and g2d into kern/kern_repl (requires Raylib)" ON)
@@ -150,20 +154,20 @@ set(KERNC_SUPPORT_SOURCES
     src/utils/build_cache.cpp
 )
 
-add_executable(kern src/main.cpp ${KERN_VERSION_RESOURCE} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES} ${SCANNER_SOURCES})
+add_executable(kern src/main.cpp ${KERN_WIN32_RESOURCES} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES} ${SCANNER_SOURCES})
 target_include_directories(kern PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(kern PRIVATE KERN_VERSION="${KERN_VERSION}")
 
 # REPL (same binary with repl mode; we use one binary that does both)
-add_executable(kern_repl src/repl/repl_main.cpp ${KERN_VERSION_RESOURCE} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES})
+add_executable(kern_repl src/repl/repl_main.cpp ${KERN_WIN32_RESOURCES} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES})
 target_include_directories(kern_repl PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(kern_repl PRIVATE KERN_VERSION="${KERN_VERSION}")
 
-add_executable(kernc src/kernc_main.cpp ${KERN_VERSION_RESOURCE} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES} ${KERNC_SUPPORT_SOURCES})
+add_executable(kernc src/kernc_main.cpp ${KERN_WIN32_RESOURCES} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES} ${KERNC_SUPPORT_SOURCES})
 target_include_directories(kernc PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(kernc PRIVATE KERN_VERSION="${KERN_VERSION}")
 
-add_executable(kern_lsp src/lsp/lsp_main.cpp ${KERN_VERSION_RESOURCE} ${COMPILER_SOURCES} ${ERROR_SOURCES})
+add_executable(kern_lsp src/lsp/lsp_main.cpp ${KERN_WIN32_RESOURCES} ${COMPILER_SOURCES} ${ERROR_SOURCES})
 target_include_directories(kern_lsp PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(kern_lsp PRIVATE KERN_VERSION="${KERN_VERSION}")
 
@@ -172,7 +176,7 @@ kern_apply_strict_warnings(kern_repl)
 kern_apply_strict_warnings(kernc)
 kern_apply_strict_warnings(kern_lsp)
 
-add_executable(kern-scan src/scanner/scan_main.cpp ${KERN_VERSION_RESOURCE} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES} ${SCANNER_SOURCES})
+add_executable(kern-scan src/scanner/scan_main.cpp ${KERN_WIN32_RESOURCES} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES} ${SCANNER_SOURCES})
 target_include_directories(kern-scan PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(kern-scan PRIVATE KERN_VERSION="${KERN_VERSION}")
 kern_apply_strict_warnings(kern-scan)
@@ -186,7 +190,7 @@ if(WIN32)
   # Compiler binary is kern-impl.exe; kern.exe is a tiny launcher (tools/kernc_launcher.c) that runs
   # cmake --build ... --target kern then execs kern-impl.exe (stale-compiler issue when only kern.exe was run).
   set_target_properties(kernc PROPERTIES OUTPUT_NAME "kern-impl")
-  add_executable(kern_launcher tools/kernc_launcher.c ${KERN_VERSION_RESOURCE})
+  add_executable(kern_launcher tools/kernc_launcher.c ${KERN_WIN32_RESOURCES})
   set_target_properties(kern_launcher PROPERTIES OUTPUT_NAME "kernc")
   # Do NOT add_dependencies(kern_launcher kernc): kernc POST_BUILD runs nested build for launcher.
   add_custom_command(TARGET kernc POST_BUILD
@@ -307,7 +311,7 @@ if(KERN_BUILD_GAME)
     target_sources(kern-scan PRIVATE src/game/game_builtins.cpp ${G2D_SOURCES})
     target_compile_definitions(kern-scan PRIVATE KERN_BUILD_GAME=1)
     target_link_libraries(kern-scan PRIVATE ${KERN_RAYLIB_TARGET})
-    add_executable(kern_game src/game/game_main.cpp ${KERN_VERSION_RESOURCE} src/game/game_builtins.cpp ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES})
+    add_executable(kern_game src/game/game_main.cpp ${KERN_WIN32_RESOURCES} src/game/game_builtins.cpp ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES})
     target_include_directories(kern_game PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
     target_compile_definitions(kern_game PRIVATE KERN_BUILD_GAME=1)
     target_link_libraries(kern_game PRIVATE ${KERN_RAYLIB_TARGET} winhttp wininet)
