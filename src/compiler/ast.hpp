@@ -451,7 +451,10 @@ struct ImportStmt : Stmt {
     std::string moduleName;
     std::string alias;
     bool hasAlias;
-    ImportStmt(std::string m, std::string a = "", bool ha = false) : moduleName(std::move(m)), alias(std::move(a)), hasAlias(ha) {}
+    /* Non-empty: from "module" import a, b — bind each name from the module map. */
+    std::vector<std::string> namedImports;
+    ImportStmt(std::string m, std::string a = "", bool ha = false, std::vector<std::string> named = {})
+        : moduleName(std::move(m)), alias(std::move(a)), hasAlias(ha), namedImports(std::move(named)) {}
 };
 
 struct Program : Stmt {

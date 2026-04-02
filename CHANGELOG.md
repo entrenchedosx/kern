@@ -10,6 +10,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.5] - 2026-04-02
+
+### Added
+
+- **Modules:** Python-style **`from "module" import sym1, sym2`** (lexer `FROM` keyword); `extern def ... from "dll"` uses strict `from` token.
+- **Packages:** **`kern verify`** — exit 0 when `kern.lock` dependency names match `kern.json` (CI); fixture under `tests/coverage/kern_verify_fixture/`.
+- **Diagnostics:** JSON runtime **`stack`** frames include **`filename`**; **`kern --trace`** for VM instruction tracing; REPL **`last`** / **`.last`** for last diagnostic; **`docs/ERROR_CODES.md`**.
+- **Phase 2 typing:** **`kern --check --strict-types`** uses append-only **`src/compiler/typed_builtins.hpp`** for simple `let x: T = builtin(...)` checks; **`docs/STRICT_TYPES.md`**; tests **`tests/strict_types_phase2/`** and **`tests/coverage/test_strict_types_phase2_pass.kn`**; stdlib slice **`lib/kern/stdlib/strict_types_slice.kn`**.
+- **Docs:** **`docs/LANGUAGE_ROADMAP.md`**, **`docs/MEMORY_MODEL.md`**, **`docs/IMPLEMENTATION_SUMMARY.md`**, **`docs/TRUST_MODEL.md`**; roadmap §8 implementation status.
+- **Tests:** **`kern test`** supports **`--grep`**, **`--list`**, **`--fail-fast`**; smoke tests for selective imports, equation solver, strict types.
+- **`kern doctor`:** Reports memory model, error codes, implementation summary, and roadmap paths when present.
+
+### Changed
+
+- **`CONTRIBUTING.md`:** Strict-types / `typed_builtins.hpp` append-only policy.
+- **`kern test`:** Skips `tests/strict_types_phase2/fail_mismatch.kn` (strict-check-only negative; still valid at runtime).
+
+---
+
 ## [1.0.4] - 2026-04-02
 
 ### Fixed

@@ -114,6 +114,10 @@ public:
     void setScriptExitCode(int c) { scriptExitCode_ = c; }
     int getScriptExitCode() const { return scriptExitCode_; }
 
+    /* * Enables per-instruction stderr tracing (same effect as KERN_VM_TRACE=1). REPL: trace on | trace off */
+    void setVmTraceEnabled(bool on) { vmTraceEnabled_ = on; }
+    bool isVmTraceEnabled() const { return vmTraceEnabled_; }
+
 private:
     Bytecode code_;
     std::vector<std::string> stringConstants_;

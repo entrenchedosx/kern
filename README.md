@@ -1,7 +1,7 @@
 # Kern
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.4-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-1.0.5-blue.svg)](VERSION)
 
 **Kern** is a small, compiled scripting language: an explicit lexer → parser → bytecode pipeline and a bytecode **VM**, with a growing **standard library** (`lib/kern/`) and a **`kern`** CLI for running scripts, linting, and the REPL.
 
@@ -31,6 +31,7 @@ This repository is the **language and toolchain** (compiler, VM, stdlib, tests, 
 - **Readable surface:** familiar statements, functions, classes, and modules without a huge runtime.
 - **Inspectable pipeline:** `--ast`, `--bytecode`, and `--check` for learning and debugging.
 - **Solid diagnostics:** errors aim for file, line, hint, and stable codes (see [Troubleshooting](docs/TROUBLESHOOTING.md)).
+- **Trust-based core:** Kern does not enforce a mandatory sandbox; power is explicit, and optional policy libraries exist for stricter designs — see [TRUST_MODEL.md](docs/TRUST_MODEL.md).
 - **Optional graphics:** build with Raylib for `g2d` / `game` samples when you need them.
 
 ---
@@ -84,13 +85,15 @@ See **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)** for CMake-only instal
 kern [options] script.kn          # run (extension optional)
 kern run script.kn               # explicit run
 kern                             # REPL
-kern --check [--json] script.kn  # compile only; JSON for IDEs
+kern --check [--json] [--strict-types] script.kn   # compile only; optional strict typing
 kern --scan [.kn files or dirs]  # cross-layer scan (see docs/KERN_SCAN.md)
-kern test [directory]            # run .kn tests (default: tests/coverage)
+kern test [options] [directory]  # --grep, --list, --fail-fast; default tests/coverage
+kern verify                      # kern.lock matches kern.json (CI)
+kern --trace script.kn           # verbose VM trace (noisy)
 kern --version / --help
 ```
 
-**Imports:** set **`KERN_LIB`** to the directory that **contains** `lib/kern` (often the repo root) so `import("lib/kern/...")` resolves when your working directory is not the project root.
+**Imports:** `import "math"`, `from "math" import sqrt`, or `import("path")` / `let m = import("math")`. Set **`KERN_LIB`** to the directory that **contains** `lib/kern` (often the repo root) so `import("lib/kern/...")` resolves when your working directory is not the project root.
 
 **Shebang:** a leading `#!/usr/bin/env kern` line is ignored on the first line so `chmod +x script.kn` works on Unix.
 
@@ -141,11 +144,17 @@ The canonical version string is the root **`VERSION`** file (used by `kern --ver
 | [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common failures and fixes |
 | [STDLIB_STD_V1.md](docs/STDLIB_STD_V1.md) | `std.v1.*` native modules |
 | [KERN_SCAN.md](docs/KERN_SCAN.md) | `kern --scan` / `kern-scan` |
+| [TRUST_MODEL.md](docs/TRUST_MODEL.md) | **Trust-the-programmer** stance and optional safety layers |
 | [LANGUAGE_SYNTAX.md](docs/LANGUAGE_SYNTAX.md) | Short syntax overview + pointers to examples |
 | [BUILTIN_REFERENCE.md](docs/BUILTIN_REFERENCE.md) | Where builtins are defined and how to look them up |
 | [RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) | Maintainer pre-release checklist |
 | [RELEASE.md](RELEASE.md) | User install + maintainer packaging |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
+| [STRICT_TYPES.md](docs/STRICT_TYPES.md) | Optional `--strict-types` checks (Phase 2) |
+| [LANGUAGE_ROADMAP.md](docs/LANGUAGE_ROADMAP.md) | Language evolution phases and status |
+| [MEMORY_MODEL.md](docs/MEMORY_MODEL.md) | Value lifetimes and FFI boundaries |
+| [ERROR_CODES.md](docs/ERROR_CODES.md) | Stable diagnostic codes |
+| [IMPLEMENTATION_SUMMARY.md](docs/IMPLEMENTATION_SUMMARY.md) | Recent toolchain upgrade summary |
 
 ---
 
@@ -161,9 +170,9 @@ See [docs/TESTING.md](docs/TESTING.md) for example sweeps, `kernc` tests, and st
 
 ## Releases & versioning
 
-- **Version:** `VERSION` at repo root (e.g. `1.0.4`).
+- **Version:** `VERSION` at repo root (e.g. `1.0.5`).
 - **Changelog:** [CHANGELOG.md](CHANGELOG.md) follows [Keep a Changelog](https://keepachangelog.com/).
-- **Tags:** release tags look like `v1.0.4` (see [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)).
+- **Tags:** release tags look like `v1.0.5` (see [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)).
 - **CI:** [`.github/workflows/windows-kern.yml`](.github/workflows/windows-kern.yml) builds and smoke-tests on pushes and PRs; [`.github/workflows/release.yml`](.github/workflows/release.yml) attaches Windows binaries when a `v*` tag is pushed.
 
 ---

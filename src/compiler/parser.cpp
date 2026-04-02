@@ -116,6 +116,7 @@ StmtPtr Parser::declaration() {
             throw ParserError("Expected 'def' after 'async'", peek().line, peek().column);
         return functionDeclaration();
     }
+    if (match(TokenType::FROM)) return fromImportStatement();
     if (match(TokenType::IMPORT)) return importStatement();
     if (match(TokenType::WITH)) return withStatement();
     if (match(TokenType::ENUM)) return enumDeclaration();
@@ -220,9 +221,7 @@ StmtPtr Parser::externDeclaration() {
         advance();
         returnType = previous().lexeme;
     }
-    consume(TokenType::IDENTIFIER, "Expected 'from' in extern declaration");
-    if (previous().lexeme != "from")
-        throw ParserError("Expected 'from' in extern declaration", previous().line, previous().column);
+    consume(TokenType::FROM, "Expected 'from' in extern declaration");
     consume(TokenType::STRING, "Expected DLL name string after 'from'");
     std::string dllName = std::get<std::string>(previous().value);
     std::string symbolName = name;
@@ -288,6 +287,30 @@ StmtPtr Parser::importStatement() {
         hasAlias = true;
     }
     return std::make_unique<ImportStmt>(name, alias, hasAlias);
+}
+
+StmtPtr Parser::fromImportStatement() {
+    std::string name;
+    if (match(TokenType::LPAREN)) {
+        if (!match(TokenType::STRING))
+            throw ParserError("Expected quoted module name after 'from'", peek().line, peek().column);
+        name = std::get<std::string>(previous().value);
+        consume(TokenType::RPAREN, "Expected ')' after from module path");
+    } else if (match(TokenType::STRING)) {
+        name = std::get<std::string>(previous().value);
+    } else {
+        throw ParserError("Expected module path: from \"math\" import ...", peek().line, peek().column);
+    }
+    if (!match(TokenType::IMPORT))
+        throw ParserError("Expected 'import' after module path in from-import", peek().line, peek().column);
+    std::vector<std::string> names;
+    consume(TokenType::IDENTIFIER, "Expected name to import");
+    names.push_back(std::get<std::string>(previous().value));
+    while (match(TokenType::COMMA)) {
+        consume(TokenType::IDENTIFIER, "Expected name in import list");
+        names.push_back(std::get<std::string>(previous().value));
+    }
+    return std::make_unique<ImportStmt>(name, "", false, std::move(names));
 }
 
 StmtPtr Parser::varDeclaration() {
@@ -570,8 +593,7 @@ StmtPtr Parser::statement() {
             val = expression();
         return std::make_unique<YieldStmt>(std::move(val));
     }
-    if (isIdentifierToken(peek(), "spawn")) {
-        advance();
+    if (match(TokenType::SPAWN)) {
         std::vector<CallArg> args;
         args.push_back(CallArg{"", expression(), false});
         return std::make_unique<ExprStmt>(

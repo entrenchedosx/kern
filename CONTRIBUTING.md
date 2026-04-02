@@ -4,6 +4,7 @@ Thanks for helping improve Kern. This document sets expectations so reviews stay
 
 ## What belongs in this repo
 
+- **Design stance:** Kern is **trust-the-programmer** at the core; optional safety belongs in libraries, hosts, and flags — see [docs/TRUST_MODEL.md](docs/TRUST_MODEL.md).
 - **In scope:** compiler, VM, builtins, `lib/kern/` stdlib, CLI (`kern`, `kernc`, `kern-scan`), tests, docs, CMake, CI workflows.
 - **Editors / IDE UI:** live under [`Kern-IDE/`](Kern-IDE/README.md). Changes there are welcome but are packaged and released separately from the core `kern` binary.
 
@@ -21,6 +22,7 @@ Thanks for helping improve Kern. This document sets expectations so reviews stay
 - **C++17** unless a file already uses a newer standard for a specific target.
 - Match **surrounding style** in the file you edit (naming, brace placement, error handling).
 - **Do not** reorder `getBuiltinNames()` entries or builtin registration indices — additions are **append-only** (see [BUILTIN_REFERENCE.md](docs/BUILTIN_REFERENCE.md)).
+- **Strict types:** if a builtin should participate in `kern --check --strict-types` for patterns like `let x: float = sqrt(1.0)`, add an **append-only** row to [`src/compiler/typed_builtins.hpp`](src/compiler/typed_builtins.hpp) (return type name: `int`, `float`, `string`, `bool`). See [docs/STRICT_TYPES.md](docs/STRICT_TYPES.md).
 - Avoid drive-by refactors unrelated to the bug or feature.
 
 ## Documentation

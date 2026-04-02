@@ -33,6 +33,7 @@
 #include <filesystem>
 #include <thread>
 #include <chrono>
+#include <regex>
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -310,19 +311,23 @@ static void printUsage(const char* prog) {
         << "                        Same as standalone `kern-scan`. Use --registry-only, --json, --strict-types, --test.\n\n"
         << "  --watch <file>        Re-run script when file changes.\n\n"
         << "Runtime mode flags (can precede any command):\n"
+        << "  --trace               Enable VM instruction trace for the next script run or REPL (very noisy).\n"
         << "  --debug / --release   Toggle runtime guard profile (debug default).\n"
         << "  --allow-unsafe        Allow raw memory ops globally (without unsafe block).\n"
         << "  --ffi                 Enable ffi_call builtin.\n"
         << "  --ffi-allow <dll>     Add DLL allowlist entry for sandboxed ffi_call.\n"
         << "  --no-sandbox          Disable FFI allowlist sandbox checks.\n\n"
         << "Commands:\n"
-        << "  " << prog << " test [path]      Run all .kn files under directory recursively (default: tests/coverage).\n"
+        << "  " << prog << " test [options] [path]\n"
+        << "                        Run all .kn files under directory recursively (default: tests/coverage).\n"
+        << "                        Options: --grep <substr>, --list, --fail-fast (-x). See: " << prog << " test --help\n"
         << "  " << prog << " doctor           Print runtime/tooling diagnostics.\n"
         << "  " << prog << " init             Bootstrap kern.json and src/main.kn.\n"
         << "  " << prog << " add <dep>        Add dependency to kern.json.\n"
         << "  " << prog << " remove <dep>     Remove dependency from kern.json.\n"
-        << "  " << prog << " install          Refresh lockfile from kern.json (not system install; see ./install.sh).\n\n"
-        << "Modules: import \"math\", \"string\", \"json\", \"g2d\", \"game\", etc.\n"
+        << "  " << prog << " install          Refresh lockfile from kern.json (not system install; see ./install.sh).\n"
+        << "  " << prog << " verify           Exit 0 if kern.lock matches kern.json dependencies (CI-friendly).\n\n"
+        << "Modules: import \"math\"; from \"math\" import sqrt; import(\"path\") (expression form) still works.\n"
         << "Docs: docs/GETTING_STARTED.md\n"
         << "Testing docs: docs/TESTING.md\n";
 }
@@ -401,6 +406,47 @@ static bool refreshLockfile(const std::string& lockPath, const std::string& mani
     return writeTextFile(lockPath, out.str());
 }
 
+static std::vector<std::string> parseLockDependencyNames(const std::string& lockText) {
+    std::vector<std::string> out;
+    std::regex re(R"re("name"\s*:\s*"([^"]+)")re");
+    for (std::sregex_iterator it(lockText.begin(), lockText.end(), re), end; it != end; ++it)
+        out.push_back((*it)[1].str());
+    std::sort(out.begin(), out.end());
+    out.erase(std::unique(out.begin(), out.end()), out.end());
+    return out;
+}
+
+static int cmdVerify() {
+    namespace fs = std::filesystem;
+    if (!fs::exists("kern.json")) {
+        std::cerr << "verify: kern.json not found in current directory\n";
+        return 1;
+    }
+    if (!fs::exists("kern.lock")) {
+        std::cerr << "verify: kern.lock not found (run `kern install` to generate it)\n";
+        return 1;
+    }
+    std::string man = readTextFile("kern.json");
+    std::string lock = readTextFile("kern.lock");
+    std::vector<std::string> ma = parseDependenciesFromManifest(man);
+    std::sort(ma.begin(), ma.end());
+    ma.erase(std::unique(ma.begin(), ma.end()), ma.end());
+    std::vector<std::string> lo = parseLockDependencyNames(lock);
+    if (ma != lo) {
+        std::cerr << "verify: kern.json dependency set does not match kern.lock\n";
+        std::cerr << "  kern.json: ";
+        for (size_t i = 0; i < ma.size(); ++i) std::cerr << (i ? ", " : "") << ma[i];
+        if (ma.empty()) std::cerr << "(empty)";
+        std::cerr << "\n  kern.lock: ";
+        for (size_t i = 0; i < lo.size(); ++i) std::cerr << (i ? ", " : "") << lo[i];
+        if (lo.empty()) std::cerr << "(empty)";
+        std::cerr << "\n";
+        return 1;
+    }
+    std::cout << "verify: kern.lock matches kern.json\n";
+    return 0;
+}
+
 static int cmdInit() {
     namespace fs = std::filesystem;
     fs::path cwd = fs::current_path();
@@ -445,6 +491,38 @@ static int cmdDoctor(const char* prog) {
         else
             std::cout << "docs/GETTING_STARTED.md not found from cwd (open repo docs/ or set cwd to repo root)\n";
     }
+    {
+        const fs::path roadmap = fs::current_path() / "docs" / "LANGUAGE_ROADMAP.md";
+        std::cout << "  language roadmap: ";
+        if (fs::exists(roadmap))
+            std::cout << roadmap.string() << " (found)\n";
+        else
+            std::cout << "docs/LANGUAGE_ROADMAP.md not found from cwd\n";
+    }
+    {
+        const fs::path mem = fs::current_path() / "docs" / "MEMORY_MODEL.md";
+        std::cout << "  memory model: ";
+        if (fs::exists(mem))
+            std::cout << mem.string() << " (found)\n";
+        else
+            std::cout << "docs/MEMORY_MODEL.md not found from cwd\n";
+    }
+    {
+        const fs::path ec = fs::current_path() / "docs" / "ERROR_CODES.md";
+        std::cout << "  error codes: ";
+        if (fs::exists(ec))
+            std::cout << ec.string() << " (found)\n";
+        else
+            std::cout << "docs/ERROR_CODES.md not found from cwd\n";
+    }
+    {
+        const fs::path impl = fs::current_path() / "docs" / "IMPLEMENTATION_SUMMARY.md";
+        std::cout << "  implementation summary: ";
+        if (fs::exists(impl))
+            std::cout << impl.string() << " (found)\n";
+        else
+            std::cout << "docs/IMPLEMENTATION_SUMMARY.md not found from cwd\n";
+    }
 #ifdef KERN_BUILD_GAME
     std::cout << "  build: KERN_BUILD_GAME enabled (g2d/g3d/game paths compiled into this binary when linked)\n";
 #else
@@ -454,10 +532,74 @@ static int cmdDoctor(const char* prog) {
     std::cout << "  env: KERN_VM_TRACE=1 enables verbose VM instruction tracing (very noisy).\n";
     std::cout << "  env: KERNC_TRACE_IMPORTS logs embedded import resolution to stderr.\n";
     std::cout << "  tip: kern test [dir] runs .kn files recursively (default tests/coverage).\n";
+    std::cout << "  tip: kern verify checks kern.lock matches kern.json dependencies.\n";
     return 0;
 }
 
-static int cmdTest(const std::string& dirPath) {
+struct TestCliOptions {
+    std::string grep;
+    bool failFast = false;
+    bool listOnly = false;
+};
+
+static void printTestUsage(const char* prog) {
+    std::cout << "Usage:\n  " << prog << " test [options] [dir]\n\n"
+              << "Run all .kn files under dir recursively (default: tests/coverage).\n\n"
+              << "Options:\n"
+              << "  --grep <substr>   Only run tests whose relative path contains the substring.\n"
+              << "  --fail-fast, -x   Stop on first unexpected failure.\n"
+              << "  --list            List tests that would run (after --grep) and exit.\n"
+              << "  -h, --help        Show this help.\n";
+}
+
+// Returns: 0 = ok, 1 = parse error, 2 = help requested.
+static int parseTestCli(int argc, char** argv, int argBase, TestCliOptions& out, std::string& dirPath) {
+    dirPath.clear();
+    out = TestCliOptions{};
+    std::vector<std::string> positionals;
+    for (int i = argBase + 1; i < argc; ++i) {
+        std::string a = argv[i];
+        if (a == "--grep" && i + 1 < argc) {
+            out.grep = argv[++i];
+            continue;
+        }
+        if (a == "--fail-fast" || a == "-x") {
+            out.failFast = true;
+            continue;
+        }
+        if (a == "--list") {
+            out.listOnly = true;
+            continue;
+        }
+        if (a == "--help" || a == "-h") {
+            return 2;
+        }
+        if (!a.empty() && a[0] == '-') {
+            std::cerr << "test: unknown flag: " << a << "\n";
+            return 1;
+        }
+        positionals.push_back(std::move(a));
+    }
+    if (positionals.size() > 1) {
+        std::cerr << "test: only one directory argument allowed\n";
+        return 1;
+    }
+    if (!positionals.empty())
+        dirPath = positionals[0];
+    return 0;
+}
+
+static int cmdTest(int argc, char** argv, int argBase, const char* prog) {
+    TestCliOptions opts;
+    std::string dirPath;
+    const int pr = parseTestCli(argc, argv, argBase, opts, dirPath);
+    if (pr == 2) {
+        printTestUsage(prog);
+        return 0;
+    }
+    if (pr != 0)
+        return 1;
+
     namespace fs = std::filesystem;
     fs::path p(dirPath.empty() ? "tests/coverage" : dirPath);
     if (!fs::exists(p)) {
@@ -485,9 +627,32 @@ static int cmdTest(const std::string& dirPath) {
         return 1;
     }
     std::sort(files.begin(), files.end());
+    // Compile-time strict negative fixture: valid VM, fails --strict-types only (see docs/STRICT_TYPES.md).
+    files.erase(std::remove_if(files.begin(), files.end(), [&](const fs::path& path) {
+            const std::string rel = path.lexically_relative(p).generic_string();
+            return rel == "strict_types_phase2/fail_mismatch.kn" || rel == "fail_mismatch.kn";
+        }),
+        files.end());
+    if (!opts.grep.empty()) {
+        std::vector<fs::path> filtered;
+        filtered.reserve(files.size());
+        for (const auto& path : files) {
+            const std::string rel = path.lexically_relative(p).generic_string();
+            if (rel.find(opts.grep) != std::string::npos)
+                filtered.push_back(path);
+        }
+        files = std::move(filtered);
+    }
     if (files.empty()) {
-        std::cerr << "test: no .kn files found under " << p.string() << "\n";
+        std::cerr << "test: no .kn files"
+                 << (opts.grep.empty() ? " found under " : " match --grep under ") << p.string() << "\n";
         return 1;
+    }
+    if (opts.listOnly) {
+        for (const auto& path : files) {
+            std::cout << path.lexically_relative(p).generic_string() << "\n";
+        }
+        return 0;
     }
     int pass = 0;
     int fail = 0;
@@ -507,6 +672,10 @@ static int cmdTest(const std::string& dirPath) {
         if (source.empty()) {
             ++fail;
             std::cout << "[FAIL] " << rel << " (empty)\n";
+            if (opts.failFast) {
+                std::cout << "\nStopped (--fail-fast): pass=" << pass << " fail=" << fail << "\n";
+                return 1;
+            }
             continue;
         }
         VM vm;
@@ -520,6 +689,10 @@ static int cmdTest(const std::string& dirPath) {
         } else {
             ++fail;
             std::cout << "[FAIL] " << rel << "\n";
+            if (opts.failFast) {
+                std::cout << "\nStopped (--fail-fast): pass=" << pass << " fail=" << fail << "\n";
+                return 1;
+            }
         }
     }
     std::cout << "\nSummary: pass=" << pass << " fail=" << fail << "\n";
@@ -559,6 +732,7 @@ static int cmdWatch(VM& vm, const std::string& scriptPath) {
 int main(int argc, char** argv) {
     const char* prog = argc >= 1 ? argv[0] : "kern";
     int argBase = 1;
+    bool vmTraceCli = false;
     RuntimeGuardPolicy runtimeGuards;
     runtimeGuards.debugMode = true;
     runtimeGuards.allowUnsafe = false;
@@ -610,6 +784,11 @@ int main(int argc, char** argv) {
         if (flag == "--ffi-allow" && argBase + 1 < argc) {
             runtimeGuards.ffiLibraryAllowlist.push_back(argv[argBase + 1]);
             argBase += 2;
+            continue;
+        }
+        if (flag == "--trace") {
+            vmTraceCli = true;
+            ++argBase;
             continue;
         }
         break;
@@ -709,7 +888,7 @@ int main(int argc, char** argv) {
             return 0;
         }
         if (arg == "test") {
-            return cmdTest(argc > argBase + 1 ? argv[argBase + 1] : "");
+            return cmdTest(argc, argv, argBase, prog);
         }
         if (arg == "doctor") {
             return cmdDoctor(prog);
@@ -742,6 +921,9 @@ int main(int argc, char** argv) {
             }
             std::cout << "Dependencies locked from kern.json\n";
             return 0;
+        }
+        if (arg == "verify") {
+            return cmdVerify();
         }
     }
 
@@ -783,6 +965,8 @@ int main(int argc, char** argv) {
     std::vector<std::string> args;
     for (int i = 0; i < argc; ++i) args.push_back(argv[i]);
     vm.setCliArgs(std::move(args));
+    if (vmTraceCli)
+        vm.setVmTraceEnabled(true);
 
     if (argc > argBase + 1 && std::string(argv[argBase]) == "--ast") {
         ResolvedKnPath rs;
@@ -1101,7 +1285,8 @@ int main(int argc, char** argv) {
     // rEPL
     // If started from outside the repo, set KERN_LIB so interactive imports still work.
     maybeAutoSetKernLibFromEntryPath(std::filesystem::current_path().string());
-    std::cout << "Kern. Type expressions or statements. help | clear | history | search <q> | exit" << std::endl;
+    std::cout << "Kern. Type expressions or statements. help | clear | history | search <q> | trace on|off | last | exit"
+              << std::endl;
     std::string line;
     std::vector<std::string> history;
     while (true) {
@@ -1121,7 +1306,7 @@ int main(int argc, char** argv) {
         }
         if (line == "exit" || line == "quit") break;
         if (line == "help" || line == ".help") {
-            std::cout << "  help / .help  — show this\n  clear / .clear — clear screen\n  history        — show command history\n  search <text>  — search history\n  exit / quit    — exit REPL\n  Example: let x = 5   print(x)   print(2+3)\n  Modules: let m = import(\"math\"); print(m.sqrt(4))\n";
+            std::cout << "  help / .help     — show this\n  clear / .clear   — clear screen\n  history          — show command history\n  search <text>    — search history\n  trace on / off   — verbose VM instruction trace (noisy)\n  last / .last     — show last reported error (code + message)\n  exit / quit      — exit REPL\n  Example: let x = 5   print(x)   print(2+3)\n  Modules: import \"math\"   or   from \"math\" import sqrt\n";
             continue;
         }
         if (line == "history" || line == ".history") {
@@ -1139,6 +1324,31 @@ int main(int argc, char** argv) {
 #else
             std::system("clear");
 #endif
+            continue;
+        }
+        if (line == "trace on" || line == ".trace on") {
+            vm.setVmTraceEnabled(true);
+            std::cout << "VM trace: on (stderr; very noisy)\n";
+            continue;
+        }
+        if (line == "trace off" || line == ".trace off") {
+            vm.setVmTraceEnabled(false);
+            std::cout << "VM trace: off\n";
+            continue;
+        }
+        if (line == "last" || line == ".last") {
+            const auto& items = g_errorReporter.getItems();
+            if (items.empty()) {
+                std::cout << "(no diagnostics recorded this session)\n";
+                continue;
+            }
+            const auto& it = items.back();
+            std::cout << it.errorCode << ": " << it.message << "\n";
+            if (!it.stackTrace.empty()) {
+                for (const auto& fr : it.stackTrace) {
+                    std::cout << "  at " << fr.functionName << " (" << fr.line << ":" << fr.column << ")\n";
+                }
+            }
             continue;
         }
         history.push_back(line);

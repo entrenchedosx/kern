@@ -2,6 +2,7 @@
 
 #include "compiler/lexer.hpp"
 #include "compiler/token.hpp"
+#include "compiler/typed_builtins.hpp"
 #include "errors.hpp"
 #include "vm/builtins.hpp"
 #ifdef KERN_BUILD_GAME
@@ -11,16 +12,17 @@
 #include <cctype>
 #include <regex>
 #include <sstream>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace kern {
 
 namespace {
 
-static bool isDeclaredKeywordContext(TokenType t) {
-    return t == TokenType::LET || t == TokenType::VAR ||
-           t == TokenType::DEF || t == TokenType::CLASS || t == TokenType::STRUCT || t == TokenType::ENUM || t == TokenType::IMPORT ||
-           t == TokenType::CATCH || t == TokenType::FOR || t == TokenType::WITH || t == TokenType::AS;
+static std::string trimInitExpr(std::string s) {
+    while (!s.empty() && std::isspace(static_cast<unsigned char>(s.front()))) s.erase(s.begin());
+    while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back()))) s.pop_back();
+    return s;
 }
 
 static std::string inferLiteralType(const std::string& expr) {
@@ -32,6 +34,35 @@ static std::string inferLiteralType(const std::string& expr) {
     if (std::regex_match(e, std::regex(R"re(-?[0-9]*\.[0-9]+)re"))) return "float";
     if (std::regex_match(e, std::regex(R"re("([^"\\]|\\.)*")re"))) return "string";
     return "";
+}
+
+static std::string inferRhsTypeStrict(const std::string& rhsIn,
+                                      const std::unordered_map<std::string, std::string>& builtinRet) {
+    const std::string rhs = trimInitExpr(rhsIn);
+    if (rhs.empty()) return "";
+    std::string lit = inferLiteralType(rhs);
+    if (!lit.empty()) return lit;
+    std::regex callRe(R"re(^([A-Za-z_][A-Za-z0-9_]*)\s*\()re");
+    std::smatch m;
+    if (std::regex_search(rhs, m, callRe)) {
+        auto it = builtinRet.find(m[1].str());
+        if (it != builtinRet.end()) return it->second;
+    }
+    return "";
+}
+
+static bool typesCompatibleStrict(const std::string& declared, const std::string& actual) {
+    if (declared == actual) return true;
+    if (declared == "double" && actual == "float") return true;
+    if (declared == "float" && actual == "int") return true;
+    return false;
+}
+
+static bool isDeclaredKeywordContext(TokenType t) {
+    return t == TokenType::LET || t == TokenType::VAR ||
+           t == TokenType::DEF || t == TokenType::CLASS || t == TokenType::STRUCT || t == TokenType::ENUM || t == TokenType::IMPORT ||
+           t == TokenType::FROM ||
+           t == TokenType::CATCH || t == TokenType::FOR || t == TokenType::WITH || t == TokenType::AS;
 }
 
 static void addDiag(SemanticResult& r, SemanticSeverity sev, const std::string& file, int line, int col,
@@ -52,6 +83,8 @@ const char* semanticSeverityName(SemanticSeverity s) {
 
 SemanticResult analyzeSemanticSource(const std::string& source, const std::string& filePath, bool strictTypes) {
     SemanticResult out;
+
+    const std::unordered_map<std::string, std::string>& builtinRet = builtinStrictReturnTypes();
 
     std::unordered_set<std::string> declared;
     std::unordered_set<std::string> builtins;
@@ -240,10 +273,9 @@ SemanticResult analyzeSemanticSource(const std::string& source, const std::strin
             std::string ty = m[2].str();
             declaredTypes[name] = ty;
             if (m.size() >= 4 && m[3].matched && strictTypes) {
-                std::string rhsTy = inferLiteralType(m[3].str());
+                std::string rhsTy = inferRhsTypeStrict(m[3].str(), builtinRet);
                 if (!rhsTy.empty()) {
-                    bool ok = (ty == rhsTy) || (ty == "double" && rhsTy == "float") || (ty == "float" && rhsTy == "int");
-                    if (!ok) {
+                    if (!typesCompatibleStrict(ty, rhsTy)) {
                         addDiag(out, SemanticSeverity::Error, filePath, lineNo, 1, "SEM_TYPE_MISMATCH",
                                 "Type mismatch: variable '" + name + "' is '" + ty + "' but initializer is '" + rhsTy + "'");
                     }
@@ -256,11 +288,10 @@ SemanticResult analyzeSemanticSource(const std::string& source, const std::strin
             std::string name = m[1].str();
             auto it = declaredTypes.find(name);
             if (it != declaredTypes.end()) {
-                std::string rhsTy = inferLiteralType(m[2].str());
+                std::string rhsTy = inferRhsTypeStrict(m[2].str(), builtinRet);
                 if (!rhsTy.empty()) {
                     const std::string& ty = it->second;
-                    bool ok = (ty == rhsTy) || (ty == "double" && rhsTy == "float") || (ty == "float" && rhsTy == "int");
-                    if (!ok) {
+                    if (!typesCompatibleStrict(ty, rhsTy)) {
                         addDiag(out, SemanticSeverity::Error, filePath, lineNo, 1, "SEM_ASSIGN_MISMATCH",
                                 "Type mismatch on assignment to '" + name + "': expected '" + ty + "', got '" + rhsTy + "'");
                     }
@@ -279,8 +310,8 @@ static std::string semanticDiagnosticDetail(const std::string& code, const std::
                "If this is a false positive, declare the name earlier or ignore for generated glue code.";
     if (code == "SEM_TYPE_MISMATCH")
         return "Under strict typing (preview/experimental feature sets), annotated variables are checked against simple "
-               "literal initializers (bool/int/float/string).\n"
-               "Widen the annotation, change the literal, or use an untyped `let` if values are computed later.";
+               "literal initializers (bool/int/float/string) and a narrow builtin return map (see src/compiler/typed_builtins.hpp).\n"
+               "Widen the annotation, change the callee, or use an untyped `let` if values are computed later.";
     if (code == "SEM_ASSIGN_MISMATCH")
         return "Strict mode compared a typed binding to a literal on the right-hand side of `=`.\n"
                "Update the literal, change the stored type, or relax strict checking in the project feature set.";

@@ -31,6 +31,7 @@ Set **`KERN_LIB`** to this repo’s `lib` folder when examples import under `lib
 | `graphics/` | `g2d`, `g3d`, games (Raylib-backed when enabled) |
 | `system/` | Processes, input, FFI, oskit |
 | `advanced/` | BrowserKit, GameKit, HTTP, project-style scripts |
+| `math/` | Equation solver REPL: linear & quadratic (`equation_solver_demo.kn`) |
 
 ## Golden examples (recommended after basics)
 

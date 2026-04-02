@@ -6008,6 +6008,8 @@ inline void registerAllBuiltins(VM& vm) {
     });
     setGlobalFn("__apply_decorator", 347);
 
+    // Cooperative task: runs the callable on the current VM (same thread). Result map is awaitable via __await_task.
+    // For OS threads or subprocesses use stdlib process / concurrency modules, not this helper.
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         std::unordered_map<std::string, ValuePtr> task;
         task["state"] = std::make_shared<Value>(Value::fromString("done"));

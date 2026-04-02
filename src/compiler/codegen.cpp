@@ -1650,6 +1650,22 @@ void CodeGenerator::emitStmt(const Stmt* s) {
         // - stdlib modules (e.g. "math")
         // - builtin module names (e.g. "g2d", "game")
         // - file paths (e.g. "lib/kern/foo.kn")
+        if (!x->namedImports.empty()) {
+            static const std::string kSelTmp = "__kern_selimp__";
+            emit(Opcode::LOAD_GLOBAL, addConstant("__import"));
+            emit(Opcode::CONST_STR, addConstant(path));
+            emit(Opcode::CALL, static_cast<size_t>(1));
+            emit(Opcode::STORE_GLOBAL, addConstant(kSelTmp));
+            for (const std::string& sym : x->namedImports) {
+                emit(Opcode::LOAD_GLOBAL, addConstant(kSelTmp));
+                emit(Opcode::CONST_STR, addConstant(sym));
+                emit(Opcode::GET_INDEX);
+                emit(Opcode::STORE_GLOBAL, addConstant(sym));
+            }
+            emit(Opcode::CONST_NULL);
+            emit(Opcode::STORE_GLOBAL, addConstant(kSelTmp));
+            return;
+        }
         std::string bindingName = x->hasAlias ? x->alias : x->moduleName;
         if (!x->hasAlias && bindingName.size() >= 4 && bindingName.compare(bindingName.size() - 4, 4, ".kn") == 0)
             bindingName = bindingName.substr(0, bindingName.size() - 4);

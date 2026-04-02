@@ -44,6 +44,7 @@ enum class TokenType {
     LAMBDA,
     EXPORT,
     IMPORT,
+    FROM,
 
     // keywords - control flow
     IF,
@@ -183,6 +184,8 @@ inline const char* tokenTypeToString(TokenType t) {
         case TokenType::BOOL: return "BOOL";
         case TokenType::STRING_TYPE: return "STRING_TYPE";
         case TokenType::VOID: return "VOID";
+        case TokenType::IMPORT: return "IMPORT";
+        case TokenType::FROM: return "FROM";
         case TokenType::DEF: return "DEF";
         case TokenType::RETURN: return "RETURN";
         case TokenType::IF: return "IF";

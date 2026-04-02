@@ -35,6 +35,7 @@ std::unordered_map<std::string, TokenType> Lexer::keywords_ = {
     {"lambda", TokenType::LAMBDA},
     {"export", TokenType::EXPORT},
     {"import", TokenType::IMPORT},
+    {"from", TokenType::FROM},
     {"if", TokenType::IF},
     {"elif", TokenType::ELIF},
     {"else", TokenType::ELSE},

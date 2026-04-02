@@ -1,0 +1,706 @@
+// Equation solver - import("lib/kern/math/equation_solver.kn")
+// Linear (one x): shunting-yard -> RPN -> [a,b] for a*x + b
+// Quadratic: same tokenizer + ^ ; polynomial [c0,c1,c2] for c0 + c1*x + c2*x^2
+
+def _eps() { return 0.000000001 }
+
+def _near_zero(x) {
+    return abs(x) < _eps()
+}
+
+def _strip_ws(s) {
+    let out = ""
+    let i = 0
+    while (i < len(s)) {
+        let c = s[i]
+        if (c != " " and c != "\t" and c != "\n" and c != "\r") {
+            out = out + c
+        }
+        i = i + 1
+    }
+    return out
+}
+
+def _is_digit_c(c) {
+    if (len(c) != 1) { return false }
+    let o = ord(c)
+    return o >= ord("0") and o <= ord("9")
+}
+
+def _is_num_tok(t) {
+    if (len(t) == 0) { return false }
+    return parse_float(t) != null
+}
+
+def _implicit_mul_needed(left, right) {
+    if (left == "(" or left == "+" or left == "-" or left == "*" or left == "/" or left == "^") { return false }
+    if (right == ")" or right == "+" or right == "-" or right == "*" or right == "/" or right == "^") { return false }
+    let l_paren = left == "("
+    let r_paren = right == ")"
+    if (l_paren or r_paren) { return false }
+    let l_ok = _is_num_tok(left) or left == "x" or left == ")"
+    let r_ok = _is_num_tok(right) or right == "x" or right == "("
+    return l_ok and r_ok
+}
+
+def _insert_implicit_mul_tokens(tok) {
+    if (len(tok) == 0) { return tok }
+    let out = array()
+    let j = 0
+    while (j < len(tok)) {
+        if (len(out) > 0 and _implicit_mul_needed(out[len(out) - 1], tok[j])) {
+            push(out, "*")
+        }
+        push(out, tok[j])
+        j = j + 1
+    }
+    return out
+}
+
+def _tokenize_expr(s) {
+    let n = len(s)
+    let i = 0
+    let tok = array()
+    while (i < n) {
+        let c = s[i]
+        if (_is_digit_c(c)) {
+            let start = i
+            while (i < n and _is_digit_c(s[i])) {
+                i = i + 1
+            }
+            if (i < n and s[i] == ".") {
+                i = i + 1
+                while (i < n and _is_digit_c(s[i])) {
+                    i = i + 1
+                }
+            }
+            push(tok, slice(s, start, i))
+            continue
+        }
+        if (c == ".") {
+            if (i + 1 >= n or !_is_digit_c(s[i + 1])) {
+                throw "invalid number near '.'"
+            }
+            let start = i
+            i = i + 1
+            while (i < n and _is_digit_c(s[i])) {
+                i = i + 1
+            }
+            push(tok, slice(s, start, i))
+            continue
+        }
+        if (c == "x") {
+            push(tok, "x")
+            i = i + 1
+            continue
+        }
+        if (c == "+" or c == "-" or c == "*" or c == "/" or c == "(" or c == ")" or c == "^") {
+            push(tok, c)
+            i = i + 1
+            continue
+        }
+        throw "invalid character in expression: " + c
+    }
+    return tok
+}
+
+def _parens_ok(s) {
+    let bal = 0
+    let i = 0
+    while (i < len(s)) {
+        if (s[i] == "(") { bal = bal + 1 }
+        if (s[i] == ")") { bal = bal - 1 }
+        if (bal < 0) { return false }
+        i = i + 1
+    }
+    return bal == 0
+}
+
+def _bad_double_ops(s) {
+    let i = 0
+    while (i + 1 < len(s)) {
+        let a = s[i]
+        let b = s[i + 1]
+        if ((a == "+" or a == "-" or a == "*" or a == "/" or a == "^") and (b == "+" or b == "*" or b == "/" or b == "^")) {
+            return true
+        }
+        i = i + 1
+    }
+    return false
+}
+
+def _bad_trailing_side(s) {
+    let t = trim(s)
+    if (len(t) == 0) { return true }
+    let last = t[len(t) - 1]
+    if (last == "+" or last == "*" or last == "/" or last == "^") { return true }
+    if (last == "-") { return true }
+    if (last == "(") { return true }
+    return false
+}
+
+def _bad_leading_side(s) {
+    let t = trim(s)
+    if (len(t) == 0) { return true }
+    let f = t[0]
+    if (f == "*" or f == "/" or f == "^") { return true }
+    return false
+}
+
+def _validate_equation_syntax(raw) {
+    let u = lower(_strip_ws(raw))
+    if (len(u) == 0) {
+        return "empty input"
+    }
+    let parts = split(u, "=")
+    if (len(parts) != 2) {
+        return "use exactly one '=' in the equation"
+    }
+    let L = trim(parts[0])
+    let R = trim(parts[1])
+    if (len(L) == 0 or len(R) == 0) {
+        return "invalid syntax: empty side of equation"
+    }
+    if (!_parens_ok(L) or !_parens_ok(R)) {
+        return "invalid syntax: mismatched parentheses"
+    }
+    if (_bad_double_ops(L) or _bad_double_ops(R)) {
+        return "invalid syntax: consecutive operators"
+    }
+    if (_bad_trailing_side(L) or _bad_trailing_side(R)) {
+        return "invalid syntax: incomplete expression (e.g. trailing + or missing term)"
+    }
+    if (_bad_leading_side(L) or _bad_leading_side(R)) {
+        return "invalid syntax: expression cannot start with * / ^"
+    }
+    return null
+}
+
+def _lin_add(u, v) {
+    return array(u[0] + v[0], u[1] + v[1])
+}
+
+def _lin_sub(u, v) {
+    return array(u[0] - v[0], u[1] - v[1])
+}
+
+def _lin_mul(u, v) {
+    let a1 = u[0]
+    let b1 = u[1]
+    let a2 = v[0]
+    let b2 = v[1]
+    let e = _eps()
+    if (abs(a1) >= e and abs(a2) >= e) {
+        return null
+    }
+    if (abs(a1) >= e and abs(a2) < e) {
+        return array(a1 * b2, b1 * b2)
+    }
+    if (abs(a1) < e and abs(a2) >= e) {
+        return array(a2 * b1, b1 * b2)
+    }
+    return array(0.0, b1 * b2)
+}
+
+def _lin_div(u, v) {
+    let a2 = v[0]
+    let b2 = v[1]
+    let e = _eps()
+    if (abs(a2) >= e) {
+        return null
+    }
+    if (abs(b2) < e) {
+        return null
+    }
+    return array(u[0] / b2, u[1] / b2)
+}
+
+def _is_op_tok(t) {
+    return t == "+" or t == "-" or t == "*" or t == "/" or t == "^"
+}
+
+def _prec_op(t) {
+    if (t == "+" or t == "-") { return 1 }
+    if (t == "*" or t == "/") { return 2 }
+    if (t == "^") { return 3 }
+    return 0
+}
+
+def _op_left_assoc(t) {
+    return t != "^"
+}
+
+def _stack_pop(st) {
+    if (len(st) == 0) { throw "internal stack underflow" }
+    let last = len(st) - 1
+    let v = st[last]
+    remove_at(st, last)
+    return v
+}
+
+def _insert_unary_zero_tokens(tok) {
+    let out = array()
+    let i = 0
+    while (i < len(tok)) {
+        let cur = tok[i]
+        if (cur == "-") {
+            let need = false
+            if (len(out) == 0) {
+                need = true
+            }
+            else {
+                let p = out[len(out) - 1]
+                if (p == "(" or p == "+" or p == "-" or p == "*" or p == "/" or p == "^") {
+                    need = true
+                }
+            }
+            if (need) { push(out, "0") }
+        }
+        push(out, cur)
+        i = i + 1
+    }
+    return out
+}
+
+def _shunting_rpn(tok) {
+    let out = array()
+    let ops = array()
+    let i = 0
+    while (i < len(tok)) {
+        let t = tok[i]
+        if (t == "x" or _is_num_tok(t)) {
+            push(out, t)
+            i = i + 1
+            continue
+        }
+        if (t == "(") {
+            push(ops, "(")
+            i = i + 1
+            continue
+        }
+        if (t == ")") {
+            while (len(ops) > 0 and ops[len(ops) - 1] != "(") {
+                push(out, _stack_pop(ops))
+            }
+            if (len(ops) == 0) { throw "mismatched parentheses" }
+            _stack_pop(ops)
+            i = i + 1
+            continue
+        }
+        if (_is_op_tok(t)) {
+            let pti = _prec_op(t)
+            let leftA = _op_left_assoc(t)
+            while (len(ops) > 0) {
+                let top = ops[len(ops) - 1]
+                if (top == "(") { break }
+                if (!_is_op_tok(top)) { break }
+                let pt = _prec_op(top)
+                if (pt < pti) { break }
+                if (pt == pti and leftA == false) { break }
+                push(out, _stack_pop(ops))
+            }
+            push(ops, t)
+            i = i + 1
+            continue
+        }
+        throw "unexpected token in expression: " + t
+    }
+    while (len(ops) > 0) {
+        let top = ops[len(ops) - 1]
+        if (top == "(") { throw "mismatched parentheses" }
+        push(out, _stack_pop(ops))
+    }
+    return out
+}
+
+def _eval_rpn_linear(rpn) {
+    let st = array()
+    let i = 0
+    while (i < len(rpn)) {
+        let t = rpn[i]
+        if (t == "^") {
+            return null
+        }
+        if (t == "x") {
+            push(st, array(1.0, 0.0))
+        }
+        else {
+            if (_is_num_tok(t)) {
+                let v = parse_float(t)
+                if (v == null) { throw "invalid number in rpn" }
+                push(st, array(0.0, v))
+            }
+            else {
+                if (_is_op_tok(t)) {
+                    if (len(st) < 2) { throw "invalid expression" }
+                    let b = _stack_pop(st)
+                    let a = _stack_pop(st)
+                    if (t == "+") {
+                        push(st, _lin_add(a, b))
+                    }
+                    else {
+                        if (t == "-") {
+                            push(st, _lin_sub(a, b))
+                        }
+                        else {
+                            if (t == "*") {
+                                let m = _lin_mul(a, b)
+                                if (m == null) { return null }
+                                push(st, m)
+                            }
+                            else {
+                                let d = _lin_div(a, b)
+                                if (d == null) { return null }
+                                push(st, d)
+                            }
+                        }
+                    }
+                }
+                else {
+                    throw "bad rpn token: " + t
+                }
+            }
+        }
+        i = i + 1
+    }
+    if (len(st) != 1) { throw "invalid expression" }
+    return st[0]
+}
+
+def _parse_linear_side(s) {
+    let t = lower(_strip_ws(s))
+    let tok = _tokenize_expr(t)
+    tok = _insert_implicit_mul_tokens(tok)
+    tok = _insert_unary_zero_tokens(tok)
+    let rpn = _shunting_rpn(tok)
+    return _eval_rpn_linear(rpn)
+}
+
+def _poly_zero() { return array(0.0, 0.0, 0.0) }
+
+def _poly_const(c) { return array(c, 0.0, 0.0) }
+
+def _poly_x() { return array(0.0, 1.0, 0.0) }
+
+def _poly_x2() { return array(0.0, 0.0, 1.0) }
+
+def _poly_neg(p) {
+    return array(-p[0], -p[1], -p[2])
+}
+
+def _poly_add(p, q) {
+    return array(p[0] + q[0], p[1] + q[1], p[2] + q[2])
+}
+
+def _poly_sub(p, q) {
+    return array(p[0] - q[0], p[1] - q[1], p[2] - q[2])
+}
+
+def _poly_mul(p, q) {
+    let p0 = p[0]
+    let p1 = p[1]
+    let p2 = p[2]
+    let q0 = q[0]
+    let q1 = q[1]
+    let q2 = q[2]
+    let r0 = p0 * q0
+    let r1 = p0 * q1 + p1 * q0
+    let r2 = p0 * q2 + p1 * q1 + p2 * q0
+    let r3 = p1 * q2 + p2 * q1
+    let r4 = p2 * q2
+    let e = _eps()
+    if (abs(r3) >= e or abs(r4) >= e) {
+        return null
+    }
+    return array(r0, r1, r2)
+}
+
+def _poly_div_scal(p, denom) {
+    let e = _eps()
+    if (abs(denom) < e) {
+        return null
+    }
+    return array(p[0] / denom, p[1] / denom, p[2] / denom)
+}
+
+def _poly_pow_int(p, n) {
+    if (n < 0) { return null }
+    if (n == 0) { return _poly_const(1.0) }
+    if (n == 1) { return p }
+    if (n == 2) {
+        return _poly_mul(p, p)
+    }
+    return null
+}
+
+def _eval_rpn_poly(rpn) {
+    let st = array()
+    let i = 0
+    while (i < len(rpn)) {
+        let t = rpn[i]
+        if (t == "x") {
+            push(st, _poly_x())
+        }
+        else {
+            if (_is_num_tok(t)) {
+                let v = parse_float(t)
+                if (v == null) { throw "invalid number in rpn" }
+                push(st, _poly_const(v))
+            }
+            else {
+                if (_is_op_tok(t)) {
+                    if (len(st) < 2) { throw "invalid expression" }
+                    let b = _stack_pop(st)
+                    let a = _stack_pop(st)
+                    if (t == "+") {
+                        push(st, _poly_add(a, b))
+                    }
+                    else {
+                        if (t == "-") {
+                            push(st, _poly_sub(a, b))
+                        }
+                        else {
+                            if (t == "*") {
+                                let m = _poly_mul(a, b)
+                                if (m == null) { return null }
+                                push(st, m)
+                            }
+                            else {
+                                if (t == "/") {
+                                    let b0 = b[0]
+                                    let b1 = b[1]
+                                    let b2 = b[2]
+                                    let e = _eps()
+                                    if (abs(b1) >= e or abs(b2) >= e) {
+                                        return null
+                                    }
+                                    let d = _poly_div_scal(a, b0)
+                                    if (d == null) { return null }
+                                    push(st, d)
+                                }
+                                else {
+                                    if (t == "^") {
+                                        let expv = b[0]
+                                        let e = _eps()
+                                        if (abs(b[1]) >= e or abs(b[2]) >= e) {
+                                            return null
+                                        }
+                                        let n = int(expv + 0.0000001)
+                                        if (abs(float(n) - expv) >= 0.0001) {
+                                            return null
+                                        }
+                                        let pp = _poly_pow_int(a, n)
+                                        if (pp == null) { return null }
+                                        push(st, pp)
+                                    }
+                                    else {
+                                        throw "bad op"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                else {
+                    throw "bad rpn token: " + t
+                }
+            }
+        }
+        i = i + 1
+    }
+    if (len(st) != 1) { throw "invalid expression" }
+    return st[0]
+}
+
+def _parse_poly_side(s) {
+    let t = lower(_strip_ws(s))
+    let tok = _tokenize_expr(t)
+    tok = _insert_implicit_mul_tokens(tok)
+    tok = _insert_unary_zero_tokens(tok)
+    let rpn = _shunting_rpn(tok)
+    return _eval_rpn_poly(rpn)
+}
+
+def _solve_poly_equation(P) {
+    let c0 = P[0]
+    let c1 = P[1]
+    let c2 = P[2]
+    let e = _eps()
+    if (abs(c2) < e) {
+        if (abs(c1) < e) {
+            if (_near_zero(c0)) {
+                return { "ok": true, "kind": "infinite", "x": null, "x2": null, "message": "infinitely many solutions (identity)" }
+            }
+            return { "ok": true, "kind": "none", "x": null, "x2": null, "message": "no solution (contradiction)" }
+        }
+        let x = -c0 / c1
+        return { "ok": true, "kind": "unique", "x": x, "x2": null, "message": "ok" }
+    }
+    let disc = c1 * c1 - 4.0 * c2 * c0
+    if (disc < -0.0000001) {
+        return { "ok": true, "kind": "no_real", "x": null, "x2": null, "message": "no real solutions (negative discriminant)" }
+    }
+    if (_near_zero(disc)) {
+        let x = -c1 / (2.0 * c2)
+        return { "ok": true, "kind": "one_repeated", "x": x, "x2": null, "message": "one repeated real root" }
+    }
+    let s = sqrt(disc)
+    let x1 = (-c1 + s) / (2.0 * c2)
+    let x2 = (-c1 - s) / (2.0 * c2)
+    return { "ok": true, "kind": "two", "x": x1, "x2": x2, "message": "ok" }
+}
+
+def _linear_steps(left_str, right_str, L, R, a, b, x) {
+    let steps = array()
+    push(steps, "Original: " + trim(left_str) + " = " + trim(right_str))
+    push(steps, "Each side in the form a*x + b: left (" + str(round_to(L[0], 6)) + ")*x + (" + str(round_to(L[1], 6)) + "), right (" + str(round_to(R[0], 6)) + ")*x + (" + str(round_to(R[1], 6)) + ")")
+    push(steps, "Subtract right from left: (" + str(round_to(a, 6)) + ")*x = " + str(round_to(b, 6)))
+    push(steps, "Divide: x = " + str(round_to(b / a, 8)))
+    return steps
+}
+
+def _linear_steps_special(kind, left_str, right_str, L, R) {
+    let steps = array()
+    push(steps, "Original: " + trim(left_str) + " = " + trim(right_str))
+    push(steps, "Linear form: left (" + str(round_to(L[0], 6)) + ")*x + (" + str(round_to(L[1], 6)) + "), right (" + str(round_to(R[0], 6)) + ")*x + (" + str(round_to(R[1], 6)) + ")")
+    if (kind == "infinite") {
+        push(steps, "Coefficients match: 0*x = 0 -> infinitely many solutions")
+    }
+    else {
+        push(steps, "Coefficient of x is 0 but constants differ -> no solution")
+    }
+    return steps
+}
+
+def _solve_linear_core(raw, want_steps) {
+    let verr = _validate_equation_syntax(raw)
+    if (verr != null) {
+        return { "ok": false, "kind": "error", "x": null, "message": verr, "steps": null }
+    }
+    let u = lower(_strip_ws(raw))
+    let parts = split(u, "=")
+    let left_raw = parts[0]
+    let right_raw = parts[1]
+    let L = _parse_linear_side(left_raw)
+    let R = _parse_linear_side(right_raw)
+    if (L == null or R == null) {
+            return { "ok": false, "kind": "error", "x": null, "message": "non-linear expression (e.g. x*x) or invalid division - try mode quadratic for x^2", "steps": null }
+    }
+    let a = L[0] - R[0]
+    let b = R[1] - L[1]
+    if (_near_zero(a)) {
+        if (_near_zero(b)) {
+            let res = { "ok": true, "kind": "infinite", "x": null, "message": "infinitely many solutions (identity)", "steps": null }
+            if (want_steps) {
+                res["steps"] = _linear_steps_special("infinite", left_raw, right_raw, L, R)
+            }
+            return res
+        }
+        let res = { "ok": true, "kind": "none", "x": null, "message": "no solution (contradiction)", "steps": null }
+        if (want_steps) {
+            res["steps"] = _linear_steps_special("none", left_raw, right_raw, L, R)
+        }
+        return res
+    }
+    let x = b / a
+    let res = { "ok": true, "kind": "unique", "x": x, "message": "ok", "steps": null }
+    if (want_steps) {
+        res["steps"] = _linear_steps(left_raw, right_raw, L, R, a, b, x)
+    }
+    return res
+}
+
+def solve_linear_equation(s) {
+    try {
+        return _solve_linear_core(s, false)
+    } catch (e) {
+        return { "ok": false, "kind": "error", "x": null, "message": error_message(e), "steps": null }
+    }
+}
+
+def solve_linear_equation_with_steps(s) {
+    try {
+        return _solve_linear_core(s, true)
+    } catch (e) {
+        return { "ok": false, "kind": "error", "x": null, "message": error_message(e), "steps": null }
+    }
+}
+
+def solve_quadratic_equation(s) {
+    try {
+        let verr = _validate_equation_syntax(s)
+        if (verr != null) {
+            return { "ok": false, "kind": "error", "x": null, "x2": null, "message": verr, "steps": null }
+        }
+        let u = lower(_strip_ws(s))
+        let parts = split(u, "=")
+        let L = _parse_poly_side(parts[0])
+        let R = _parse_poly_side(parts[1])
+        if (L == null or R == null) {
+            return { "ok": false, "kind": "error", "x": null, "x2": null, "message": "expression too complex (degree > 2)", "steps": null }
+        }
+        let P = _poly_sub(L, R)
+        let steps = null
+        let c0 = P[0]
+        let c1 = P[1]
+        let c2 = P[2]
+        let stp = array()
+        push(stp, "Standard form (all terms on left): " + str(round_to(c2, 6)) + "*x^2 + " + str(round_to(c1, 6)) + "*x + " + str(round_to(c0, 6)) + " = 0")
+        let e = _eps()
+        if (abs(c2) < e) {
+            push(stp, "No x^2 term -> reduce to linear.")
+        }
+        else {
+            let disc = c1 * c1 - 4.0 * c2 * c0
+            push(stp, "Discriminant D = " + str(round_to(disc, 8)))
+        }
+        steps = stp
+        let r = _solve_poly_equation(P)
+        r["steps"] = steps
+        return r
+    } catch (e) {
+        return { "ok": false, "kind": "error", "x": null, "x2": null, "message": error_message(e), "steps": null }
+    }
+}
+
+def format_solution(res) {
+    if (!res["ok"]) {
+        return "Error: " + res["message"]
+    }
+    let k = res["kind"]
+    if (k == "unique") {
+        let x = res["x"]
+        let xr = round_to(x, 8)
+        return "Solution: x = " + str(xr)
+    }
+    if (k == "infinite") {
+        return "Result: " + res["message"]
+    }
+    if (k == "none") {
+        return "Result: " + res["message"]
+    }
+    if (k == "two") {
+        let x1 = round_to(res["x"], 8)
+        let x2 = round_to(res["x2"], 8)
+        return "Solutions: x = " + str(x1) + " or x = " + str(x2)
+    }
+    if (k == "one_repeated") {
+        return "Solution: x = " + str(round_to(res["x"], 8)) + " (repeated root)"
+    }
+    if (k == "no_real") {
+        return "Result: " + res["message"]
+    }
+    return "Error: " + res["message"]
+}
+
+def format_solution_verbose(res) {
+    let out = format_solution(res)
+    if (has(res, "steps") and res["steps"] != null) {
+        let i = 0
+        while (i < len(res["steps"])) {
+            out = out + "\n  " + res["steps"][i]
+            i = i + 1
+        }
+    }
+    return out
+}

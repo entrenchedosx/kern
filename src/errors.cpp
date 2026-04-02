@@ -365,7 +365,8 @@ std::string ErrorReporter::toJson() const {
                     const auto& sf = st[j];
                     if (j) out << ",";
                     out << "{\"function\":\"" << escapeJson(sf.functionName) << "\","
-                        << "\"line\":" << sf.line << ",\"column\":" << sf.column << "}";
+                        << "\"line\":" << sf.line << ",\"column\":" << sf.column << ","
+                        << "\"filename\":\"" << escapeJson(it.filename) << "\"}";
                 }
             } else {
                 size_t jout = 0;
@@ -373,14 +374,16 @@ std::string ErrorReporter::toJson() const {
                     if (jout) out << ",";
                     const auto& sf = st[j];
                     out << "{\"function\":\"" << escapeJson(sf.functionName) << "\","
-                        << "\"line\":" << sf.line << ",\"column\":" << sf.column << "}";
+                        << "\"line\":" << sf.line << ",\"column\":" << sf.column << ","
+                        << "\"filename\":\"" << escapeJson(it.filename) << "\"}";
                 }
                 out << ",{\"_truncated\":true,\"omitted\":" << (n - kTracebackHeadFrames - kTracebackTailFrames) << "}";
                 for (size_t j = n - kTracebackTailFrames; j < n; ++j) {
                     out << ",";
                     const auto& sf = st[j];
                     out << "{\"function\":\"" << escapeJson(sf.functionName) << "\","
-                        << "\"line\":" << sf.line << ",\"column\":" << sf.column << "}";
+                        << "\"line\":" << sf.line << ",\"column\":" << sf.column << ","
+                        << "\"filename\":\"" << escapeJson(it.filename) << "\"}";
                 }
             }
             out << "]";

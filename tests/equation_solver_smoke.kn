@@ -1,0 +1,32 @@
+// Smoke: lib/kern/math/equation_solver.kn — run from repo root: kern tests/equation_solver_smoke.kn
+import("lib/kern/testing.kn")
+
+let ES = import("lib/kern/math/equation_solver.kn")
+let solve = ES["solve_linear_equation"]
+
+def expect_unique(eq, want_x) {
+    let r = solve(eq)
+    assert_eq(r["ok"], true, eq + " ok")
+    assert_eq(r["kind"], "unique", eq + " kind")
+    assert_eq(abs(r["x"] - want_x) < 0.000001, true, eq + " value")
+}
+
+expect_unique("2*x+3=7", 2.0)
+expect_unique("2x+3=7", 2.0)
+expect_unique("x-5=0", 5.0)
+expect_unique("(2*x+3)=11", 4.0)
+expect_unique("3*(x-1)=12", 5.0)
+expect_unique("x/2+1=5", 8.0)
+
+let r_inf = solve("x+1=x+1")
+assert_eq(r_inf["ok"], true, "inf ok")
+assert_eq(r_inf["kind"], "infinite", "inf kind")
+
+let r_none = solve("x+1=x+2")
+assert_eq(r_none["ok"], true, "none ok")
+assert_eq(r_none["kind"], "none", "none kind")
+
+let r_bad = solve("x*x=1")
+assert_eq(r_bad["ok"], false, "bad ok")
+
+print("equation_solver_smoke: ok")

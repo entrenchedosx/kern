@@ -306,7 +306,11 @@ static void collectAstDeclarationsFromStmt(const Stmt* s, ParsedFileInfo& file) 
         return;
     }
     if (const auto* imp = dynamic_cast<const ImportStmt*>(s)) {
-        file.declared.insert(importBindingName(imp));
+        if (!imp->namedImports.empty()) {
+            for (const auto& n : imp->namedImports) file.declared.insert(n);
+        } else {
+            file.declared.insert(importBindingName(imp));
+        }
         return;
     }
     if (const auto* fi = dynamic_cast<const ForInStmt*>(s)) {

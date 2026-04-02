@@ -27,7 +27,8 @@ static std::vector<std::string> discoverImports(const std::string& source) {
     std::regex reA(R"re(\bimport\s*"([^"]+)")re");
     std::regex reB(R"re(\binclude\s*"([^"]+)")re");
     std::regex reC(R"re(\bimport\s*\(\s*"([^"]+)"\s*\))re");
-    for (const auto* re : {&reA, &reB, &reC}) {
+    std::regex reD(R"re(\bfrom\s*"([^"]+)"\s*import\b)re");
+    for (const auto* re : {&reA, &reB, &reC, &reD}) {
         for (std::sregex_iterator it(source.begin(), source.end(), *re), end; it != end; ++it) {
             out.push_back((*it)[1].str());
         }

@@ -49,6 +49,7 @@ private:
     StmtPtr structDeclaration();
     StmtPtr externDeclaration();
     StmtPtr importStatement();
+    StmtPtr fromImportStatement();
     StmtPtr ifStatement();
     StmtPtr forStatement();
     StmtPtr whileStatement();
