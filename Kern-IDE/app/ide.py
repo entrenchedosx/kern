@@ -4,6 +4,7 @@ import os
 import platform
 import shutil
 import subprocess
+import sys
 from collections.abc import Callable
 from pathlib import Path
 from tkinter import (
@@ -30,21 +31,27 @@ from tkinter import (
 
 from services.diagnostics import format_problem_line
 
+from services.ide_logging import append_log
+from services.ide_settings import get_active_kern_tag, load_settings as load_ide_settings
+from services.kern_version_store import find_kern_exe, version_dir
+from services.portable_env import ensure_portable_layout, kern_versions_dir
+
 from .editor import EditorTab
 from .filesystem import FileExplorer
-from .runner import KernRunner
+from .runner import KernRunner, locate_dev_kern_exe
 from .state import load_state, save_state
 from .theme import Theme, resolve_theme
 from .version import ide_version
+from .version_panel import VersionPanel
 from ui.command_palette import show_command_palette
 from ui.tooltip import ToolTip
 
 
-def default_workspace_root() -> Path:
-    if getattr(__import__("sys"), "frozen", False):
-        import sys
-
-        return Path(sys.executable).resolve().parent
+def default_workspace_root(portable_root: Path) -> Path:
+    if getattr(sys, "frozen", False):
+        pd = portable_root / "projects"
+        pd.mkdir(parents=True, exist_ok=True)
+        return pd
     return Path(__file__).resolve().parents[2]
 
 
@@ -56,7 +63,9 @@ class KernIDE:
         self.root.geometry("1200x760")
         self.root.minsize(920, 560)
 
-        self.workspace_root = default_workspace_root()
+        self.portable_root = ensure_portable_layout()
+        self.ide_settings: dict = load_ide_settings(self.portable_root)
+        self.workspace_root = default_workspace_root(self.portable_root)
         self.state_path = self.workspace_root / ".kern-ide-state.json"
         self.state = load_state(self.state_path)
         ws = self.state.get("workspace_root")
@@ -76,7 +85,7 @@ class KernIDE:
         self._autosave_job: str | None = None
 
         self.theme: Theme = resolve_theme(self.dark_mode)
-        self.runner = KernRunner()
+        self.runner = KernRunner(self._resolve_kern_exe)
         self.editors: dict[str, EditorTab] = {}
         self.untitled_count = 1
         self._problem_items: list[dict[str, object]] = []
@@ -93,6 +102,16 @@ class KernIDE:
         self.root.after(300, self._maybe_show_onboarding)
 
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _resolve_kern_exe(self) -> str | None:
+        s = load_ide_settings(self.portable_root)
+        tag = get_active_kern_tag(s)
+        if tag:
+            vd = version_dir(kern_versions_dir(self.portable_root), tag)
+            ex = find_kern_exe(vd)
+            if ex:
+                return str(ex)
+        return locate_dev_kern_exe()
 
     def _build_styles(self) -> None:
         self.style = ttk.Style(self.root)
@@ -205,21 +224,30 @@ class KernIDE:
         self.debug_text.insert("1.0", "Debugger panel\n\nBreakpoints / step execution are not wired yet.\nShows file + cursor context when enabled.")
         self.debug_text.configure(state="disabled")
 
-        self.console_frame = ttk.Frame(self.main_vertical, height=180)
-        self.main_vertical.add(self.console_frame, weight=1)
-        self.console_label = ttk.Label(self.console_frame, text="Output", anchor="w")
+        self.bottom_shell = ttk.Frame(self.main_vertical, height=200)
+        self.main_vertical.add(self.bottom_shell, weight=1)
+        self.bottom_notebook = ttk.Notebook(self.bottom_shell)
+        self.bottom_notebook.pack(fill=BOTH, expand=True)
+
+        self.output_tab = ttk.Frame(self.bottom_notebook)
+        self.bottom_notebook.add(self.output_tab, text="Output")
+        self.console_label = ttk.Label(self.output_tab, text="Console", anchor="w")
         self.console_label.pack(fill=X, padx=8, pady=(6, 2))
 
-        self.problems_frame = ttk.Frame(self.console_frame)
+        self.problems_frame = ttk.Frame(self.output_tab)
         self.problems_label = ttk.Label(self.problems_frame, text="Problems (double-click to jump)", anchor="w", style="Section.TLabel")
         self.problems_label.pack(fill=X, padx=0, pady=(0, 2))
         self.problems_list = Listbox(self.problems_frame, height=4, relief="flat", borderwidth=0, highlightthickness=0)
         self.problems_list.pack(fill=X)
         self.problems_list.bind("<Double-Button-1>", self._on_problem_double_click)
 
-        self.console = Text(self.console_frame, height=10, wrap="word", relief="flat")
+        self.console = Text(self.output_tab, height=10, wrap="word", relief="flat")
         self.console.pack(fill=BOTH, expand=True, padx=8, pady=(0, 8))
         self.console.configure(state="disabled")
+
+        self.version_tab = ttk.Frame(self.bottom_notebook)
+        self.bottom_notebook.add(self.version_tab, text="Kern versions")
+        self.version_panel = VersionPanel(self, self.version_tab)
 
         self.status = ttk.Label(self.root, anchor="w")
         self.status.pack(side=BOTTOM, fill=X, padx=8, pady=(0, 6))
@@ -325,11 +353,13 @@ class KernIDE:
         txt.pack(fill=BOTH, expand=True)
         body = (
             "Welcome\n\n"
-            "1. This window is your workspace — use File → Open workspace… to point at a Kern checkout "
-            "(the folder that contains lib/kern and your examples).\n\n"
-            "2. Create or open a .kn file, edit in the center, and press Run (or F5) to execute with kern.exe.\n\n"
-            "3. Check (Ctrl+K) runs the compiler diagnostics; issues appear under Problems — double-click to jump.\n\n"
-            "4. Set KERN_EXE in the environment if kern.exe is not found next to the IDE.\n\n"
+            "1. Portable data lives next to the app (or in ~/.kern_ide when running from source): "
+            "kern_versions/, config/, logs/, projects/.\n\n"
+            "2. Open the Kern versions tab to download compilers from GitHub, pick an active version, "
+            "or use (development PATH) with KERN_EXE / a local build.\n\n"
+            "3. Workspace: use File → Open workspace… for your project (folder with lib/kern and .kn files). "
+            "When packaged, the default workspace is projects/ under the portable root.\n\n"
+            "4. Run (F5) uses the active downloaded compiler; Check (Ctrl+K) shows Problems (double-click to jump).\n\n"
             "5. Command Palette: Ctrl+Shift+P for all actions.\n"
         )
         txt.insert("1.0", body)
@@ -357,6 +387,7 @@ class KernIDE:
             "F5 — Run\n"
             "Shift+F5 — Stop\n"
             "Ctrl+Shift+P — Command palette\n"
+            "Kern versions tab — download compilers, pick active version\n"
             "Ctrl+` — Toggle console\n"
             "Ctrl+Shift+T — Toggle theme\n"
             "Ctrl+Space — Autocomplete",
@@ -513,11 +544,11 @@ class KernIDE:
             self.top_horizontal.forget(self.debug_frame)
 
         v_panes = self.main_vertical.panes()
-        con = str(self.console_frame)
+        con = str(self.bottom_shell)
         if self.show_console.get() and con not in v_panes:
-            self.main_vertical.add(self.console_frame, weight=1)
+            self.main_vertical.add(self.bottom_shell, weight=1)
         if not self.show_console.get() and con in v_panes:
-            self.main_vertical.forget(self.console_frame)
+            self.main_vertical.forget(self.bottom_shell)
 
     def toggle_theme(self) -> None:
         self.dark_mode = not self.dark_mode
@@ -629,7 +660,10 @@ class KernIDE:
                 return
         self.save_current()
         self.clear_output()
-        self._append_output(f"running {editor.file_path}\n\n")
+        exe = self.runner.kern_exe
+        self._append_output(f"running {editor.file_path}\n")
+        self._append_output(f"using: {exe or '(none)'}\n\n")
+        append_log("runtime.log", f"run file={editor.file_path} exe={exe}", portable_root=self.portable_root)
 
         def done(code: int) -> None:
             self.root.after(0, lambda: self._append_output(f"\nprocess exited with code {code}\n"))
@@ -652,6 +686,7 @@ class KernIDE:
         editor = self._current_editor()
         if editor.file_path is None:
             return
+        append_log("runtime.log", f"check file={editor.file_path} exe={self.runner.kern_exe}", portable_root=self.portable_root)
         diagnostics, err = self.runner.check_script(editor.file_path, self.workspace_root)
         if err:
             self._append_output(f"check failed: {err}\n")

@@ -7,7 +7,7 @@ A **small, self-contained** desktop editor for the [Kern](https://github.com/ent
 ## Requirements
 
 - **Python 3.10+** with Tkinter (included with the official Windows/macOS installers; on Linux install `python3-tk`).
-- A built **`kern.exe`** next to the repo (e.g. `build/Release/kern.exe`) or set **`KERN_EXE`** to its full path.
+- **Compiler:** use the **Kern versions** tab to download Windows zips from [GitHub Releases](https://github.com/entrenchedosx/kern/releases), *or* point at a local build (`build/Release/kern.exe`) / **`KERN_EXE`** when **Active Kern version** is set to **(development PATH)**.
 
 ## Run (development)
 
@@ -29,8 +29,10 @@ Working directory should be **`Kern-IDE`** so imports (`app`, `services`, `ui`) 
 
 | Area | Behavior |
 |------|------------|
-| **Layout** | Resizable panes: explorer · editor + breadcrumbs · optional debugger · output + problems |
-| **Run / Check** | F5 runs the current saved file; Ctrl+K runs `kern --check --json` and shows **Problems** (double-click to jump) |
+| **Portable root** | Frozen EXE: folder next to `kern-ide.exe`. Dev: `~/.kern_ide`. Override with **`KERN_IDE_HOME`**. Subfolders: `kern_versions/`, `config/settings.json`, `logs/`, `projects/` |
+| **Kern versions** | Tab lists [entrenchedosx/kern](https://github.com/entrenchedosx/kern) releases; download/install zips; active version dropdown; auto-check for updates |
+| **Layout** | Explorer · editor + breadcrumbs · optional debugger · bottom tabs **Output** (console + problems) and **Kern versions** |
+| **Run / Check** | F5 / Ctrl+K use the **active** `kern.exe` under `kern_versions/<tag>/` or dev PATH |
 | **Command palette** | Ctrl+Shift+P — filtered list of actions |
 | **Explorer** | Right-click: new file, rename, delete (under the workspace root) |
 | **Preferences** | Font size, autosave interval (ms; `0` = off) |
@@ -39,7 +41,9 @@ Working directory should be **`Kern-IDE`** so imports (`app`, `services`, `ui`) 
 
 ## Workspace
 
-The IDE picks a default **workspace root** (the Kern repo root when running from a checkout). Use **File → Open workspace…** to point at a project folder that contains `lib/kern` and your `.kn` files. State is stored in **`<workspace>/.kern-ide-state.json`**.
+- **Packaged (frozen):** default workspace is **`projects/`** under the portable root (created on launch).
+- **From source:** default workspace is the Kern **repository root** (parent of `Kern-IDE/`).
+- Use **File → Open workspace…** for a project folder that contains `lib/kern` and your `.kn` files. UI state is stored in **`<workspace>/.kern-ide-state.json`**; compiler selection lives in **`config/settings.json`** under the portable root.
 
 ## Packaging
 
@@ -73,10 +77,13 @@ CI for the Tk editor lives in the main kern repo (`.github/workflows/kern-ide-tk
 
 ## Code layout
 
-- `app/ide.py` — main window, menus, layout, problems list, palette, preferences
+- `app/ide.py` — main window, menus, layout, problems list, palette, preferences, portable root
+- `app/version_panel.py` — GitHub release list, downloads, active version UI
 - `app/editor.py` — `Text` buffer, highlighting, diagnostics underlines, autocomplete
-- `app/runner.py` — locate `kern.exe`, stream run output, `kern --check --json`
-- `services/` — diagnostics parsing, completion data, etc.
+- `app/runner.py` — resolves active `kern.exe` (managed install or dev PATH), run/check
+- `services/portable_env.py`, `ide_settings.py`, `ide_logging.py` — layout, `config/settings.json`, `logs/*.log`
+- `services/github_kern_releases.py`, `kern_version_store.py` — API + zip install / verify
+- `services/` — diagnostics, completion data, etc.
 - `ui/` — command palette, tooltips
 
 ## Limitations (honest)
