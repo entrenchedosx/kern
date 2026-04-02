@@ -1,0 +1,60 @@
+# Build Windows portable ZIP (kern-ide.exe + VERSION + README) and optionally attach to entrenchedosx/kern-IDE releases.
+# Secrets: KERN_IDE_RELEASE_PAT — fine-grained PAT with Contents: Write on kern-IDE (optional; else artifact only).
+
+name: Kern IDE portable (Windows)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag on kern-IDE repo to upload to (e.g. v0.3.0)"
+        required: true
+        type: string
+      upload_to_kern_ide:
+        description: "Upload ZIP to that release on entrenchedosx/kern-IDE"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  portable:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: Kern-IDE
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PyInstaller and build
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          python -m PyInstaller --noconfirm packaging/kern-ide.spec
+
+      - name: Create portable zip
+        shell: pwsh
+        run: |
+          $ver = (Get-Content "VERSION" -Raw).Trim()
+          $zipName = "kern-ide-windows-x64-portable-v$ver.zip"
+          Compress-Archive -Path "dist/kern-ide.exe","VERSION","packaging/README_PORTABLE.txt" -DestinationPath $zipName -Force
+          Get-Item $zipName | Format-List Name,Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kern-ide-portable-windows
+          path: Kern-IDE/kern-ide-windows-x64-portable-v*.zip
+
+      - name: Upload release asset on kern-IDE repo
+        if: ${{ github.event.inputs.upload_to_kern_ide == 'true' && secrets.KERN_IDE_RELEASE_PAT != '' }}
+        working-directory: ${{ github.workspace }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.KERN_IDE_RELEASE_PAT }}
+        run: |
+          $zip = Get-ChildItem -Path Kern-IDE -Filter "kern-ide-windows-x64-portable-v*.zip" | Select-Object -First 1
+          if (-not $zip) { throw "zip not found" }
+          gh release upload "${{ inputs.release_tag }}" $zip.FullName --repo entrenchedosx/kern-IDE --clobber

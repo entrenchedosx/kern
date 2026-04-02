@@ -16,6 +16,7 @@ shareable-kern-compiler/
 FINAL/
 Kern-IDE/desktop-tk/build/
 Kern-IDE/desktop-tk/dist/
+Kern-IDE/kern-ide-windows-x64-portable-v*.zip
 Kern-IDE/native-qt/build*/
 Kern-IDE/build/
 Kern-IDE/packaging/work_verify*/

@@ -49,6 +49,16 @@ Working directory should be **`Kern-IDE`** so imports (`app`, `services`, `ui`) 
 
 See `packaging/` for PyInstaller specs (`kern-ide.spec`). Build a one-folder or one-file bundle after installing PyInstaller.
 
+**Portable Windows zip (local build):**
+
+```powershell
+.\Kern-IDE\packaging\build_portable_zip.ps1
+```
+
+**Official downloads:** [Kern IDE releases](https://github.com/entrenchedosx/kern-IDE/releases) — get **`kern-ide-windows-x64-portable-v*.zip`**, extract anywhere, run `kern-ide.exe`.
+
+CI: run workflow **Kern IDE portable (Windows)** in the main repo (`.github/workflows/kern-ide-portable-release.yml`) to reproduce the zip; optional upload to `kern-IDE` needs repo secret `KERN_IDE_RELEASE_PAT`.
+
 ## Publishing to [entrenchedosx/kern-IDE](https://github.com/entrenchedosx/kern-IDE.git)
 
 That repository uses a multi-package layout:
