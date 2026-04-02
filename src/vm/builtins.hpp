@@ -43,6 +43,9 @@
 #else
 #include <fcntl.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <crt_externs.h>
+#endif
 #include <sys/mman.h>
 #include <sys/stat.h>
 #endif
@@ -3664,7 +3667,13 @@ inline void registerAllBuiltins(VM& vm) {
             FreeEnvironmentStringsA(env);
         }
 #else
-        for (char** p = ::environ; p && *p; ++p) {
+        char** envp;
+#if defined(__APPLE__)
+        envp = *_NSGetEnviron();
+#else
+        envp = ::environ;
+#endif
+        for (char** p = envp; p && *p; ++p) {
             std::string s(*p); size_t eq = s.find('='); if (eq != std::string::npos) m[s.substr(0, eq)] = std::make_shared<Value>(Value::fromString(s.substr(eq + 1)));
         }
 #endif

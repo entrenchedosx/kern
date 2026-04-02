@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 
 - **macOS build:** repo-root semver file renamed from **`VERSION`** to **`KERN_VERSION.txt`** so a default **case-insensitive** volume does not make `#include <version>` pick up the wrong file (C++20 standard header vs. version text).
+- **macOS `env_all()`:** use `_NSGetEnviron()` from `<crt_externs.h>` (Darwin does not expose `::environ` like glibc).
 - **CMake / macOS:** embed `version_info.rc` only on **Windows** so Apple Clang and other non-MSVC toolchains do not try to compile the PE resource file (unblocks Release workflow macOS/Linux packaging).
 
 ### Added
