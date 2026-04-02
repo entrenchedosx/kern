@@ -39,6 +39,36 @@ namespace kern {
 namespace {
 namespace fs = std::filesystem;
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+static fs::path getExecutableDir() {
+    std::error_code ec;
+#ifdef _WIN32
+    char buf[MAX_PATH];
+    DWORD n = GetModuleFileNameA(nullptr, buf, MAX_PATH);
+    if (n > 0 && n < MAX_PATH) {
+        fs::path p(std::string(buf, n));
+        if (p.has_parent_path()) return p.parent_path();
+    }
+#endif
+    fs::path cwd = fs::current_path(ec);
+    return ec ? fs::path() : cwd;
+}
+
+static void addBundledStdlibRootIfPresent(std::vector<fs::path>& roots) {
+    // If a portable drop ships `lib/kern/` next to `kern.exe`, prefer that automatically
+    // so users don't need KERN_LIB.
+    fs::path exeDir = getExecutableDir();
+    if (exeDir.empty()) return;
+    fs::path libKern = exeDir / "lib" / "kern";
+    std::error_code ec;
+    if (fs::is_directory(libKern, ec) && !ec) {
+        roots.push_back(exeDir);
+    }
+}
+
 struct ImportState {
     std::unordered_map<std::string, ValuePtr> moduleCache;
     std::unordered_set<std::string> loading;
@@ -108,6 +138,8 @@ static std::string resolveImportPath(const std::string& importPath, std::string*
     const char* lib = std::getenv("KERN_LIB");
     if (lib && lib[0]) {
         roots.emplace_back(lib);
+    } else {
+        addBundledStdlibRootIfPresent(roots);
     }
 
     // absolute paths are permitted only if under an allowed root.

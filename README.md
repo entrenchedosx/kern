@@ -80,9 +80,14 @@ cmake -B build -DKERN_BUILD_GAME=ON -DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/build
 cmake --build build --config Release --target kern kernc
 ```
 
-## Editors (Kern-IDE)
+## Editors
 
-Use the **[Kern-IDE](Kern-IDE/README.md)** folder: desktop Tk IDE, Qt editor, and VS Code extension. They invoke **`kern`** via subprocess / tasks; they do not embed this compiler.
+Editor sources in this monorepo:
+
+- `kern-ide/` — desktop Tk IDE (`main.py`, `app/`, `packaging/`)
+- `editors/vscode-kern/` — VS Code extension
+
+They invoke **`kern`** via subprocess/tasks; they do not embed this compiler.
 
 ## Windows portable / shareable folders
 
@@ -91,7 +96,7 @@ Maintainer-built drops may include:
 - **`shareable-ide/compiler/`** — toolchain + `lib/` for `KERN_LIB`
 - **`shareable-kern-to-exe/`** — packager + `kern` / `kernc`
 
-IDE packaging is maintained under **Kern-IDE** (`desktop-tk/packaging/`).
+IDE packaging is maintained under `kern-ide/packaging/`.
 
 ## Documentation
 
