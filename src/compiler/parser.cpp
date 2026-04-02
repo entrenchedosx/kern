@@ -449,7 +449,7 @@ std::vector<Param> Parser::parameterList() {
         params.emplace_back(std::move(name), std::move(typeName), std::move(defaultExpr));
         if (!match(TokenType::COMMA)) break;
     }
-    return std::move(params);
+    return params;
 }
 
 StmtPtr Parser::classDeclaration() {
@@ -960,13 +960,13 @@ ExprPtr Parser::assignment() {
         match(TokenType::STAR_EQ) || match(TokenType::SLASH_EQ) || match(TokenType::PERCENT_EQ)) {
         TokenType op = previous().type;
         ExprPtr value = assignment();
-        if (auto* id = dynamic_cast<Identifier*>(expr.get())) {
+        if (dynamic_cast<Identifier*>(expr.get())) {
             return std::make_unique<AssignExpr>(std::move(expr), std::move(value), op);
         }
-        if (auto* mem = dynamic_cast<MemberExpr*>(expr.get())) {
+        if (dynamic_cast<MemberExpr*>(expr.get())) {
             return std::make_unique<AssignExpr>(std::move(expr), std::move(value), op);
         }
-        if (auto* idx = dynamic_cast<IndexExpr*>(expr.get())) {
+        if (dynamic_cast<IndexExpr*>(expr.get())) {
             return std::make_unique<AssignExpr>(std::move(expr), std::move(value), op);
         }
         if (auto* un = dynamic_cast<UnaryExpr*>(expr.get())) {

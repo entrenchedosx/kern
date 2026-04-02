@@ -19,6 +19,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Build:** optional `KERN_WERROR` (GCC/Clang, Debug only); root `Dockerfile` for a minimal Ubuntu build image.
 - **Git:** ignore MkDocs output directory `site/`.
 
+### Fixed
+
+- **GCC `-Werror` (Linux CI):** disambiguate integer token literal overload; drop pessimizing `std::move` on `parameterList` return; silence assignment-target `dynamic_cast` bindings; fix misleading indentation in `mem_fill_pattern` / `uuid`; scope `std::tm bt` to Windows in `time_format`; scope `sigVals` to Windows in `ffi_call`; mark unused `wait_process` / `kill_process` args on non-Windows; ignore `system()` return in REPL `clear`.
+
 ---
 
 ## [1.0.5] - 2026-04-02

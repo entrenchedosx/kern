@@ -3057,8 +3057,10 @@ inline void registerAllBuiltins(VM& vm) {
         uint32_t pat = static_cast<uint32_t>(toInt(args[2]) & 0xFFFFFFFFu);
         unsigned char* dst = static_cast<unsigned char*>(p);
         for (int64_t i = 0; i < n; i += 4) {
-            dst[i] = pat & 0xFF; if (i + 1 < n) dst[i + 1] = (pat >> 8) & 0xFF;
-            if (i + 2 < n) dst[i + 2] = (pat >> 16) & 0xFF; if (i + 3 < n) dst[i + 3] = (pat >> 24) & 0xFF;
+            dst[i] = pat & 0xFF;
+            if (i + 1 < n) dst[i + 1] = (pat >> 8) & 0xFF;
+            if (i + 2 < n) dst[i + 2] = (pat >> 16) & 0xFF;
+            if (i + 3 < n) dst[i + 3] = (pat >> 24) & 0xFF;
         }
         return Value::nil();
     });
@@ -3517,11 +3519,15 @@ inline void registerAllBuiltins(VM& vm) {
         static std::uniform_int_distribution<int> hex(0, 15);
         const char h[] = "0123456789abcdef";
         std::string s;
-        for (int i = 0; i < 8; ++i) s += h[hex(rng)]; s += '-';
-        for (int i = 0; i < 4; ++i) s += h[hex(rng)]; s += "-4";
-        for (int i = 0; i < 3; ++i) s += h[hex(rng)]; s += '-';
+        for (int i = 0; i < 8; ++i) s += h[hex(rng)];
+        s += '-';
+        for (int i = 0; i < 4; ++i) s += h[hex(rng)];
+        s += "-4";
+        for (int i = 0; i < 3; ++i) s += h[hex(rng)];
+        s += '-';
         s += h[(hex(rng) & 3) | 8];
-        for (int i = 0; i < 3; ++i) s += h[hex(rng)]; s += '-';
+        for (int i = 0; i < 3; ++i) s += h[hex(rng)];
+        s += '-';
         for (int i = 0; i < 12; ++i) s += h[hex(rng)];
         return Value::fromString(s);
     });
@@ -3592,8 +3598,8 @@ inline void registerAllBuiltins(VM& vm) {
         std::time_t t = std::time(nullptr);
         if (args.size() >= 2 && args[1] && (args[1]->type == Value::Type::INT || args[1]->type == Value::Type::FLOAT))
             t = static_cast<std::time_t>(args[1]->type == Value::Type::INT ? std::get<int64_t>(args[1]->data) : std::get<double>(args[1]->data));
-        std::tm bt = {};
 #ifdef _WIN32
+        std::tm bt = {};
         if (localtime_s(&bt, &t) != 0) return Value::fromString("");
         std::tm* btp = &bt;
 #else
@@ -4198,6 +4204,8 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromMap(std::move(m));
 #else
+        (void)args;
+        (void)toInt;
         std::unordered_map<std::string, ValuePtr> m;
         m["ok"] = std::make_shared<Value>(Value::fromBool(false));
         m["exited"] = std::make_shared<Value>(Value::fromBool(false));
@@ -4219,6 +4227,8 @@ inline void registerAllBuiltins(VM& vm) {
         g_spawnHandles.erase(it);
         return Value::fromBool(ok != 0);
 #else
+        (void)args;
+        (void)toInt;
         return Value::fromBool(false);
 #endif
     });
@@ -5682,8 +5692,8 @@ inline void registerAllBuiltins(VM& vm) {
 #endif
         if (!args[4] || args[4]->type != Value::Type::ARRAY)
             throw VMError("ffi_call expected array of parameter types", 0, 0, 5);
-        const auto& sigVals = std::get<std::vector<ValuePtr>>(args[4]->data);
 #ifdef _WIN32
+        const auto& sigVals = std::get<std::vector<ValuePtr>>(args[4]->data);
         if (guards.sandboxEnabled && !guards.ffiLibraryAllowlist.empty()) {
             if (std::find(guards.ffiLibraryAllowlist.begin(), guards.ffiLibraryAllowlist.end(), dllName) ==
                 guards.ffiLibraryAllowlist.end()) {

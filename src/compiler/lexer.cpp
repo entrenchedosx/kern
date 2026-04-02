@@ -265,7 +265,7 @@ void Lexer::number() {
             std::string numStr = source_.substr(start_, current_ - start_);
             for (auto it = numStr.begin(); it != numStr.end(); ) { if (*it == '_') it = numStr.erase(it); else ++it; }
             if (numStr.empty()) numStr = "0";
-            addToken(TokenType::INTEGER, std::stoll(numStr));
+            addToken(TokenType::INTEGER, static_cast<int64_t>(std::stoll(numStr)));
         }
     } catch (const std::out_of_range&) {
         throw LexerError("Number literal out of range", line_, column_);

@@ -1354,9 +1354,9 @@ int main(int argc, char** argv) {
         }
         if (line == "clear" || line == ".clear") {
 #ifdef _WIN32
-            std::system("cls");
+            (void)std::system("cls");
 #else
-            std::system("clear");
+            (void)std::system("clear");
 #endif
             continue;
         }
