@@ -35,6 +35,7 @@ from .filesystem import FileExplorer
 from .runner import KernRunner
 from .state import load_state, save_state
 from .theme import Theme, resolve_theme
+from .version import ide_version
 from ui.command_palette import show_command_palette
 from ui.tooltip import ToolTip
 
@@ -50,7 +51,8 @@ def default_workspace_root() -> Path:
 class KernIDE:
     def __init__(self, root: Tk) -> None:
         self.root = root
-        self.root.title("Kern IDE")
+        self._ide_version = ide_version()
+        self.root.title(f"Kern IDE {self._ide_version}")
         self.root.geometry("1200x760")
         self.root.minsize(920, 560)
 
@@ -151,7 +153,7 @@ class KernIDE:
     def _build_ui(self) -> None:
         self.toolbar = ttk.Frame(self.root)
         self.toolbar.pack(side=TOP, fill=X, padx=8, pady=(8, 4))
-        self.app_title = ttk.Label(self.toolbar, text="Kern IDE", anchor="w")
+        self.app_title = ttk.Label(self.toolbar, text=f"Kern IDE {self._ide_version}", anchor="w")
         self.app_title.pack(side=LEFT, padx=(0, 12))
         self.btn_run = ttk.Button(self.toolbar, text="Run", command=self.run_current)
         self.btn_run.pack(side=LEFT, padx=(0, 6))
@@ -761,7 +763,8 @@ class KernIDE:
     def _show_about(self) -> None:
         messagebox.showinfo(
             "About Kern IDE",
-            "Kern IDE — Tk-based editor for the Kern language.\n\n"
+            f"Kern IDE {self._ide_version}\n"
+            "Tk-based editor for the Kern language.\n\n"
             "F5 run · Ctrl+K check · Ctrl+Shift+P palette · Ctrl+` toggle console\n"
             "See Help → Quick start for a short tour.",
         )

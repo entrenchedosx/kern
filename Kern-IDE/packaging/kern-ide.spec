@@ -13,10 +13,11 @@ a = Analysis(
     [os.path.join(ide_root, "main.py")],
     pathex=[ide_root, repo_root],
     binaries=[],
-    datas=[],
+    datas=[(os.path.join(ide_root, "VERSION"), ".")],
     hiddenimports=[
         "app",
         "app.ide",
+        "app.version",
         "app.editor",
         "app.filesystem",
         "app.runner",
