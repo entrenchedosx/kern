@@ -8,12 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.6] - 2026-04-02
+
 ### Added
 
 - **CLI:** `kern docs` (documentation paths + MkDocs hint) and `kern build` (CMake build instructions).
 - **CI:** Linux and macOS workflows (headless CMake, smoke tests) alongside existing Windows jobs.
 - **CI:** Linux jobs for **Debug + `KERN_WERROR=ON`** (GCC/Clang) and **`mkdocs build --strict`**.
-- **Releases:** Tagged **`v*`** builds now attach **Linux** and **macOS** tarballs in addition to the Windows zip (see `.github/workflows/release.yml`).
+- **Releases:** Tagged **`v*`** builds attach **Linux** and **macOS** tarballs in addition to the Windows zip (see `.github/workflows/release.yml`).
 - **Docs:** `docs/index.md`, `docs/ADOPTION_ROADMAP.md`, root `mkdocs.yml` for optional `mkdocs serve` (nav + validation tuned for strict builds).
 - **Community:** `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1).
 - **Build:** optional `KERN_WERROR` (GCC/Clang, Debug only); root `Dockerfile` for a minimal Ubuntu build image.
