@@ -4,9 +4,9 @@ Use this before tagging a public release. Pair with [RELEASE.md](../RELEASE.md) 
 
 ## Pre-release
 
-- [ ] **Version:** update root [`VERSION`](../VERSION) (semver, e.g. `1.0.3`).
+- [ ] **Version:** update root [`KERN_VERSION.txt`](../KERN_VERSION.txt) (semver, e.g. `1.0.3`).
 - [ ] **Changelog:** move `[Unreleased]` items into a dated section with the new version; keep `[Unreleased]` empty or stub for the next cycle.
-- [ ] **README:** badge/version line matches `VERSION` if you display it explicitly.
+- [ ] **README:** badge/version line matches `KERN_VERSION.txt` if you display it explicitly.
 - [ ] **CI green:** latest `main` passes [Windows Kern](../.github/workflows/windows-kern.yml), [Linux Kern](../.github/workflows/linux-kern.yml), and [macOS Kern](../.github/workflows/macos-kern.yml).
 
 ## Build & test (local or CI)

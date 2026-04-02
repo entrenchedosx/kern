@@ -60,7 +60,7 @@ Use the **[Kern-IDE](Kern-IDE/README.md)** directory: Tk desktop IDE, Qt editor,
 ## For maintainers: preparing a release
 
 1. **Version**
-   - Set the version in the root `VERSION` file (e.g. `1.0.0`). This is used by `kern --version` and the `kern_version()` builtin.
+   - Set the version in the root `KERN_VERSION.txt` file (e.g. `1.0.0`). This is used by `kern --version` and the `kern_version()` builtin.
 
 2. **Changelog**
    - Update `CHANGELOG.md` with the release date and any last-minute notes.
@@ -104,7 +104,7 @@ Use the **[Kern-IDE](Kern-IDE/README.md)** directory: Tk desktop IDE, Qt editor,
 
 ## Production checklist (quick)
 
-- [ ] `VERSION` file set.
+- [ ] `KERN_VERSION.txt` set.
 - [ ] `kern --version` and `kern_version()` match.
 - [ ] `kern --help` lists all options.
 - [ ] Core examples run: `examples/basic/01_hello_world.kn`, `examples/advanced/00_full_feature_smoke.kn`.

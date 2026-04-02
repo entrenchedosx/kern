@@ -76,7 +76,7 @@ jobs:
         id: zip
         shell: pwsh
         run: |
-          $ver = (Get-Content -Raw VERSION).Trim()
+          $ver = (Get-Content -Raw KERN_VERSION.txt).Trim()
           $out = "kern-windows-x64-v$ver.zip"
           New-Item -ItemType Directory -Path pkg/kern-${ver}-win64 | Out-Null
           Copy-Item build/Release/kern.exe pkg/kern-${ver}-win64/
@@ -84,7 +84,7 @@ jobs:
           Copy-Item build/Release/kern-scan.exe pkg/kern-${ver}-win64/
           Copy-Item LICENSE pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
           Copy-Item README.md pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
-          Copy-Item VERSION pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
+          Copy-Item KERN_VERSION.txt pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
           Compress-Archive -Path pkg/kern-${ver}-win64 -DestinationPath $out -Force
           Add-Content -Path $env:GITHUB_OUTPUT -Value "zip_path=$out"
 
@@ -116,12 +116,12 @@ jobs:
       - name: Package tarball
         id: tgz
         run: |
-          ver=$(tr -d ' \t\r\n' < VERSION)
+          ver=$(tr -d ' \t\r\n' < KERN_VERSION.txt)
           out="kern-linux-x64-v${ver}.tar.gz"
           mkdir -p "pkg/kern-${ver}-linux-x64"
           chmod +x build/kern build/kernc build/kern-scan
           cp build/kern build/kernc build/kern-scan "pkg/kern-${ver}-linux-x64/"
-          cp LICENSE README.md VERSION "pkg/kern-${ver}-linux-x64/" 2>/dev/null || true
+          cp LICENSE README.md KERN_VERSION.txt "pkg/kern-${ver}-linux-x64/" 2>/dev/null || true
           tar -czvf "$out" -C pkg "kern-${ver}-linux-x64"
           echo "tgz_path=$out" >> "$GITHUB_OUTPUT"
 
@@ -152,12 +152,12 @@ jobs:
       - name: Package tarball
         id: tgz
         run: |
-          ver=$(tr -d ' \t\r\n' < VERSION)
+          ver=$(tr -d ' \t\r\n' < KERN_VERSION.txt)
           out="kern-macos-v${ver}.tar.gz"
           mkdir -p "pkg/kern-${ver}-macos"
           chmod +x build/kern build/kernc build/kern-scan
           cp build/kern build/kernc build/kern-scan "pkg/kern-${ver}-macos/"
-          cp LICENSE README.md VERSION "pkg/kern-${ver}-macos/" 2>/dev/null || true
+          cp LICENSE README.md KERN_VERSION.txt "pkg/kern-${ver}-macos/" 2>/dev/null || true
           tar -czvf "$out" -C pkg "kern-${ver}-macos"
           echo "tgz_path=$out" >> "$GITHUB_OUTPUT"
 

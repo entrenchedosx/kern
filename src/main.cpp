@@ -899,7 +899,7 @@ int main(int argc, char** argv) {
 #ifdef KERN_VERSION
             ver = KERN_VERSION;
 #else
-            std::ifstream vf("VERSION");
+            std::ifstream vf("KERN_VERSION.txt");
             if (vf) {
                 std::string line;
                 if (std::getline(vf, line)) {

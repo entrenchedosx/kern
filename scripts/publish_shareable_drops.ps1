@@ -2,7 +2,7 @@
 .SYNOPSIS
     Publish shareable-kern-to-exe and refresh shareable-ide\compiler (optionally rebuild ide.exe).
 .DESCRIPTION
-    Default: publish shareable-kern-to-exe + sync shareable-ide\compiler (exes, lib, VERSION).
+    Default: publish shareable-kern-to-exe + sync shareable-ide\compiler (exes, lib, KERN_VERSION.txt).
     -FullIde: also run PyInstaller (build_shareable_ide.ps1) for a fresh ide.exe.
     -SkipIde: only shareable-kern-to-exe.
 .PARAMETER SkipNative

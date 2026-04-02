@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **macOS build:** repo-root semver file renamed from **`VERSION`** to **`KERN_VERSION.txt`** so a default **case-insensitive** volume does not make `#include <version>` pick up the wrong file (C++20 standard header vs. version text).
 - **CMake / macOS:** embed `version_info.rc` only on **Windows** so Apple Clang and other non-MSVC toolchains do not try to compile the PE resource file (unblocks Release workflow macOS/Linux packaging).
 
 ### Added
@@ -33,6 +34,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Linux link:** `env_all()` uses `::environ` (POSIX global), not `kern::environ`.
 - **Linux `-Wunused-function`:** gate `process_module`’s `toInt` helper behind `_WIN32`.
 - **Linux `kernc`:** include `<cstdint>` in `build_cache.hpp` for `uint64_t` (GCC is stricter than MSVC transitive includes).
+
+### Changed
+
+- **Version file:** root semver file is **`KERN_VERSION.txt`** instead of **`VERSION`** (see Fixed → macOS build). Update scripts and packaging that referenced the old filename.
 
 ---
 
@@ -165,4 +170,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Build
 
 - CMake 3.14+; C++17. Optional Raylib for g2d/game (vcpkg or RAYLIB_ROOT).
-- Version from root `VERSION` file; reflected in `--version` and `kern_version()`.
+- Version from root `KERN_VERSION.txt`; reflected in `--version` and `kern_version()`.

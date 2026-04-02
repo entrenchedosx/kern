@@ -9,7 +9,7 @@
 .PARAMETER DestDir
     Destination folder (default: <repo>/shareable-ide/compiler).
 .PARAMETER IncludeLib
-    Also mirror repo lib/ into compiler/lib and copy VERSION (full toolchain for IDE).
+    Also mirror repo lib/ into compiler/lib and copy KERN_VERSION.txt (full toolchain for IDE).
 #>
 [CmdletBinding()]
 param(
@@ -54,8 +54,8 @@ if ($IncludeLib) {
     if (-not (Test-Path $LibSrc)) { Write-Error "Missing lib folder: $LibSrc" }
     if (Test-Path $destLib) { Remove-Item $destLib -Recurse -Force }
     Copy-Item $LibSrc $destLib -Recurse -Force
-    $verSrc = Join-Path $Root "VERSION"
-    if (Test-Path $verSrc) { Copy-Item $verSrc (Join-Path $DestDir "VERSION") -Force }
+    $verSrc = Join-Path $Root "KERN_VERSION.txt"
+    if (Test-Path $verSrc) { Copy-Item $verSrc (Join-Path $DestDir "KERN_VERSION.txt") -Force }
     $Repl = Join-Path $Release "kern_repl.exe"
     $Impl = Join-Path $Release "kern-impl.exe"
     $Game = Join-Path $Release "kern_game.exe"
@@ -65,6 +65,6 @@ if ($IncludeLib) {
             Write-Host "Copied $($pair[1])" -ForegroundColor Gray
         }
     }
-    Write-Host 'Synced lib/ and VERSION under compiler/' -ForegroundColor Green
+    Write-Host 'Synced lib/ and KERN_VERSION.txt under compiler/' -ForegroundColor Green
 }
 

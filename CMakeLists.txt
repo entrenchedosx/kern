@@ -26,9 +26,11 @@ function(kern_apply_strict_warnings target)
   endif()
 endfunction()
 
-# Version from VERSION file (for --version and kern_version() builtin)
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION")
-  file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" KERN_VERSION_RAW)
+# Version from KERN_VERSION.txt (for --version and kern_version() builtin).
+# Do not use a file named "VERSION" at repo root: on case-insensitive filesystems (macOS default)
+# it shadows the C++20 standard header <version>.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/KERN_VERSION.txt")
+  file(READ "${CMAKE_CURRENT_SOURCE_DIR}/KERN_VERSION.txt" KERN_VERSION_RAW)
   string(STRIP "${KERN_VERSION_RAW}" KERN_VERSION)
 else()
   set(KERN_VERSION "1.0.0")

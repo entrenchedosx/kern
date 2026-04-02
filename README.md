@@ -1,7 +1,7 @@
 # Kern
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.6-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-1.0.6-blue.svg)](KERN_VERSION.txt)
 
 **Kern** is a small, compiled scripting language: an explicit lexer → parser → bytecode pipeline and a bytecode **VM**, with a growing **standard library** (`lib/kern/`) and a **`kern`** CLI for running scripts, linting, and the REPL.
 
@@ -133,7 +133,7 @@ cmake --build build --config Release --target kern kernc kern-scan
 | `Kern-IDE/` | **Editor bundle** (Python/Qt/VS Code) — not required to build `kern` |
 | `framework/` | Optional document-runtime demo (CMake-gated) |
 
-The canonical version string is the root **`VERSION`** file (used by `kern --version` and `kern_version()`).
+The canonical version string is the root **`KERN_VERSION.txt`** file (used by `kern --version` and `kern_version()`).
 
 ---
 
@@ -172,7 +172,7 @@ See [docs/TESTING.md](docs/TESTING.md) for example sweeps, `kernc` tests, and st
 
 ## Releases & versioning
 
-- **Version:** `VERSION` at repo root (e.g. `1.0.6`).
+- **Version:** `KERN_VERSION.txt` at repo root (e.g. `1.0.6`).
 - **Changelog:** [CHANGELOG.md](CHANGELOG.md) follows [Keep a Changelog](https://keepachangelog.com/).
 - **Tags:** release tags look like `v1.0.6` (see [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)).
 - **CI:** [`.github/workflows/windows-kern.yml`](.github/workflows/windows-kern.yml), [`.github/workflows/linux-kern.yml`](.github/workflows/linux-kern.yml), and [`.github/workflows/macos-kern.yml`](.github/workflows/macos-kern.yml) build and smoke-test on pushes and PRs.

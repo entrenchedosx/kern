@@ -4,7 +4,7 @@
 .DESCRIPTION
     Writes to <repo>\shareable-kern-to-exe:
       kern_to_exe\   (package .py only)
-      kern-to-exe.bat, README.md, VERSION, kernc.exe (from build\Release)
+      kern-to-exe.bat, README.md, KERN_VERSION.txt, kernc.exe (from build\Release)
     Omits __pycache__, .pyc, .kern-cache, dist artifacts.
 .PARAMETER BuildDir
     CMake build root (default: <repo>\build).
@@ -28,7 +28,7 @@ if (-not (Test-Path -LiteralPath $KerncSrc)) {
 $SrcPkg = Join-Path $RepoRoot "kern-to-exe\kern_to_exe"
 $SrcBat = Join-Path $RepoRoot "kern-to-exe\kern-to-exe.bat"
 $SrcReadme = Join-Path $RepoRoot "kern-to-exe\README.md"
-$VerSrc = Join-Path $RepoRoot "VERSION"
+$VerSrc = Join-Path $RepoRoot "KERN_VERSION.txt"
 if (-not (Test-Path $SrcPkg)) { Write-Error "Missing package folder: $SrcPkg" }
 
 $Dest = Join-Path $RepoRoot "shareable-kern-to-exe"
@@ -50,7 +50,7 @@ Get-ChildItem -LiteralPath $SrcPkg -Recurse -File | ForEach-Object {
 
 Copy-Item -LiteralPath $SrcBat -Destination (Join-Path $Dest "kern-to-exe.bat") -Force
 if (Test-Path $SrcReadme) { Copy-Item -LiteralPath $SrcReadme -Destination (Join-Path $Dest "README.md") -Force }
-if (Test-Path $VerSrc) { Copy-Item -LiteralPath $VerSrc -Destination (Join-Path $Dest "VERSION") -Force }
+if (Test-Path $VerSrc) { Copy-Item -LiteralPath $VerSrc -Destination (Join-Path $Dest "KERN_VERSION.txt") -Force }
 
 Copy-Item -LiteralPath $KerncSrc -Destination (Join-Path $Dest "kernc.exe") -Force
 if (Test-Path $KernSrc) {
@@ -74,7 +74,7 @@ Double-click kern-to-exe.bat or run:
 kernc.exe sits in this folder. Override with: set KERNC_EXE=path\to\kernc.exe
 Requires Python 3.10+ with tkinter (Windows installer: include tcl/tk).
 
-Version: see file VERSION
+Version: see file KERN_VERSION.txt
 '@
 $start | Set-Content -LiteralPath (Join-Path $Dest "START_HERE.txt") -Encoding utf8
 
