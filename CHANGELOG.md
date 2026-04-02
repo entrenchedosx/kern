@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **CI:** Windows workflows skip full `tests/coverage` and g3d smoke on GitHub-hosted runners (no OpenGL window); use local `kern test tests/coverage` for full suite.
+
 ---
 
 ## [1.0.3] - 2026-04-02

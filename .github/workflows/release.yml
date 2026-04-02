@@ -64,13 +64,14 @@ jobs:
         shell: cmd
         run: cmake --build build --config Release --target kern kernc kern-scan --parallel 4
 
+      # Headless runners have no OpenGL window; skip full coverage (includes g3d window tests).
       - name: Verify
         shell: cmd
         run: |
           build\Release\kern.exe --version
           build\Release\kern.exe --scan --registry-only
           build\Release\kern.exe tests\std_v1_builtins_smoke.kn
-          build\Release\kern.exe test tests\coverage
+          build\Release\kern.exe examples\basic\01_hello_world.kn
 
       - name: Package zip
         id: zip
