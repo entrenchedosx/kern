@@ -10,6 +10,7 @@
 #include "../vm/value.hpp"
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <stdexcept>
 
@@ -42,6 +43,15 @@ private:
     std::vector<std::vector<size_t>> continuePatches_;
     std::unordered_map<std::string, std::vector<std::string>> functionParams_;
 
+    struct LambdaCodegenLayer {
+        size_t captureBoundary = 0;  // scopes_.size() before lambda beginScope
+        size_t arity = 0;
+        std::vector<std::string> captureOrder;
+        std::unordered_map<std::string, size_t> captureIndex;
+        size_t nextInnerSlot = 0;
+    };
+    std::vector<LambdaCodegenLayer> lambdaCtxStack_;
+
     size_t addConstant(const std::string& s);
     size_t addValueConstant(Value v);
     size_t emit(Opcode op);
@@ -52,6 +62,14 @@ private:
     size_t emit(Opcode op, size_t a, size_t b);
     void patchJump(size_t at, size_t target);
     size_t resolveLocal(const std::string& name);
+    int findDefiningScopeIndex(const std::string& name) const;
+    bool tryResolveLocalSlot(const std::string& name, int64_t* outSlot);
+    void scanLambdaCapturesStmt(const Stmt* s, size_t boundary, std::unordered_set<std::string>& seen,
+                                std::vector<std::string>& order);
+    void scanLambdaCapturesExpr(const Expr* e, size_t boundary, std::unordered_set<std::string>& seen,
+                                std::vector<std::string>& order);
+    void scanAssignTargetForCaptures(const Expr* t, size_t boundary, std::unordered_set<std::string>& seen,
+                                     std::vector<std::string>& order);
     size_t totalLocalCount();
     void declareLocal(const std::string& name);
     void beginScope();

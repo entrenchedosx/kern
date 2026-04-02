@@ -84,6 +84,7 @@ struct FunctionObject {
     size_t arity = 0;
     size_t entryPoint = 0;  // bytecode index (into script->code when script is set)
     std::shared_ptr<ScriptCode> script;  // when set, function was defined in an imported script
+    std::vector<ValuePtr> captures;  // lambda closure values (copied at creation); appended after args in CALL
     std::vector<std::string> paramNames;
     std::vector<ValuePtr> defaults;
     bool isBuiltin = false;

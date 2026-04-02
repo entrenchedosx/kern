@@ -4,3 +4,4 @@ h = security.sha256("kern")
 u = security.uuid()
 print("sha256 len:", len(h))
 print("uuid len > 0:", len(u) > 0)
+print "ahash:", h

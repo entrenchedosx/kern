@@ -1,6 +1,0 @@
-// import stdlib modules: math, sys
-let math = import("math")
-print("math.sqrt(4) =", math.sqrt(4))
-print("math.PI =", math.PI)
-let sys = import("sys")
-print("kern_version:", sys.kern_version())

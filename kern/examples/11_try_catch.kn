@@ -1,8 +1,0 @@
-// try / catch with explicit throw
-try {
-    throw "Something went wrong"
-    print("not reached")
-} catch (e) {
-    print("Caught:", error_message(e))
-}
-print("Done.")

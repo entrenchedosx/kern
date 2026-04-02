@@ -545,6 +545,8 @@ void VM::runInstruction(const Instruction& inst) {
                     go->locals = std::move(args);
                     while (go->locals.size() < fn->arity)
                         go->locals.push_back(std::make_shared<Value>(Value::nil()));
+                    for (const auto& c : fn->captures)
+                        go->locals.push_back(ensureNonNull(c ? c : std::make_shared<Value>(Value::nil())));
                     go->exhausted = false;
                     push(std::make_shared<Value>(Value::fromGenerator(std::move(go))));
                 } else {
@@ -565,12 +567,17 @@ void VM::runInstruction(const Instruction& inst) {
                         valueConstants_ = fn->script->valueConstants;
                     }
                     // tail-call reuse is invalid without an outer frame (would callStack_.back() UB).
+                    auto appendCaptures = [&] {
+                        for (const auto& c : fn->captures)
+                            locals_.push_back(ensureNonNull(c ? c : std::make_shared<Value>(Value::nil())));
+                    };
                     if (tailCall && !callStack_.empty()) {
                         callStack_.back() = {fn->name.empty() ? "<anonymous>" : fn->name, inst.line, 0};
                         locals_.clear();
                         for (size_t i = 0; i < args.size(); ++i)
                             locals_.push_back(ensureNonNull(ValuePtr(args[i])));
                         while (locals_.size() < fn->arity) locals_.push_back(std::make_shared<Value>(Value::nil()));
+                        appendCaptures();
                         ip_ = fn->entryPoint - 1;
                     } else {
                         deferStack_.push_back({});
@@ -582,6 +589,7 @@ void VM::runInstruction(const Instruction& inst) {
                             locals_.push_back(ensureNonNull(ValuePtr(args[i])));
                         while (locals_.size() < fn->arity)
                             locals_.push_back(std::make_shared<Value>(Value::nil()));
+                        appendCaptures();
                         ip_ = fn->entryPoint - 1;
                     }
                 }
@@ -639,6 +647,39 @@ void VM::runInstruction(const Instruction& inst) {
             fn->arity = 0;
             if (currentScript_) {
                 fn->script = currentScript_;  // so we can run after import returns
+            } else {
+                if (!entryScriptCache_) {
+                    entryScriptCache_ = std::make_shared<ScriptCode>();
+                    entryScriptCache_->code = code_;
+                    entryScriptCache_->stringConstants = stringConstants_;
+                    entryScriptCache_->valueConstants = valueConstants_;
+                }
+                fn->script = entryScriptCache_;
+            }
+            push(std::make_shared<Value>(Value::fromFunction(fn)));
+            break;
+        }
+        case Opcode::BUILD_CLOSURE: {
+            if (!std::holds_alternative<std::pair<size_t, size_t>>(inst.operand))
+                throw VMError("Invalid bytecode operand: BUILD_CLOSURE expects pair(entry, captureCount)", inst.line, 0, 1,
+                              static_cast<int>(VMErrorCode::INVALID_BYTECODE));
+            auto p = std::get<std::pair<size_t, size_t>>(inst.operand);
+            size_t entry = p.first;
+            size_t captureCount = p.second;
+            if (entry >= code_.size()) throw VMError("Invalid function entry point", inst.line);
+            if (stack_.size() < captureCount)
+                throw VMError("Stack underflow in BUILD_CLOSURE", inst.line, 0, 1,
+                              static_cast<int>(VMErrorCode::STACK_UNDERFLOW));
+            std::vector<ValuePtr> caps;
+            caps.reserve(captureCount);
+            for (size_t i = 0; i < captureCount; ++i) caps.push_back(popStack());
+            std::reverse(caps.begin(), caps.end());
+            auto fn = std::make_shared<FunctionObject>();
+            fn->entryPoint = entry;
+            fn->arity = 0;
+            fn->captures = std::move(caps);
+            if (currentScript_) {
+                fn->script = currentScript_;
             } else {
                 if (!entryScriptCache_) {
                     entryScriptCache_ = std::make_shared<ScriptCode>();

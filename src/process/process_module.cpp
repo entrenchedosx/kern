@@ -57,6 +57,23 @@ static std::string narrowExeName(const wchar_t* wname) {
     }
     return out;
 }
+
+// Low byte of MemoryBasicInformation::Protect (ignore modifiers in high bits for our checks).
+static bool memoryBasicIsReadable(DWORD protect) {
+    if (protect & PAGE_GUARD) return false;
+    switch (protect & 0xFF) {
+        case PAGE_READONLY:
+        case PAGE_READWRITE:
+        case PAGE_WRITECOPY:
+        case PAGE_EXECUTE:
+        case PAGE_EXECUTE_READ:
+        case PAGE_EXECUTE_READWRITE:
+        case PAGE_EXECUTE_WRITECOPY:
+            return true;
+        default:
+            return false;
+    }
+}
 #endif
 
 } // namespace
@@ -178,6 +195,33 @@ ValuePtr createProcessModule(VM& vm, const std::shared_ptr<RuntimeServices>& /* 
 #endif
     });
 
+    // First committed readable region (VirtualQueryEx). Use this instead of address 0 — the null page is not mapped.
+    add("first_readable_region", [context](VM*, std::vector<ValuePtr> args) {
+        if (args.empty()) return Value::nil();
+#ifdef _WIN32
+        HANDLE h = getHandle(*context, toInt(args[0]));
+        if (!h) return Value::nil();
+        uint8_t* address = nullptr;
+        for (;;) {
+            MEMORY_BASIC_INFORMATION mbi{};
+            if (VirtualQueryEx(h, address, &mbi, sizeof(mbi)) != sizeof(mbi)) break;
+            if (mbi.State == MEM_COMMIT && memoryBasicIsReadable(mbi.Protect)) {
+                auto row = std::unordered_map<std::string, ValuePtr>{};
+                row["base"] = std::make_shared<Value>(
+                    Value::fromInt(static_cast<int64_t>(reinterpret_cast<uintptr_t>(mbi.BaseAddress))));
+                row["size"] = std::make_shared<Value>(Value::fromInt(static_cast<int64_t>(mbi.RegionSize)));
+                return Value::fromMap(std::move(row));
+            }
+            uint8_t* next = static_cast<uint8_t*>(mbi.BaseAddress) + mbi.RegionSize;
+            if (next <= address) break;
+            address = next;
+        }
+        return Value::nil();
+#else
+        return Value::nil();
+#endif
+    });
+
     add("metadata", [context](VM*, std::vector<ValuePtr> args) {
         std::unordered_map<std::string, ValuePtr> out;
         out["pid"] = std::make_shared<Value>(Value::fromInt(-1));
@@ -202,6 +246,9 @@ ValuePtr createProcessModule(VM& vm, const std::shared_ptr<RuntimeServices>& /* 
 #endif
         return Value::fromMap(std::move(out));
     });
+
+    // Script-visible ABI level (first_readable_region + VirtualQueryEx scan = 2).
+    mod["_kern_process_api"] = std::make_shared<Value>(Value::fromInt(2));
 
     return std::make_shared<Value>(Value::fromMap(std::move(mod)));
 }

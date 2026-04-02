@@ -12,24 +12,7 @@
         "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/tools/vcpkg/scripts/buildsystems/vcpkg.cmake",
         "VCPKG_TARGET_TRIPLET": "x64-windows-static",
         "KERN_BUILD_GAME": "ON",
-        "KERN_PREFER_STATIC_RAYLIB": "ON",
-        "KERN_BUILD_NATIVE_IDE": "OFF"
-      }
-    },
-    {
-      "name": "windows-native-ide",
-      "displayName": "Native Qt IDE via bundled vcpkg (installs qtbase; first run can take 30-90+ min)",
-      "generator": "Visual Studio 17 2022",
-      "architecture": "x64",
-      "binaryDir": "${sourceDir}/build-native-ide",
-      "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/tools/vcpkg/scripts/buildsystems/vcpkg.cmake",
-        "VCPKG_TARGET_TRIPLET": "x64-windows",
-        "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON",
-        "VCPKG_MANIFEST_FEATURES": "native-ide",
-        "KERN_BUILD_GAME": "OFF",
-        "KERN_BUILD_NATIVE_IDE": "ON",
-        "KERN_PREFER_STATIC_RAYLIB": "OFF"
+        "KERN_PREFER_STATIC_RAYLIB": "ON"
       }
     }
   ],
@@ -39,12 +22,6 @@
       "configurePreset": "windows-vcpkg-static-release",
       "configuration": "Release",
       "targets": ["kern", "kernc"]
-    },
-    {
-      "name": "release-kern-ide-native",
-      "configurePreset": "windows-native-ide",
-      "configuration": "Release",
-      "targets": ["kern_ide_native"]
     }
   ]
 }

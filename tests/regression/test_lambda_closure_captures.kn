@@ -1,0 +1,11 @@
+// Regression: lambdas must capture outer locals (VM appends captures after params on CALL).
+// Broke g3d.run(update, draw) when update closed over g3 / scene objects (LOAD slot out of range).
+
+def make_adder(a) {
+    return lambda (b) => a + b
+}
+
+let x = 41
+let f = lambda () => x + 1
+assert_eq(f(), 42)
+assert_eq(make_adder(3)(5), 8)

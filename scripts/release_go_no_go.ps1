@@ -29,7 +29,6 @@ function Check-Step([string]$name, [scriptblock]$run) {
 
 Check-Step "shareable artifacts exist" {
     $required = @(
-        "shareable-ide\ide.exe",
         "shareable-ide\compiler\kern.exe",
         "shareable-ide\compiler\kern_repl.exe",
         "shareable-ide\compiler\kernc.exe",
@@ -47,15 +46,6 @@ Check-Step "shareable artifacts exist" {
 Check-Step "shareable kern doctor" {
     & (Join-Path $Root "shareable-ide\compiler\kern.exe") doctor *> $null
     if ($LASTEXITCODE -ne 0) { throw "kern doctor failed (exit $LASTEXITCODE)" }
-}
-
-Check-Step "packaged ide startup smoke" {
-    $p = Start-Process -FilePath (Join-Path $Root "shareable-ide\ide.exe") -PassThru
-    Start-Sleep -Milliseconds 2500
-    if ($p.HasExited) {
-        throw "ide exited early (code $($p.ExitCode))"
-    }
-    Stop-Process -Id $p.Id -Force
 }
 
 Check-Step "shareable dependency audit" {

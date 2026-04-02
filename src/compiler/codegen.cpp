@@ -134,6 +134,288 @@ size_t CodeGenerator::resolveLocal(const std::string& name) {
     return static_cast<size_t>(-1);
 }
 
+int CodeGenerator::findDefiningScopeIndex(const std::string& name) const {
+    for (int i = static_cast<int>(scopes_.size()) - 1; i >= 0; --i) {
+        if (scopes_[static_cast<size_t>(i)].count(name)) return i;
+    }
+    return -1;
+}
+
+bool CodeGenerator::tryResolveLocalSlot(const std::string& name, int64_t* outSlot) {
+    if (!lambdaCtxStack_.empty()) {
+        const auto& L = lambdaCtxStack_.back();
+        int d = findDefiningScopeIndex(name);
+        if (d >= 0 && static_cast<size_t>(d) < L.captureBoundary) {
+            auto it = L.captureIndex.find(name);
+            if (it == L.captureIndex.end())
+                throw CodegenError("Internal: missing lambda capture index for '" + name + "'", currentLine_);
+            *outSlot = static_cast<int64_t>(L.arity + it->second);
+            return true;
+        }
+        if (d >= 0) {
+            *outSlot = static_cast<int64_t>(scopes_[static_cast<size_t>(d)].at(name));
+            return true;
+        }
+        return false;
+    }
+    size_t local = resolveLocal(name);
+    if (local == static_cast<size_t>(-1)) return false;
+    *outSlot = static_cast<int64_t>(local);
+    return true;
+}
+
+void CodeGenerator::scanAssignTargetForCaptures(const Expr* t, size_t boundary, std::unordered_set<std::string>& seen,
+                                                std::vector<std::string>& order) {
+    if (!t) return;
+    if (auto* id = dynamic_cast<const Identifier*>(t)) {
+        int d = findDefiningScopeIndex(id->name);
+        if (d >= 0 && static_cast<size_t>(d) < boundary) {
+            if (seen.insert(id->name).second) order.push_back(id->name);
+        }
+        return;
+    }
+    if (auto* idx = dynamic_cast<const IndexExpr*>(t)) {
+        scanLambdaCapturesExpr(idx->object.get(), boundary, seen, order);
+        scanLambdaCapturesExpr(idx->index.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* mem = dynamic_cast<const MemberExpr*>(t)) {
+        scanLambdaCapturesExpr(mem->object.get(), boundary, seen, order);
+    }
+}
+
+void CodeGenerator::scanLambdaCapturesExpr(const Expr* e, size_t boundary, std::unordered_set<std::string>& seen,
+                                           std::vector<std::string>& order) {
+    if (!e) return;
+    if (dynamic_cast<const LambdaExpr*>(e)) return;
+    if (auto* id = dynamic_cast<const Identifier*>(e)) {
+        int d = findDefiningScopeIndex(id->name);
+        if (d >= 0 && static_cast<size_t>(d) < boundary) {
+            if (seen.insert(id->name).second) order.push_back(id->name);
+        }
+        return;
+    }
+    if (auto* x = dynamic_cast<const BinaryExpr*>(e)) {
+        scanLambdaCapturesExpr(x->left.get(), boundary, seen, order);
+        scanLambdaCapturesExpr(x->right.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const UnaryExpr*>(e)) {
+        scanLambdaCapturesExpr(x->operand.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const AwaitExpr*>(e)) {
+        scanLambdaCapturesExpr(x->target.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const CallExpr*>(e)) {
+        scanLambdaCapturesExpr(x->callee.get(), boundary, seen, order);
+        for (const auto& a : x->args) scanLambdaCapturesExpr(a.expr.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const MemberExpr*>(e)) {
+        scanLambdaCapturesExpr(x->object.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const IndexExpr*>(e)) {
+        scanLambdaCapturesExpr(x->object.get(), boundary, seen, order);
+        scanLambdaCapturesExpr(x->index.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const AssignExpr*>(e)) {
+        scanLambdaCapturesExpr(x->value.get(), boundary, seen, order);
+        scanAssignTargetForCaptures(x->target.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const CoalesceExpr*>(e)) {
+        scanLambdaCapturesExpr(x->left.get(), boundary, seen, order);
+        scanLambdaCapturesExpr(x->right.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const PipelineExpr*>(e)) {
+        scanLambdaCapturesExpr(x->left.get(), boundary, seen, order);
+        scanLambdaCapturesExpr(x->right.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const TernaryExpr*>(e)) {
+        scanLambdaCapturesExpr(x->condition.get(), boundary, seen, order);
+        scanLambdaCapturesExpr(x->thenExpr.get(), boundary, seen, order);
+        scanLambdaCapturesExpr(x->elseExpr.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const ArrayComprehensionExpr*>(e)) {
+        scanLambdaCapturesExpr(x->iterExpr.get(), boundary, seen, order);
+        scanLambdaCapturesExpr(x->bodyExpr.get(), boundary, seen, order);
+        if (x->filterExpr) scanLambdaCapturesExpr(x->filterExpr.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const MapComprehensionExpr*>(e)) {
+        scanLambdaCapturesExpr(x->iterExpr.get(), boundary, seen, order);
+        scanLambdaCapturesExpr(x->keyExpr.get(), boundary, seen, order);
+        scanLambdaCapturesExpr(x->valExpr.get(), boundary, seen, order);
+        if (x->filterExpr) scanLambdaCapturesExpr(x->filterExpr.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const ArrayLiteral*>(e)) {
+        for (const auto& el : x->elements) scanLambdaCapturesExpr(el.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const MapLiteral*>(e)) {
+        for (const auto& kv : x->entries) {
+            scanLambdaCapturesExpr(kv.first.get(), boundary, seen, order);
+            scanLambdaCapturesExpr(kv.second.get(), boundary, seen, order);
+        }
+        return;
+    }
+    if (auto* x = dynamic_cast<const RangeExpr*>(e)) {
+        scanLambdaCapturesExpr(x->start.get(), boundary, seen, order);
+        scanLambdaCapturesExpr(x->end.get(), boundary, seen, order);
+        if (x->step) scanLambdaCapturesExpr(x->step.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const DurationExpr*>(e)) {
+        scanLambdaCapturesExpr(x->amount.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const SliceExpr*>(e)) {
+        scanLambdaCapturesExpr(x->object.get(), boundary, seen, order);
+        if (x->start) scanLambdaCapturesExpr(x->start.get(), boundary, seen, order);
+        if (x->end) scanLambdaCapturesExpr(x->end.get(), boundary, seen, order);
+        if (x->step) scanLambdaCapturesExpr(x->step.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const FStringExpr*>(e)) {
+        for (const auto& part : x->parts) {
+            if (std::holds_alternative<ExprPtr>(part))
+                scanLambdaCapturesExpr(std::get<ExprPtr>(part).get(), boundary, seen, order);
+        }
+        return;
+    }
+    if (auto* x = dynamic_cast<const OptionalChainExpr*>(e)) {
+        scanLambdaCapturesExpr(x->object.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const OptionalIndexExpr*>(e)) {
+        scanLambdaCapturesExpr(x->object.get(), boundary, seen, order);
+        scanLambdaCapturesExpr(x->index.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const SpreadExpr*>(e)) {
+        scanLambdaCapturesExpr(x->target.get(), boundary, seen, order);
+    }
+}
+
+void CodeGenerator::scanLambdaCapturesStmt(const Stmt* s, size_t boundary, std::unordered_set<std::string>& seen,
+                                           std::vector<std::string>& order) {
+    if (!s) return;
+    if (dynamic_cast<const FunctionDeclStmt*>(s)) return;
+    if (dynamic_cast<const ClassDeclStmt*>(s)) return;
+    if (auto* x = dynamic_cast<const ExprStmt*>(s)) {
+        scanLambdaCapturesExpr(x->expr.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const VarDeclStmt*>(s)) {
+        if (x->initializer) scanLambdaCapturesExpr(x->initializer.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const DestructureStmt*>(s)) {
+        if (x->initializer) scanLambdaCapturesExpr(x->initializer.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const SequenceStmt*>(s)) {
+        for (const auto& st : x->statements) scanLambdaCapturesStmt(st.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const BlockStmt*>(s)) {
+        for (const auto& st : x->statements) scanLambdaCapturesStmt(st.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const UnsafeBlockStmt*>(s)) {
+        scanLambdaCapturesStmt(x->body.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const IfStmt*>(s)) {
+        scanLambdaCapturesExpr(x->condition.get(), boundary, seen, order);
+        scanLambdaCapturesStmt(x->thenBranch.get(), boundary, seen, order);
+        if (x->elseBranch) scanLambdaCapturesStmt(x->elseBranch.get(), boundary, seen, order);
+        for (const auto& el : x->elifBranches) {
+            scanLambdaCapturesExpr(el.first.get(), boundary, seen, order);
+            scanLambdaCapturesStmt(el.second.get(), boundary, seen, order);
+        }
+        return;
+    }
+    if (auto* x = dynamic_cast<const ForRangeStmt*>(s)) {
+        scanLambdaCapturesExpr(x->start.get(), boundary, seen, order);
+        scanLambdaCapturesExpr(x->end.get(), boundary, seen, order);
+        scanLambdaCapturesExpr(x->step.get(), boundary, seen, order);
+        scanLambdaCapturesStmt(x->body.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const ForCStyleStmt*>(s)) {
+        if (x->init) scanLambdaCapturesStmt(x->init.get(), boundary, seen, order);
+        if (x->condition) scanLambdaCapturesExpr(x->condition.get(), boundary, seen, order);
+        if (x->update) scanLambdaCapturesExpr(x->update.get(), boundary, seen, order);
+        scanLambdaCapturesStmt(x->body.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const WhileStmt*>(s)) {
+        scanLambdaCapturesExpr(x->condition.get(), boundary, seen, order);
+        scanLambdaCapturesStmt(x->body.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const RepeatStmt*>(s)) {
+        scanLambdaCapturesExpr(x->count.get(), boundary, seen, order);
+        scanLambdaCapturesStmt(x->body.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const RepeatWhileStmt*>(s)) {
+        scanLambdaCapturesStmt(x->body.get(), boundary, seen, order);
+        scanLambdaCapturesExpr(x->condition.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const DeferStmt*>(s)) {
+        scanLambdaCapturesExpr(x->expr.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const TryStmt*>(s)) {
+        scanLambdaCapturesStmt(x->tryBlock.get(), boundary, seen, order);
+        if (x->catchBlock) scanLambdaCapturesStmt(x->catchBlock.get(), boundary, seen, order);
+        if (x->elseBlock) scanLambdaCapturesStmt(x->elseBlock.get(), boundary, seen, order);
+        if (x->finallyBlock) scanLambdaCapturesStmt(x->finallyBlock.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const ThrowStmt*>(s)) {
+        scanLambdaCapturesExpr(x->value.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const AssertStmt*>(s)) {
+        scanLambdaCapturesExpr(x->condition.get(), boundary, seen, order);
+        if (x->message) scanLambdaCapturesExpr(x->message.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const MatchStmt*>(s)) {
+        scanLambdaCapturesExpr(x->value.get(), boundary, seen, order);
+        for (const auto& c : x->cases) {
+            if (c.pattern) scanLambdaCapturesExpr(c.pattern.get(), boundary, seen, order);
+            if (c.guard) scanLambdaCapturesExpr(c.guard.get(), boundary, seen, order);
+            scanLambdaCapturesStmt(c.body.get(), boundary, seen, order);
+        }
+        return;
+    }
+    if (auto* x = dynamic_cast<const ForInStmt*>(s)) {
+        scanLambdaCapturesExpr(x->iterable.get(), boundary, seen, order);
+        scanLambdaCapturesStmt(x->body.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* y = dynamic_cast<const YieldStmt*>(s)) {
+        if (y->value) scanLambdaCapturesExpr(y->value.get(), boundary, seen, order);
+        return;
+    }
+    if (auto* x = dynamic_cast<const ReturnStmt*>(s)) {
+        for (const auto& v : x->values) scanLambdaCapturesExpr(v.get(), boundary, seen, order);
+    }
+}
+
 size_t CodeGenerator::totalLocalCount() {
     size_t n = 0;
     for (const auto& scope : scopes_) n += scope.size();
@@ -141,6 +423,11 @@ size_t CodeGenerator::totalLocalCount() {
 }
 
 void CodeGenerator::declareLocal(const std::string& name) {
+    if (!lambdaCtxStack_.empty()) {
+        size_t slot = lambdaCtxStack_.back().nextInnerSlot++;
+        scopes_.back()[name] = slot;
+        return;
+    }
     size_t slot = totalLocalCount();
     scopes_.back()[name] = slot;
 }
@@ -242,12 +529,11 @@ void CodeGenerator::emitExpr(const Expr* e) {
         return;
     }
     if (auto* x = dynamic_cast<const Identifier*>(e)) {
-        size_t local = resolveLocal(x->name);
-        if (local != static_cast<size_t>(-1)) {
-            emit(Opcode::LOAD, static_cast<int64_t>(local));
-        } else {
+        int64_t slot = 0;
+        if (tryResolveLocalSlot(x->name, &slot))
+            emit(Opcode::LOAD, slot);
+        else
             emit(Opcode::LOAD_GLOBAL, addConstant(x->name));
-        }
         return;
     }
     if (auto* x = dynamic_cast<const BinaryExpr*>(e)) {
@@ -386,9 +672,10 @@ void CodeGenerator::emitExpr(const Expr* e) {
     if (auto* x = dynamic_cast<const AssignExpr*>(e)) {
         if (x->op == TokenType::COALESCE_EQ) {
             if (auto* id = dynamic_cast<Identifier*>(x->target.get())) {
-                size_t local = resolveLocal(id->name);
-                if (local != static_cast<size_t>(-1))
-                    emit(Opcode::LOAD, static_cast<int64_t>(local));
+                int64_t localSlot = 0;
+                bool isLocal = tryResolveLocalSlot(id->name, &localSlot);
+                if (isLocal)
+                    emit(Opcode::LOAD, localSlot);
                 else
                     emit(Opcode::LOAD_GLOBAL, addConstant(id->name));
                 emit(Opcode::DUP);
@@ -398,15 +685,15 @@ void CodeGenerator::emitExpr(const Expr* e) {
                 emit(Opcode::POP);
                 emitExpr(x->value.get());
                 emit(Opcode::DUP); // expression result (same as plain = assign)
-                if (local != static_cast<size_t>(-1))
-                    emit(Opcode::STORE, static_cast<int64_t>(local));
+                if (isLocal)
+                    emit(Opcode::STORE, localSlot);
                 else
                     emit(Opcode::STORE_GLOBAL, addConstant(id->name));
                 size_t endJ = emit(Opcode::JMP, size_t(0));
                 patchJump(keep, code_.size());
                 emit(Opcode::POP); // skip path: drop value left from DUP/EQ (assign path jumps over this)
-                if (local != static_cast<size_t>(-1))
-                    emit(Opcode::LOAD, static_cast<int64_t>(local));
+                if (isLocal)
+                    emit(Opcode::LOAD, localSlot);
                 else
                     emit(Opcode::LOAD_GLOBAL, addConstant(id->name));
                 patchJump(endJ, code_.size());
@@ -484,9 +771,9 @@ void CodeGenerator::emitExpr(const Expr* e) {
         bool leaveOnStack = dynamic_cast<Identifier*>(x->target.get()) != nullptr;
         if (leaveOnStack) emit(Opcode::DUP);  // chained assignment: a = b = c = 0
         if (auto* id = dynamic_cast<Identifier*>(x->target.get())) {
-            size_t local = resolveLocal(id->name);
-            if (local != static_cast<size_t>(-1))
-                emit(Opcode::STORE, static_cast<int64_t>(local));
+            int64_t localSlot = 0;
+            if (tryResolveLocalSlot(id->name, &localSlot))
+                emit(Opcode::STORE, localSlot);
             else
                 emit(Opcode::STORE_GLOBAL, addConstant(id->name));
         }
@@ -616,21 +903,41 @@ void CodeGenerator::emitExpr(const Expr* e) {
         return;
     }
     if (auto* lam = dynamic_cast<const LambdaExpr*>(e)) {
+        size_t captureBoundary = scopes_.size();
         size_t skipBody = emit(Opcode::JMP, size_t(0));
         size_t entry = code_.size();
         beginScope();
-        for (const auto& p : lam->params) declareLocal(p);
-        // single expression body: leave value on stack for RETURN (don't POP)
+        lambdaCtxStack_.push_back(LambdaCodegenLayer{});
+        LambdaCodegenLayer& LC = lambdaCtxStack_.back();
+        LC.captureBoundary = captureBoundary;
+        LC.arity = lam->params.size();
+        std::unordered_set<std::string> capSeen;
+        if (auto* es = dynamic_cast<const ExprStmt*>(lam->body.get()))
+            scanLambdaCapturesExpr(es->expr.get(), captureBoundary, capSeen, LC.captureOrder);
+        else
+            scanLambdaCapturesStmt(lam->body.get(), captureBoundary, capSeen, LC.captureOrder);
+        for (size_t i = 0; i < LC.captureOrder.size(); ++i) LC.captureIndex[LC.captureOrder[i]] = i;
+        LC.nextInnerSlot = LC.arity + LC.captureOrder.size();
+        for (size_t pi = 0; pi < lam->params.size(); ++pi) scopes_.back()[lam->params[pi]] = pi;
         if (auto* es = dynamic_cast<const ExprStmt*>(lam->body.get())) {
             emitExpr(es->expr.get());
         } else {
             emitStmt(lam->body.get());
         }
         emit(Opcode::RETURN);
+        std::vector<std::string> capOrder = std::move(LC.captureOrder);
+        lambdaCtxStack_.pop_back();
         endScope();
         patchJump(skipBody, code_.size());
-        emit(Opcode::BUILD_FUNC, entry);
+        for (const auto& capName : capOrder) {
+            int64_t outerSlot = 0;
+            if (!tryResolveLocalSlot(capName, &outerSlot))
+                throw CodegenError("Lambda capture '" + capName + "' is not a local in the enclosing scope", currentLine_);
+            emit(Opcode::LOAD, outerSlot);
+        }
+        emit(Opcode::BUILD_CLOSURE, entry, capOrder.size());
         emit(Opcode::SET_FUNC_ARITY, static_cast<size_t>(lam->params.size()));
+        if (stmtHasYield(lam->body.get())) emit(Opcode::SET_FUNC_GENERATOR);
         emit(Opcode::SET_FUNC_NAME, addConstant("<lambda>"));
         return;
     }
@@ -1209,6 +1516,8 @@ void CodeGenerator::emitStmt(const Stmt* s) {
         return;
     }
     if (auto* x = dynamic_cast<const FunctionDeclStmt*>(s)) {
+        std::vector<LambdaCodegenLayer> savedLambdaCtx;
+        savedLambdaCtx.swap(lambdaCtxStack_);
         size_t skipBody = emit(Opcode::JMP, size_t(0));
         size_t entry = code_.size();
         beginScope();
@@ -1252,6 +1561,7 @@ void CodeGenerator::emitStmt(const Stmt* s) {
             declareLocal(x->name);
             emit(Opcode::STORE, static_cast<int64_t>(scopes_.back()[x->name]));
         }
+        lambdaCtxStack_ = std::move(savedLambdaCtx);
         return;
     }
     if (auto* x = dynamic_cast<const ClassDeclStmt*>(s)) {
@@ -1357,6 +1667,8 @@ void CodeGenerator::emitProgram(const Program* p) {
 }
 
 void CodeGenerator::emitFunctionOntoStack(const FunctionDeclStmt* x) {
+    std::vector<LambdaCodegenLayer> savedLambdaCtx;
+    savedLambdaCtx.swap(lambdaCtxStack_);
     size_t skipBody = emit(Opcode::JMP, size_t(0));
     size_t entry = code_.size();
     beginScope();
@@ -1394,6 +1706,7 @@ void CodeGenerator::emitFunctionOntoStack(const FunctionDeclStmt* x) {
     }
     if (stmtHasYield(x->body.get())) emit(Opcode::SET_FUNC_GENERATOR);
     functionParams_[x->name] = std::move(pnames);
+    lambdaCtxStack_ = std::move(savedLambdaCtx);
 }
 
 Bytecode CodeGenerator::generate(std::unique_ptr<Program> program) {

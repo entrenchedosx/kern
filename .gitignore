@@ -14,8 +14,9 @@ shareable-kern/
 shareable-kern-to-exe/
 shareable-kern-compiler/
 FINAL/
-kern-ide/build/
-kern-ide/dist/
+Kern-IDE/desktop-tk/build/
+Kern-IDE/desktop-tk/dist/
+Kern-IDE/native-qt/build*/
 vcpkg_installed/
 # CI / local clone next to repo root (see .github/workflows/windows-kern.yml)
 /vcpkg/
@@ -34,7 +35,10 @@ venv/
 
 # Node / editor extensions
 node_modules/
-editors/**/node_modules/
+Kern-IDE/vscode-extension/node_modules/
+
+# Generated reports (contain absolute local paths)
+tests/advanced_module_suite_report.json
 
 # Toolchains / vendored SDKs (do not commit)
 tools/Qt/

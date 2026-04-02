@@ -51,15 +51,13 @@ set(KERN_VERSION_RESOURCE "${CMAKE_BINARY_DIR}/version_info.rc")
 
 # Default ON so kern.exe includes game + g2d when Raylib is available (no extra flags needed)
 option(KERN_BUILD_GAME "Build kern_game and g2d into kern/kern_repl (requires Raylib)" ON)
-option(KERN_BUILD_NATIVE_IDE "Build native Qt IDE (kern-ide)" ON)
 option(KERN_PREFER_STATIC_RAYLIB "Prefer static Raylib so kern.exe has no raylib.dll dependency" ON)
 option(KERN_AUTO_FETCH_RAYLIB "Auto-download/build Raylib when not found locally" ON)
 option(KERN_BUILD_DOC_FRAMEWORK_DEMO "Build modular document runtime framework demo" ON)
 option(KERN_DISTRIBUTION_STATIC_CRT "Build the Kern toolchain with a static MSVC runtime (/MT) for portable drops" ON)
 
 # For public/shareable Windows drops we want the toolchain to run with no MSVC runtime installs.
-# Use /MT(/MTd) for the Kern toolchain when enabled. Native IDE builds that link against dynamic
-# Qt/vcpkg can turn this off at configure time.
+# Use /MT(/MTd) for the Kern toolchain when enabled.
 if(MSVC AND KERN_DISTRIBUTION_STATIC_CRT)
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
@@ -325,22 +323,5 @@ if(KERN_BUILD_GAME)
   endif()
 endif()
 
-# Native IDE (Qt) lives under kern/ide/qt-native
-if(KERN_BUILD_NATIVE_IDE)
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/kern/ide/qt-native/CMakeLists.txt")
-    find_package(Qt6 COMPONENTS Widgets Gui Core QUIET)
-    if(Qt6_FOUND)
-      add_subdirectory(kern/ide/qt-native)
-      message(STATUS "Kern: native Qt IDE enabled")
-    else()
-      message(WARNING
-        "KERN_BUILD_NATIVE_IDE=ON but Qt6 was not found — the kern-ide (Qt) target is skipped.\n"
-        "  Install Qt 6 with the MSVC 64-bit kit and the Qt Widgets module, then reconfigure with e.g.:\n"
-        "    -DCMAKE_PREFIX_PATH=C:/Qt/6.8.0/msvc2022_64\n"
-        "  (use your installed version path; msvc2019_64 also works with VS 2022.) "
-        "Alternatively set Qt6_DIR to .../lib/cmake/Qt6. See docs/TROUBLESHOOTING.md (Native IDE).")
-    endif()
-  else()
-    message(WARNING "KERN_BUILD_NATIVE_IDE=ON but kern/ide/qt-native not found")
-  endif()
-endif()
+include(GNUInstallDirs)
+install(TARGETS kern RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

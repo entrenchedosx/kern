@@ -21,11 +21,9 @@
 
 ## IDE launches but run/check fails
 
-- Ensure the runtime binary exists in `build\Release\`.
-- Launch the IDE from repo root:
-  ```powershell
-  python .\kern-ide\main.py
-  ```
+- Ensure **`kern.exe`** is on `PATH` or set **`KERN_EXE`**, or place `kern.exe` under **`Kern-IDE/desktop-tk/kern_version/`**.
+- Run from **`Kern-IDE/desktop-tk`**: `python main.py`
+- For imports from **`lib/kern/`**, set **`KERN_LIB`** to the Kern repository root. See [Kern-IDE/docs/INTEGRATION.md](../Kern-IDE/docs/INTEGRATION.md).
 
 ## Graphics or game scripts fail
 

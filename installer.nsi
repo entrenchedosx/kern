@@ -24,7 +24,7 @@ Section "Kern"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   WriteRegStr HKLM "Software\Kern" "InstallPath" "$INSTDIR"
 
-  ; Bin: kern.exe and IDE (all files from BUILD/bin)
+  ; Bin: kern.exe, kernc.exe, etc. (all files from BUILD/bin)
   SetOutPath "$INSTDIR\bin"
   File /r "${BUILD_ROOT}\bin\*.*"
 
@@ -53,8 +53,6 @@ Section "Kern"
 
   ; Start Menu shortcuts
   CreateDirectory "$SMPROGRAMS\Kern"
-  IfFileExists "$INSTDIR\bin\kern-ide.exe" 0 +2
-  CreateShortCut "$SMPROGRAMS\Kern\Kern IDE.lnk" "$INSTDIR\bin\kern-ide.exe" "" "$INSTDIR\bin\kern-ide.exe" 0
   CreateShortCut "$SMPROGRAMS\Kern\Uninstall Kern.lnk" "$INSTDIR\Uninstall.exe" "" "$INSTDIR\Uninstall.exe" 0
   IfFileExists "$INSTDIR\docs\GETTING_STARTED.md" 0 +2
   CreateShortCut "$SMPROGRAMS\Kern\Kern Documentation.lnk" "$INSTDIR\docs\GETTING_STARTED.md" "" "" 0

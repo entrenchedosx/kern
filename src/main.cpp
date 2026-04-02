@@ -28,6 +28,7 @@
 #include <vector>
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <filesystem>
 #include <thread>
 #include <chrono>
@@ -75,7 +76,83 @@ static void dumpBytecode(const Bytecode& code, const std::vector<std::string>& c
     }
 }
 
-static bool runSource(VM& vm, const std::string& source, const std::string& filename = "") {
+static std::string readTextFile(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return "";
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
+static void stripUtf8Bom(std::string& s) {
+    if (s.size() >= 3 && static_cast<unsigned char>(s[0]) == 0xEF && static_cast<unsigned char>(s[1]) == 0xBB &&
+        static_cast<unsigned char>(s[2]) == 0xBF)
+        s.erase(0, 3);
+}
+
+// Strip leading #! line when executing a script file (e.g. ./hello.kn with shebang).
+static void stripShebangLineForFile(std::string& s, const std::string& filenameForRun) {
+    if (filenameForRun.empty()) return;
+    if (s.size() >= 2 && s[0] == '#' && s[1] == '!') {
+        size_t n = s.find('\n');
+        if (n == std::string::npos)
+            s.clear();
+        else
+            s.erase(0, n + 1);
+    }
+}
+
+static void normalizeKernSourceText(std::string& s, const std::string& filenameForRun) {
+    stripUtf8Bom(s);
+    stripShebangLineForFile(s, filenameForRun);
+}
+
+static std::string pathExtensionLower(const std::filesystem::path& p) {
+    std::string e = p.extension().string();
+    for (char& c : e) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return e;
+}
+
+struct ResolvedKnPath {
+    std::string path;
+    bool warnedNonKn = false;
+};
+
+// Resolves script path: exact file, or base name -> base.kn when no extension was given.
+static bool resolveKnScriptPath(const std::string& given, ResolvedKnPath& out, std::string& errMsg) {
+    namespace fs = std::filesystem;
+    fs::path p(given);
+    std::error_code ec;
+    auto isReg = [&](const fs::path& cand) -> bool {
+        std::error_code e2;
+        if (!fs::exists(cand, e2) || e2) return false;
+        return fs::is_regular_file(cand, e2) && !e2;
+    };
+
+    fs::path chosen;
+    if (isReg(p)) {
+        chosen = p;
+    } else if (!p.has_extension()) {
+        fs::path withKn = fs::path(given + ".kn");
+        if (isReg(withKn)) chosen = std::move(withKn);
+    }
+
+    if (chosen.empty()) {
+        errMsg = "File not found: " + given;
+        if (!p.has_extension()) errMsg += " (also tried " + (given + ".kn") + ")";
+        return false;
+    }
+
+    fs::path canon = fs::weakly_canonical(chosen, ec);
+    out.path = ec ? chosen.string() : canon.string();
+    std::string ext = pathExtensionLower(chosen);
+    if (!ext.empty() && ext != ".kn") out.warnedNonKn = true;
+    return true;
+}
+
+static bool runSource(VM& vm, const std::string& sourceIn, const std::string& filename = "") {
+    std::string source = sourceIn;
+    normalizeKernSourceText(source, filename);
     g_errorReporter.setSource(source);
     g_errorReporter.setFilename(filename);
     try {
@@ -155,6 +232,49 @@ static bool runSource(VM& vm, const std::string& source, const std::string& file
     }
 }
 
+static void setEnvVarIfEmpty(const char* key, const std::string& value) {
+    const char* existing = std::getenv(key);
+    if (existing && existing[0]) return;
+    if (value.empty()) return;
+#ifdef _WIN32
+    _putenv_s(key, value.c_str()); // ensures getenv() sees the new value in-process
+#else
+    setenv(key, value.c_str(), 1);
+#endif
+}
+
+// Auto-detect project root so examples that import `lib/kern/...` work even when the user runs
+// `kern <absolute/scriptPath.kn>` from a different working directory.
+static void maybeAutoSetKernLibFromEntryPath(const std::string& entryPath) {
+    namespace fs = std::filesystem;
+    fs::path entry(entryPath);
+    if (entry.empty()) return;
+
+    // If entryPath is a directory use it, otherwise use its parent directory.
+    if (!fs::is_directory(entry)) entry = entry.parent_path();
+    if (entry.empty()) return;
+
+    fs::path cur = entry;
+    for (int i = 0; i < 12 && !cur.empty(); ++i) {
+        // Repo root (the directory containing `lib/kern/`)
+        if (fs::exists(cur / "lib" / "kern")) {
+            setEnvVarIfEmpty("KERN_LIB", cur.string());
+            return;
+        }
+
+        // shareable-ide layout: `<root>/shareable-ide/compiler/lib/kern`
+        fs::path shareableCompilerRoot = cur / "shareable-ide" / "compiler";
+        if (fs::exists(shareableCompilerRoot / "lib" / "kern")) {
+            setEnvVarIfEmpty("KERN_LIB", shareableCompilerRoot.string());
+            return;
+        }
+
+        fs::path parent = cur.parent_path();
+        if (parent == cur) break;
+        cur = std::move(parent);
+    }
+}
+
 static void printUsage(const char* prog) {
     std::cout << "Kern " <<
 #ifdef KERN_VERSION
@@ -164,7 +284,11 @@ static void printUsage(const char* prog) {
 #endif
         << "\n\nUsage:\n"
         << "  " << prog << " [options] [script.kn]\n"
+        << "  " << prog << " [options] run <script.kn>   Same as above (explicit run).\n"
         << "  " << prog << "                    Start REPL (no script).\n\n"
+        << "Scripts:\n"
+        << "  Paths ending in .kn run as Kern source. If the path has no extension, " << prog << " tries <path>.kn.\n"
+        << "  A leading #! (e.g. #!/usr/bin/env kern) is ignored when running a file — use chmod +x then ./script.kn on Unix.\n\n"
         << "Options:\n"
         << "  --version, -v          Show version and exit.\n"
         << "  --help, -h            Show this help and exit.\n"
@@ -189,18 +313,10 @@ static void printUsage(const char* prog) {
         << "  " << prog << " init             Bootstrap kern.json and src/main.kn.\n"
         << "  " << prog << " add <dep>        Add dependency to kern.json.\n"
         << "  " << prog << " remove <dep>     Remove dependency from kern.json.\n"
-        << "  " << prog << " install          Refresh lockfile from manifest.\n\n"
+        << "  " << prog << " install          Refresh lockfile from kern.json (not system install; see ./install.sh).\n\n"
         << "Modules: import \"math\", \"string\", \"json\", \"g2d\", \"game\", etc.\n"
         << "Docs: docs/GETTING_STARTED.md\n"
         << "Testing docs: docs/TESTING.md\n";
-}
-
-static std::string readTextFile(const std::string& path) {
-    std::ifstream f(path, std::ios::binary);
-    if (!f) return "";
-    std::ostringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
 }
 
 static bool writeTextFile(const std::string& path, const std::string& text) {
@@ -344,6 +460,11 @@ static int cmdTest(const std::string& dirPath) {
         std::cerr << "test: not a directory: " << p.string() << "\n";
         return 1;
     }
+
+    // Ensure `import("lib/kern/...")` works even when the user runs `kern` from
+    // a different working directory.
+    maybeAutoSetKernLibFromEntryPath(p.string());
+
     std::vector<fs::path> files;
     try {
         for (const auto& entry :
@@ -404,6 +525,10 @@ static int cmdWatch(VM& vm, const std::string& scriptPath) {
         std::cerr << "watch: file not found: " << scriptPath << "\n";
         return 1;
     }
+
+    // Ensure runtime module imports work even when `kern --watch` is started from elsewhere.
+    maybeAutoSetKernLibFromEntryPath(p.string());
+
     auto last = fs::last_write_time(p);
     std::cout << "Watching " << p.string() << " (Ctrl+C to stop)\n";
     while (true) {
@@ -632,7 +757,15 @@ int main(int argc, char** argv) {
     vm.setCliArgs(std::move(args));
 
     if (argc > argBase + 1 && std::string(argv[argBase]) == "--ast") {
-        std::string path = argv[argBase + 1];
+        ResolvedKnPath rs;
+        std::string resolveErr;
+        if (!resolveKnScriptPath(argv[argBase + 1], rs, resolveErr)) {
+            std::cerr << "error: " << resolveErr << "\n";
+            return 1;
+        }
+        if (rs.warnedNonKn)
+            std::cerr << "warning: not a .kn file; continuing: " << rs.path << "\n";
+        std::string path = rs.path;
         std::ifstream f(path);
         if (!f) {
             g_errorReporter.setFilename(path);
@@ -643,10 +776,12 @@ int main(int argc, char** argv) {
         }
         std::stringstream buf;
         buf << f.rdbuf();
-        g_errorReporter.setSource(buf.str());
+        std::string source = buf.str();
+        normalizeKernSourceText(source, path);
+        g_errorReporter.setSource(source);
         g_errorReporter.setFilename(path);
         try {
-            Lexer lexer(buf.str());
+            Lexer lexer(source);
             std::vector<Token> tokens = lexer.tokenize();
             Parser parser(std::move(tokens));
             std::unique_ptr<Program> program = parser.parse();
@@ -679,7 +814,15 @@ int main(int argc, char** argv) {
     }
 
     if (argc > argBase + 1 && std::string(argv[argBase]) == "--bytecode") {
-        std::string path = argv[argBase + 1];
+        ResolvedKnPath rs;
+        std::string resolveErr;
+        if (!resolveKnScriptPath(argv[argBase + 1], rs, resolveErr)) {
+            std::cerr << "error: " << resolveErr << "\n";
+            return 1;
+        }
+        if (rs.warnedNonKn)
+            std::cerr << "warning: not a .kn file; continuing: " << rs.path << "\n";
+        std::string path = rs.path;
         std::ifstream f(path);
         if (!f) {
             g_errorReporter.setFilename(path);
@@ -690,10 +833,12 @@ int main(int argc, char** argv) {
         }
         std::stringstream buf;
         buf << f.rdbuf();
-        g_errorReporter.setSource(buf.str());
+        std::string source = buf.str();
+        normalizeKernSourceText(source, path);
+        g_errorReporter.setSource(source);
         g_errorReporter.setFilename(path);
         try {
-            Lexer lexer(buf.str());
+            Lexer lexer(source);
             std::vector<Token> tokens = lexer.tokenize();
             Parser parser(std::move(tokens));
             std::unique_ptr<Program> program = parser.parse();
@@ -728,8 +873,15 @@ int main(int argc, char** argv) {
     }
 
     if (argc > argBase + 1 && std::string(argv[argBase]) == "--watch") {
-        std::string path = argv[argBase + 1];
-        return cmdWatch(vm, path);
+        ResolvedKnPath rs;
+        std::string resolveErr;
+        if (!resolveKnScriptPath(argv[argBase + 1], rs, resolveErr)) {
+            std::cerr << "error: " << resolveErr << "\n";
+            return 1;
+        }
+        if (rs.warnedNonKn)
+            std::cerr << "warning: not a .kn file; continuing: " << rs.path << "\n";
+        return cmdWatch(vm, rs.path);
     }
 
     // check / --lint: compile only, no run (for CI and IDE)
@@ -755,14 +907,15 @@ int main(int argc, char** argv) {
             return 1;
         }
 
-        namespace fs = std::filesystem;
-        std::error_code ec;
-        fs::path fpath(path);
-        std::string pathResolved = path;
-        if (fs::exists(fpath, ec)) {
-            fs::path can = fs::weakly_canonical(fpath, ec);
-            if (!ec) pathResolved = can.string();
+        ResolvedKnPath rs;
+        std::string resolveErr;
+        if (!resolveKnScriptPath(path, rs, resolveErr)) {
+            std::cerr << "error: " << resolveErr << "\n";
+            return 1;
         }
+        if (rs.warnedNonKn)
+            std::cerr << "warning: not a .kn file; continuing: " << rs.path << "\n";
+        std::string pathResolved = rs.path;
 
         struct SuppressHumanDiagnosticsGuard {
             ErrorReporter& rep;
@@ -786,6 +939,7 @@ int main(int argc, char** argv) {
         std::stringstream buf;
         buf << f.rdbuf();
         std::string source = buf.str();
+        normalizeKernSourceText(source, pathResolved);
         g_errorReporter.setSource(source);
         g_errorReporter.setFilename(pathResolved);
         try {
@@ -831,7 +985,15 @@ int main(int argc, char** argv) {
 
     // fmt: format source (indent by brace level)
     if (argc > argBase + 1 && std::string(argv[argBase]) == "--fmt") {
-        std::string path = argv[argBase + 1];
+        ResolvedKnPath rs;
+        std::string resolveErr;
+        if (!resolveKnScriptPath(argv[argBase + 1], rs, resolveErr)) {
+            std::cerr << "error: " << resolveErr << "\n";
+            return 1;
+        }
+        if (rs.warnedNonKn)
+            std::cerr << "warning: not a .kn file; continuing: " << rs.path << "\n";
+        std::string path = rs.path;
         std::ifstream f(path);
         if (!f) {
             std::cerr << "fmt: could not open " << path << std::endl;
@@ -840,6 +1002,7 @@ int main(int argc, char** argv) {
         std::stringstream buf;
         buf << f.rdbuf();
         std::string source = buf.str();
+        normalizeKernSourceText(source, path);
         int indent = 0;
         const int indentStep = 2;
         std::string out;
@@ -868,8 +1031,27 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    if (argc > argBase) {
-        std::string path = argv[argBase];
+    int scriptArg = argBase;
+    if (argc > argBase && std::string(argv[argBase]) == "run") {
+        if (argc <= argBase + 1) {
+            std::cerr << "error: kern run: missing script path (e.g. kern run hello.kn)\n";
+            return 1;
+        }
+        scriptArg = argBase + 1;
+    }
+
+    if (argc > scriptArg) {
+        ResolvedKnPath rs;
+        std::string resolveErr;
+        if (!resolveKnScriptPath(argv[scriptArg], rs, resolveErr)) {
+            std::cerr << "error: " << resolveErr << "\n";
+            return 1;
+        }
+        if (rs.warnedNonKn)
+            std::cerr << "warning: not a .kn file; running anyway: " << rs.path << "\n";
+        std::string path = rs.path;
+        // Make imports resilient to arbitrary CWD.
+        maybeAutoSetKernLibFromEntryPath(path);
         std::ifstream f(path);
         if (!f) {
             g_errorReporter.setFilename(path);
@@ -889,6 +1071,8 @@ int main(int argc, char** argv) {
     }
 
     // rEPL
+    // If started from outside the repo, set KERN_LIB so interactive imports still work.
+    maybeAutoSetKernLibFromEntryPath(std::filesystem::current_path().string());
     std::cout << "Kern. Type expressions or statements. help | clear | history | search <q> | exit" << std::endl;
     std::string line;
     std::vector<std::string> history;

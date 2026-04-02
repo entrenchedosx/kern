@@ -5,6 +5,15 @@ def main() {
         return null
     }
 
+    let fr = process["first_readable_region"]
+    if (fr == null || type(fr) != "function") {
+        print("process.first_readable_region is missing from this executable (stale or pre-API build).")
+        print("Rebuild and run the new kern.exe, for example:")
+        print("  cmake --build D:/simple_programming_language/build --config Release --target kern --clean-first")
+        print("If it still fails, delete build/Release/kern.exe then build again so the linker runs.")
+        return null
+    }
+
     let rows = process.list()
     if (len(rows) == 0) {
         print("no processes found")
@@ -31,14 +40,28 @@ def main() {
     }
 
     print("target:", target.pid, target.name, "handle=", h)
-    // safe read attempt; may return nil if not readable.
-    let bytes = process.read(h, 0, 16)
+
+    // Virtual address 0 is not mapped in normal user processes - ReadProcessMemory fails; nil is expected.
+    let atZero = process.read(h, 0, 16)
+    print("read at 0x0 (expect nil on Windows):", type(atZero))
+
+    let region = fr(h)
+    if (region == null) {
+        print("no readable region found (protected process or access denied)")
+        process.close(h)
+        return null
+    }
+
+    let base = region.base
+    print("first readable region base:", base, "size:", region.size)
+
+    let bytes = process.read(h, base, 16)
     print("read result type:", type(bytes))
     if (type(bytes) == "array") {
         print("read bytes count:", len(bytes))
     }
 
-    let probe = process.read_u32(h, 0)
+    let probe = process.read_u32(h, base)
     print("read_u32 type:", type(probe), "value:", probe)
 
     let meta = process.metadata(h)
@@ -48,5 +71,3 @@ def main() {
 }
 
 main()
-
-

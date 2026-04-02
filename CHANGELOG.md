@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Repository layout:** Language toolchain and **Kern-IDE** are split in-tree: editor sources live under **`Kern-IDE/`** (desktop Tk, `native-qt`, `vscode-extension`). The nested duplicate **`kern/`** tree and **`editors/vscode-kern/`** were removed; Qt IDE is **`Kern-IDE/native-qt/`** (`kern-ide-qt.exe`). Root **CMake** no longer builds a native IDE; **`vcpkg.json`** drops the `native-ide` feature. Added root **`LICENSE`** (MIT). See **`docs/NESTED_KERN_TREE_REMOVED.md`**.
+
+---
+
+## [1.0.2] - 2026-04-02
+
+### Added
+
+- **Compiler / VM:** lambda **closure captures** (`BUILD_CLOSURE`, `FunctionObject::captures`); `CALL` appends captures after parameters (fixes callbacks like `g3.run` with lambdas over outer locals).
+- **CLI:** `kern run <script>`; extensionless script path tries `<name>.kn`; UTF-8 BOM + shebang line strip for file runs; non-`.kn` scripts warned but allowed; `kern install` help text clarifies project lockfile vs system install.
+- **Install:** `install.sh`, `install.ps1`, root `Makefile` `install` target, CMake `install(TARGETS kern)`; Windows `.reg` and Linux MIME helpers under `tools/`.
+- **`kern::process` (Windows):** `first_readable_region` (VirtualQueryEx); `system_process_safe_read.kn` example; module field `_kern_process_api` for introspection.
+
+### Fixed
+
+- **Examples / tooling:** `system_process_safe_read` documents VA 0 reads and avoids non-ASCII punctuation in messages (Windows console mojibake).
+
 ---
 
 ## [1.0.1] - 2026-04-01

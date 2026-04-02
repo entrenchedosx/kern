@@ -55,7 +55,6 @@ jobs:
           cmake -B build -G "Visual Studio 17 2022" -A x64 ^
             -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake ^
             -DVCPKG_TARGET_TRIPLET=x64-windows-static ^
-            -DKERN_BUILD_NATIVE_IDE=OFF ^
             -DKERN_BUILD_GAME=ON ^
             -DKERN_PREFER_STATIC_RAYLIB=ON
 

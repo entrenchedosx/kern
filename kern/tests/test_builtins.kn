@@ -1,9 +1,0 @@
-// builtin tests: core functions return expected values.
-print("test_builtins: math")
-let s = sqrt(4)
-let f = floor(3.7)
-if (s >= 1.99 and s <= 2.01 and f == 3) { print("  sqrt, floor OK") } else { panic("sqrt/floor failed") }
-if (min(1, 2) == 1 and max(1, 2) == 2) { print("  min, max OK") } else { panic("min/max failed") }
-print("test_builtins: types")
-if (type(1) == "int" and type(1.0) == "float" and type("x") == "string" and type(array(1)) == "array") { print("  type OK") } else { panic("type failed") }
-print("test_builtins: OK")

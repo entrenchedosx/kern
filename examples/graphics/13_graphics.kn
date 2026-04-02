@@ -16,5 +16,3 @@ if (g2d == null) {
     g2d.close()
     print("Done.")
 }
-
-

@@ -1,6 +1,6 @@
 # Kern — Release and Installation Guide
 
-This guide is for **users** who want to run Kern (run scripts, use the REPL, or the IDE) and for **maintainers** preparing a public release.
+This guide is for **users** who want to run Kern (run scripts, use the REPL) and for **maintainers** preparing a public release. **Editors** are documented in the **Kern-IDE** tree ([Kern-IDE/README.md](Kern-IDE/README.md)).
 
 ---
 
@@ -51,11 +51,9 @@ Executables: `build/Release/kern.exe` (Windows) or `build/kern` (Unix).
 
 Then run `build/Release/kern.exe examples/graphics/graphics_demo.kn` (or your script).
 
-### Option C: Kern IDE (tkinter)
+### Option C: Kern-IDE (editors)
 
-- **From source:** `python kern-ide/main.py` from the repo root (or `cd kern-ide` then `python main.py`).
-- **Packaged (Windows):** Run `.\build\build_ecosystem.ps1` to produce `FINAL\kern-ide\kern-ide.exe` alongside `FINAL\kern\` (toolchain). Use `FINAL` as the working directory for `lib/` imports. The IDE can also run **Build ecosystem** from the toolbar to rebuild `FINAL` with live logs.
-- **Older docs:** Some older references mention an Electron-based IDE build script; prefer the current shareable builds and `build_ecosystem.ps1` flows.
+Use the **[Kern-IDE](Kern-IDE/README.md)** directory: Tk desktop IDE, Qt editor, and VS Code extension. They call the **`kern`** binary you install from this repository (or from a release archive).
 
 ---
 
@@ -79,7 +77,7 @@ Then run `build/Release/kern.exe examples/graphics/graphics_demo.kn` (or your sc
    - Create archives (e.g. `kern-1.0.0-win64.zip`, `kern-1.0.0-linux64.tar.gz`) containing:
      - `kern` (or `kern.exe`), `kern_repl` (or `kern_repl.exe`), and optionally `kern_game`.
      - Optional: `examples/`, `docs/`, `LICENSE`, `README.md`.
-   - Optionally build and publish the Kern IDE installer (e.g. Windows NSIS, macOS DMG, Linux AppImage).
+   - Optionally coordinate a **Kern-IDE** release (separate repository) for editor binaries.
 
 6. **Publish**
    - Create a Git tag (e.g. `v1.0.0`).
@@ -87,12 +85,7 @@ Then run `build/Release/kern.exe examples/graphics/graphics_demo.kn` (or your sc
 
 ### shareable drops used in this repository
 
-- `shareable-ide/`
-  - `ide.exe`
-  - `compiler/kern.exe`
-  - `compiler/kern_repl.exe`
-  - `compiler/kernc.exe`
-  - `compiler/lib/`
+- `shareable-ide/compiler/` — toolchain (`kern.exe`, `kern_repl.exe`, `kernc.exe`, `lib/`) for portable drops (IDE packaging lives in **Kern-IDE**).
 - `shareable-kern-to-exe/`
   - `kern-to-exe.bat`
   - `kern.exe`

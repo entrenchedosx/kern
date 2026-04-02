@@ -29,13 +29,16 @@ Compiler tool:
 .\build\Release\kernc.exe --help
 ```
 
-## IDE
+## Editors (Kern-IDE)
 
-Run the IDE from repo root:
+Editor sources live under **`Kern-IDE/`** (desktop Tk, Qt, VS Code extension). From a checkout of this monorepo:
 
 ```powershell
-python .\kern-ide\main.py
+cd Kern-IDE\desktop-tk
+python main.py
 ```
+
+Install the **Kern** toolchain first and ensure `kern` is on `PATH`, or set `KERN_EXE`. See [Kern-IDE/docs/INTEGRATION.md](../Kern-IDE/docs/INTEGRATION.md).
 
 ## Portable “shareable” drops (Windows)
 
@@ -44,12 +47,13 @@ These are self-contained folders meant to run on machines without installing ext
 - `shareable-ide\compiler\` contains `kern.exe`, `kern_repl.exe`, `kernc.exe`, and `lib\`
 - `shareable-kern-to-exe\` contains `kern.exe`, `kernc.exe`, and the `kern-to-exe` packager
 
-Build them from repo root:
+Build the **kern-to-exe** drop from repo root:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\build_shareable_ide.ps1 -SkipNative
 powershell -ExecutionPolicy Bypass -File .\scripts\publish_shareable_kern_to_exe.ps1
 ```
+
+For a packaged desktop IDE, build from **`Kern-IDE/desktop-tk/packaging/`** (PyInstaller); see [Kern-IDE/README.md](../Kern-IDE/README.md).
 
 ## Next docs
 

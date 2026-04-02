@@ -63,6 +63,7 @@ enum class Opcode : uint8_t {
     CALL,
     RETURN,
     BUILD_FUNC,
+    BUILD_CLOSURE,   // operand = pair(entry, captureCount); pop captureCount values, attach as captures, push function
     SET_FUNC_ARITY,  // operand = param count; pop function, set arity, push
     SET_FUNC_PARAM_NAMES,  // operand = string constant index "a,b,c"; pop function, set paramNames, push
     SET_FUNC_NAME,   // operand = string constant index; pop function, set name, push
@@ -150,6 +151,7 @@ inline const char* opcodeName(Opcode op) {
         case Opcode::CALL: return "CALL";
         case Opcode::RETURN: return "RETURN";
         case Opcode::BUILD_FUNC: return "BUILD_FUNC";
+        case Opcode::BUILD_CLOSURE: return "BUILD_CLOSURE";
         case Opcode::SET_FUNC_ARITY: return "SET_FUNC_ARITY";
         case Opcode::SET_FUNC_PARAM_NAMES: return "SET_FUNC_PARAM_NAMES";
         case Opcode::SET_FUNC_NAME: return "SET_FUNC_NAME";
