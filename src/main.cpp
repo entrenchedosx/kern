@@ -1356,7 +1356,9 @@ int main(int argc, char** argv) {
 #ifdef _WIN32
             (void)std::system("cls");
 #else
-            (void)std::system("clear");
+            // glibc marks system() with warn_unused_result; (void) cast is not enough.
+            int clearRc = std::system("clear");
+            (void)clearRc;
 #endif
             continue;
         }

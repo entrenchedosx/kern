@@ -21,7 +21,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
-- **GCC `-Werror` (Linux CI):** disambiguate integer token literal overload; drop pessimizing `std::move` on `parameterList` return; silence assignment-target `dynamic_cast` bindings; fix misleading indentation in `mem_fill_pattern` / `uuid`; scope `std::tm bt` to Windows in `time_format`; scope `sigVals` to Windows in `ffi_call`; mark unused `wait_process` / `kill_process` args on non-Windows; ignore `system()` return in REPL `clear`.
+- **GCC `-Werror` (Linux CI):** disambiguate integer token literal overload; drop pessimizing `std::move` on `parameterList` return; silence assignment-target `dynamic_cast` bindings; fix misleading indentation in `mem_fill_pattern` / `uuid`; scope `std::tm bt` to Windows in `time_format`; scope `sigVals` to Windows in `ffi_call`; mark unused `wait_process` / `kill_process` args on non-Windows; assign `system()` result in REPL `clear` (glibc `warn_unused_result`).
+- **Linux link:** `env_all()` uses `::environ` (POSIX global), not `kern::environ`.
+- **Linux `-Wunused-function`:** gate `process_module`’s `toInt` helper behind `_WIN32`.
 
 ---
 

@@ -26,12 +26,14 @@ namespace kern {
 
 namespace {
 
+#ifdef _WIN32
 static int64_t toInt(ValuePtr v) {
     if (!v) return 0;
     if (v->type == Value::Type::INT) return std::get<int64_t>(v->data);
     if (v->type == Value::Type::FLOAT) return static_cast<int64_t>(std::get<double>(v->data));
     return 0;
 }
+#endif
 
 struct ProcessContext {
 #ifdef _WIN32

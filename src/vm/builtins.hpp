@@ -3664,8 +3664,7 @@ inline void registerAllBuiltins(VM& vm) {
             FreeEnvironmentStringsA(env);
         }
 #else
-        extern char** environ;
-        for (char** p = environ; p && *p; ++p) {
+        for (char** p = ::environ; p && *p; ++p) {
             std::string s(*p); size_t eq = s.find('='); if (eq != std::string::npos) m[s.substr(0, eq)] = std::make_shared<Value>(Value::fromString(s.substr(eq + 1)));
         }
 #endif
