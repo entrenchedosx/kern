@@ -1,0 +1,33 @@
+// Whitespace normalization helpers.
+// import("lib/kern/stdlib/text/whitespace.kn")
+
+def collapse_spaces(s) {
+    let out = ""
+    let prev_space = false
+    let i = 0
+    while (i < len(s)) {
+        let c = s[i]
+        let sp = c == " " or c == "\t" or c == "\n" or c == "\r"
+        if (sp) {
+            if (!prev_space) { out = out + " " }
+            prev_space = true
+        }
+        else {
+            out = out + c
+            prev_space = false
+        }
+        i = i + 1
+    }
+    return trim(out)
+}
+
+def strip_blank_lines(s) {
+    let lines = split_lines(s)
+    let out = array()
+    let i = 0
+    while (i < len(lines)) {
+        if (len(trim(lines[i])) > 0) { push(out, lines[i]) }
+        i = i + 1
+    }
+    return join(out, "\n")
+}

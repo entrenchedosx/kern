@@ -1,0 +1,29 @@
+// BFS distances (unweighted) from start node; keys are strings.
+// import("lib/kern/stdlib/graph/bfs_simple.kn")
+
+def bfs_distances(g, start) {
+    let dist = {}
+    let q = array()
+    let s0 = str(start)
+    dist[s0] = 0
+    push(q, start)
+    let qi = 0
+    while (qi < len(q)) {
+        let u = q[qi]
+        qi = qi + 1
+        let su = str(u)
+        if (!has(g, su)) { continue }
+        let neigh = g[su]
+        let i = 0
+        while (i < len(neigh)) {
+            let v = neigh[i]
+            let sv = str(v)
+            if (!has(dist, sv)) {
+                dist[sv] = dist[su] + 1
+                push(q, v)
+            }
+            i = i + 1
+        }
+    }
+    return dist
+}

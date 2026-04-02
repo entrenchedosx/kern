@@ -1,0 +1,14 @@
+// Simple duration helpers (seconds as float, from monotonic_time if available).
+// import("lib/kern/stdlib/time/duration.kn")
+
+def duration_seconds(start_t, end_t) {
+    return float(end_t) - float(start_t)
+}
+
+def duration_ms(seconds) {
+    return int(seconds * 1000.0)
+}
+
+def duration_from_ms(ms) {
+    return float(ms) / 1000.0
+}

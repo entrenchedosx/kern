@@ -1,0 +1,17 @@
+// Wall-clock style timer using monotonic_time().
+// import("lib/kern/stdlib/time/stopwatch.kn")
+
+def stopwatch_start() {
+    return { "t0": monotonic_time(), "lap": monotonic_time() }
+}
+
+def stopwatch_elapsed(sw) {
+    return monotonic_time() - sw["t0"]
+}
+
+def stopwatch_lap(sw) {
+    let now = monotonic_time()
+    let dt = now - sw["lap"]
+    sw["lap"] = now
+    return dt
+}

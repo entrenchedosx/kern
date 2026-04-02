@@ -1,0 +1,58 @@
+// Double-ended queue as a map { "items": array } — O(n) pop front, simple & stable.
+// import("lib/kern/stdlib/collections/deque.kn")
+
+def deque_new() {
+    return { "items": array() }
+}
+
+def deque_len(d) {
+    return len(d["items"])
+}
+
+def deque_push_back(d, x) {
+    push(d["items"], x)
+}
+
+def deque_push_front(d, x) {
+    let old = d["items"]
+    let n = len(old)
+    let out = array(x)
+    let i = 0
+    while (i < n) {
+        push(out, old[i])
+        i = i + 1
+    }
+    d["items"] = out
+}
+
+def deque_pop_back(d) {
+    let a = d["items"]
+    if (len(a) == 0) { throw "deque: pop_back on empty" }
+    let v = a[len(a) - 1]
+    d["items"] = slice(a, 0, len(a) - 1)
+    return v
+}
+
+def deque_pop_front(d) {
+    let a = d["items"]
+    if (len(a) == 0) { throw "deque: pop_front on empty" }
+    let v = a[0]
+    d["items"] = slice(a, 1, len(a))
+    return v
+}
+
+def deque_peek_front(d) {
+    let a = d["items"]
+    if (len(a) == 0) { return null }
+    return a[0]
+}
+
+def deque_peek_back(d) {
+    let a = d["items"]
+    if (len(a) == 0) { return null }
+    return a[len(a) - 1]
+}
+
+def deque_to_array(d) {
+    return copy(d["items"])
+}

@@ -123,6 +123,12 @@ set(SYSTEM_MODULE_SOURCES
     src/modules/system/vision_module.cpp
     src/modules/system/render_module.cpp
 )
+set(SCANNER_SOURCES
+    src/scanner/scan_driver.cpp
+    src/scanner/builtin_registry_check.cpp
+    src/scanner/stdlib_export_check.cpp
+)
+
 set(KERNC_SUPPORT_SOURCES
     src/compiler/import_aliases.cpp
     src/compiler/project_resolver.cpp
@@ -139,7 +145,7 @@ set(KERNC_SUPPORT_SOURCES
     src/utils/build_cache.cpp
 )
 
-add_executable(kern src/main.cpp ${KERN_VERSION_RESOURCE} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES})
+add_executable(kern src/main.cpp ${KERN_VERSION_RESOURCE} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES} ${SCANNER_SOURCES})
 target_include_directories(kern PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(kern PRIVATE KERN_VERSION="${KERN_VERSION}")
 
@@ -161,10 +167,16 @@ kern_apply_strict_warnings(kern_repl)
 kern_apply_strict_warnings(kernc)
 kern_apply_strict_warnings(kern_lsp)
 
+add_executable(kern-scan src/scanner/scan_main.cpp ${KERN_VERSION_RESOURCE} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES} ${SCANNER_SOURCES})
+target_include_directories(kern-scan PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(kern-scan PRIVATE KERN_VERSION="${KERN_VERSION}")
+kern_apply_strict_warnings(kern-scan)
+
 if(WIN32)
   target_link_libraries(kernc PRIVATE psapi winhttp wininet)
   target_link_libraries(kern_repl PRIVATE psapi winhttp wininet)
   target_link_libraries(kern PRIVATE psapi winhttp wininet)
+  target_link_libraries(kern-scan PRIVATE psapi winhttp wininet)
   target_link_libraries(kern_lsp PRIVATE winhttp wininet)
   # Compiler binary is kern-impl.exe; kern.exe is a tiny launcher (tools/kernc_launcher.c) that runs
   # cmake --build ... --target kern then execs kern-impl.exe (stale-compiler issue when only kern.exe was run).
@@ -287,6 +299,9 @@ if(KERN_BUILD_GAME)
     target_sources(kern PRIVATE src/game/game_builtins.cpp ${G2D_SOURCES})
     target_compile_definitions(kern PRIVATE KERN_BUILD_GAME=1)
     target_link_libraries(kern PRIVATE ${KERN_RAYLIB_TARGET})
+    target_sources(kern-scan PRIVATE src/game/game_builtins.cpp ${G2D_SOURCES})
+    target_compile_definitions(kern-scan PRIVATE KERN_BUILD_GAME=1)
+    target_link_libraries(kern-scan PRIVATE ${KERN_RAYLIB_TARGET})
     add_executable(kern_game src/game/game_main.cpp ${KERN_VERSION_RESOURCE} src/game/game_builtins.cpp ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES})
     target_include_directories(kern_game PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
     target_compile_definitions(kern_game PRIVATE KERN_BUILD_GAME=1)
@@ -308,6 +323,7 @@ if(KERN_BUILD_GAME)
       target_link_libraries(kernc PRIVATE ${_kern_raylib_extra})
       target_link_libraries(kern_repl PRIVATE ${_kern_raylib_extra})
       target_link_libraries(kern PRIVATE ${_kern_raylib_extra})
+      target_link_libraries(kern-scan PRIVATE ${_kern_raylib_extra})
       target_link_libraries(kern_game PRIVATE ${_kern_raylib_extra})
     endif()
     if(KERN_PREFER_STATIC_RAYLIB)
@@ -324,4 +340,4 @@ if(KERN_BUILD_GAME)
 endif()
 
 include(GNUInstallDirs)
-install(TARGETS kern RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS kern kern-scan RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

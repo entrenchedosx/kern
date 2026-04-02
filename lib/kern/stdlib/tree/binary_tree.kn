@@ -1,0 +1,14 @@
+// Binary tree nodes as maps: { "v": value, "left": child|null, "right": child|null }.
+// import("lib/kern/stdlib/tree/binary_tree.kn")
+
+def bt_leaf(v) {
+    return { "v": v, "left": null, "right": null }
+}
+
+def bt_node(v, left, right) {
+    return { "v": v, "left": left, "right": right }
+}
+
+def bt_is_leaf(n) {
+    return n["left"] == null and n["right"] == null
+}

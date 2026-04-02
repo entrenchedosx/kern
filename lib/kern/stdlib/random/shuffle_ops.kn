@@ -1,0 +1,8 @@
+// Fisher–Yates shuffle on a copy (delegates to lib/kern/algo.kn shuffle).
+// import("lib/kern/stdlib/random/shuffle_ops.kn")
+
+import("lib/kern/algo.kn")
+
+def shuffled(arr) {
+    return shuffle(copy(arr))
+}

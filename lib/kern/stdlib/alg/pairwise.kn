@@ -1,0 +1,13 @@
+// Adjacent pairs from an array.
+// import("lib/kern/stdlib/alg/pairwise.kn")
+
+def pairwise(arr) {
+    if (len(arr) < 2) { return array() }
+    let out = array()
+    let i = 0
+    while (i < len(arr) - 1) {
+        push(out, array(arr[i], arr[i + 1]))
+        i = i + 1
+    }
+    return out
+}

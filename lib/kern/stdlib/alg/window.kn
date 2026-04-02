@@ -1,0 +1,13 @@
+// Sliding window views as arrays of length `width` (step 1).
+// import("lib/kern/stdlib/alg/window.kn")
+
+def sliding_window(arr, width) {
+    if (width <= 0) { throw "sliding_window: width must be > 0" }
+    let out = array()
+    let i = 0
+    while (i + width <= len(arr)) {
+        push(out, slice(arr, i, i + width))
+        i = i + 1
+    }
+    return out
+}

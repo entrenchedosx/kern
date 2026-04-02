@@ -1,0 +1,21 @@
+// Undirected adjacency list as map: node key -> array of neighbors.
+// import("lib/kern/stdlib/graph/adjacency_list.kn")
+
+def graph_new() {
+    return {}
+}
+
+def graph_add_edge(g, u, v) {
+    let su = str(u)
+    let sv = str(v)
+    if (!has(g, su)) { g[su] = array() }
+    if (!has(g, sv)) { g[sv] = array() }
+    push(g[su], v)
+    push(g[sv], u)
+}
+
+def graph_neighbors(g, u) {
+    let su = str(u)
+    if (!has(g, su)) { return array() }
+    return copy(g[su])
+}

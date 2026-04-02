@@ -250,7 +250,19 @@ inline std::vector<std::string> getBuiltinNames() {
         "parse_cookie_header","set_cookie_fields","content_type_charset","is_safe_http_redirect",
         "http_parse_request","parse_link_header","parse_content_disposition","url_normalize","html_sanitize_strict","css_url_escape",
         "http_build_response","html_nl2br","url_path_join","parse_authorization_basic","merge_query","parse_accept_language",
-        "ffi_allow_library","ffi_call"};
+        "ffi_allow_library","ffi_call",
+        "std_math_fmod","std_math_hypot","std_math_log10","std_math_log2","std_math_exp","std_math_expm1","std_math_log1p",
+        "std_math_cbrt","std_math_asin","std_math_acos","std_math_atan","std_math_sinh","std_math_cosh","std_math_tanh",
+        "std_math_copysign","std_math_nextafter","std_math_trunc","std_math_round_to_int",
+        "std_string_index_of","std_string_last_index_of","std_string_count_substr","std_string_substr",
+        "std_string_equals_ignore_case","std_string_compare","std_string_trim_left","std_string_trim_right",
+        "std_string_split_first","std_string_char_at","std_string_is_empty","std_string_remove_prefix","std_string_remove_suffix",
+        "std_string_pad_center",
+        "std_bytes_crc32","std_bytes_to_hex","std_bytes_from_hex","std_bytes_xor","std_bytes_concat","std_bytes_slice",
+        "std_bytes_equal","std_bytes_get_u16_le","std_bytes_get_u32_le","std_bytes_set_u32_le","std_bytes_get_u8",
+        "std_bytes_from_string","std_bytes_len",
+        "std_col_array_index_of","std_col_array_last_index_of","std_col_swap","std_col_rotate_left","std_col_dict_merge_shallow",
+        "std_col_array_zip_pairs","std_col_array_unique","std_col_array_fill","std_col_map_invert","std_col_array_intersect"};
     return names;
 }
 
@@ -6250,6 +6262,8 @@ inline void registerAllBuiltins(VM& vm) {
         return Value::fromMap(std::move(out));
     });
     setGlobalFn("__safe_invoke2", 351);
+
+#include "std_builtins_v1.inl"
 }
 
 } // namespace kern

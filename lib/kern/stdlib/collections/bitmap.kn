@@ -1,0 +1,42 @@
+// Dense bit vector as array of 0/1 ints (fixed width).
+// import("lib/kern/stdlib/collections/bitmap.kn")
+
+def bitmap_new(n_bits) {
+    if (n_bits <= 0) { throw "bitmap: n_bits must be > 0" }
+    let a = array()
+    let i = 0
+    while (i < n_bits) {
+        push(a, 0)
+        i = i + 1
+    }
+    return { "bits": a }
+}
+
+def bitmap_len(b) {
+    return len(b["bits"])
+}
+
+def bitmap_set(b, i, v) {
+    if (i < 0 or i >= len(b["bits"])) { throw "bitmap: index out of range" }
+    b["bits"][i] = v != 0 ? 1 : 0
+}
+
+def bitmap_get(b, i) {
+    if (i < 0 or i >= len(b["bits"])) { throw "bitmap: index out of range" }
+    return b["bits"][i]
+}
+
+def bitmap_flip(b, i) {
+    if (i < 0 or i >= len(b["bits"])) { throw "bitmap: index out of range" }
+    b["bits"][i] = b["bits"][i] == 0 ? 1 : 0
+}
+
+def bitmap_count_ones(b) {
+    let c = 0
+    let i = 0
+    while (i < len(b["bits"])) {
+        if (b["bits"][i] != 0) { c = c + 1 }
+        i = i + 1
+    }
+    return c
+}

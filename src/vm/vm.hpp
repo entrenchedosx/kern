@@ -67,6 +67,8 @@ public:
     void run();
     using BuiltinFn = std::function<Value(VM*, std::vector<ValuePtr>)>;
     void registerBuiltin(size_t index, BuiltinFn fn);
+    /* * true if a builtin handler is registered at this index (used by kern-scan registry checks).*/
+    bool builtinSlotFilled(size_t index) const;
     void setGlobal(const std::string& name, ValuePtr value);
     /* * get global by name (for building stdlib modules). Returns nullptr if not set.*/
     ValuePtr getGlobal(const std::string& name) const;

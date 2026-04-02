@@ -1,0 +1,13 @@
+// Build an array by repeating a value.
+// import("lib/kern/stdlib/iter/repeat.kn")
+
+def repeat_val(x, n) {
+    if (n < 0) { throw "repeat_val: n must be >= 0" }
+    let out = array()
+    let i = 0
+    while (i < n) {
+        push(out, x)
+        i = i + 1
+    }
+    return out
+}

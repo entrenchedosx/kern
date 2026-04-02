@@ -1,0 +1,92 @@
+# Build Windows Release binaries when a version tag (v*) is pushed.
+# Uploads a zip artifact for GitHub Releases (attach manually or use "Generate release notes").
+name: Release (Windows)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache vcpkg installed tree
+        uses: actions/cache@v4
+        with:
+          path: _vcpkg/installed
+          key: vcpkg-installed-${{ runner.os }}-x64-windows-static-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-installed-${{ runner.os }}-x64-windows-static-
+
+      - name: Fetch + bootstrap vcpkg
+        shell: cmd
+        run: |
+          if exist vcpkg\vcpkg.exe (
+            echo vcpkg already present
+          ) else (
+            git clone https://github.com/microsoft/vcpkg.git vcpkg
+            cd vcpkg
+            call bootstrap-vcpkg.bat
+            cd ..
+          )
+
+      - name: Install Raylib (static)
+        shell: cmd
+        run: |
+          "%GITHUB_WORKSPACE%\vcpkg\vcpkg.exe" install --triplet x64-windows-static --x-manifest-root="%GITHUB_WORKSPACE%" --x-install-root="%GITHUB_WORKSPACE%\_vcpkg\installed"
+
+      - name: Configure CMake
+        shell: cmd
+        run: |
+          cmake -B build -G "Visual Studio 17 2022" -A x64 ^
+            -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static ^
+            -DKERN_BUILD_GAME=ON ^
+            -DKERN_PREFER_STATIC_RAYLIB=ON
+
+      - name: Build
+        shell: cmd
+        run: cmake --build build --config Release --target kern kernc kern-scan --parallel 4
+
+      - name: Verify
+        shell: cmd
+        run: |
+          build\Release\kern.exe --version
+          build\Release\kern.exe --scan --registry-only
+          build\Release\kern.exe tests\std_v1_builtins_smoke.kn
+          build\Release\kern.exe test tests\coverage
+
+      - name: Package zip
+        id: zip
+        shell: pwsh
+        run: |
+          $ver = (Get-Content -Raw VERSION).Trim()
+          $out = "kern-windows-x64-v$ver.zip"
+          New-Item -ItemType Directory -Path pkg/kern-${ver}-win64 | Out-Null
+          Copy-Item build/Release/kern.exe pkg/kern-${ver}-win64/
+          Copy-Item build/Release/kernc.exe pkg/kern-${ver}-win64/
+          Copy-Item build/Release/kern-scan.exe pkg/kern-${ver}-win64/
+          Copy-Item LICENSE pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
+          Copy-Item README.md pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
+          Copy-Item VERSION pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
+          Compress-Archive -Path pkg/kern-${ver}-win64 -DestinationPath $out -Force
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "zip_path=$out"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kern-windows-x64
+          path: ${{ steps.zip.outputs.zip_path }}

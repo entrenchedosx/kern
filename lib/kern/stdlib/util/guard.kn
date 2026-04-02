@@ -1,0 +1,14 @@
+// Preconditions and invariants.
+// import("lib/kern/stdlib/util/guard.kn")
+
+def require(cond, msg) {
+    if (!cond) { throw msg }
+}
+
+def require_not_null(x, name) {
+    if (x == null) { throw str(name) + ": must not be null" }
+}
+
+def require_index(arr, i) {
+    if (i < 0 or i >= len(arr)) { throw "index out of range" }
+}

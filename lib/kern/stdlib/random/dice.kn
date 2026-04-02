@@ -1,0 +1,29 @@
+// Dice rolls using random_int(lo, hi) inclusive.
+// import("lib/kern/stdlib/random/dice.kn")
+
+def roll_d(sides) {
+    if (sides < 1) { throw "roll_d: sides must be >= 1" }
+    return random_int(1, sides)
+}
+
+def roll_nd(n, sides) {
+    if (n < 1) { throw "roll_nd: n must be >= 1" }
+    let out = array()
+    let i = 0
+    while (i < n) {
+        push(out, roll_d(sides))
+        i = i + 1
+    }
+    return out
+}
+
+def roll_sum(n, sides) {
+    let xs = roll_nd(n, sides)
+    let s = 0
+    let i = 0
+    while (i < len(xs)) {
+        s = s + xs[i]
+        i = i + 1
+    }
+    return s
+}

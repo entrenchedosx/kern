@@ -1,4 +1,5 @@
 #include "stdlib_modules.hpp"
+#include "stdlib_stdv1_exports.hpp"
 #include "vm/builtins.hpp"
 #include "vm/value.hpp"
 #include <unordered_map>
@@ -19,7 +20,56 @@ const std::unordered_map<std::string, std::string>& stdlibBuiltinAliasTarget() {
 }
 } // namespace
 
-ValuePtr createStdlibModule(VM& vm, const std::string& name) {
+ValuePtr createStdlibModule(VM& vm, const std::string& nameIn) {
+    const std::string name = resolveStdlibModuleAlias(nameIn);
+    const std::vector<std::string>& builtinNames = getBuiltinNames();
+    auto bindExport = [&](std::unordered_map<std::string, ValuePtr>& out, const std::string& exportKey, const std::string& lookupKey) {
+        std::string lookup = lookupKey;
+        auto ait = stdlibBuiltinAliasTarget().find(lookupKey);
+        if (ait != stdlibBuiltinAliasTarget().end()) lookup = ait->second;
+        ValuePtr gv = vm.getGlobal(lookup);
+        if (gv && gv->type == Value::Type::FUNCTION) {
+            out[exportKey] = gv;
+            return;
+        }
+        for (size_t i = 0; i < builtinNames.size(); ++i) {
+            if (builtinNames[i] == lookup) {
+                auto fn = std::make_shared<FunctionObject>();
+                fn->isBuiltin = true;
+                fn->builtinIndex = static_cast<int>(i);
+                out[exportKey] = std::make_shared<Value>(Value::fromFunction(fn));
+                return;
+            }
+        }
+    };
+
+    if (name == "std") {
+        std::unordered_map<std::string, ValuePtr> out;
+        out["v1"] = createStdlibModule(vm, "std.v1");
+        return std::make_shared<Value>(Value::fromMap(std::move(out)));
+    }
+    if (name == "std.v1") {
+        std::unordered_map<std::string, ValuePtr> out;
+        const char* subs[] = {"math", "string", "bytes", "collections", "fs", "process", "time"};
+        for (const char* s : subs) {
+            std::string full = std::string("std.v1.") + s;
+            out[s] = createStdlibModule(vm, full);
+        }
+        return std::make_shared<Value>(Value::fromMap(std::move(out)));
+    }
+
+    auto itV1 = stdV1NamedExports().find(name);
+    if (itV1 != stdV1NamedExports().end()) {
+        std::unordered_map<std::string, ValuePtr> out;
+        for (const auto& pr : itV1->second) bindExport(out, pr.first, pr.second);
+        if (name == "std.v1.math") {
+            out["PI"] = std::make_shared<Value>(Value::fromFloat(3.14159265358979323846));
+            out["E"] = std::make_shared<Value>(Value::fromFloat(2.71828182845904523536));
+            out["TAU"] = std::make_shared<Value>(Value::fromFloat(6.28318530717958647692));
+        }
+        return std::make_shared<Value>(Value::fromMap(std::move(out)));
+    }
+
     static const std::unordered_map<std::string, std::vector<std::string>> MODULES = {
         // math: full set including constants (PI, E set below)
         { "math", {
@@ -249,32 +299,12 @@ ValuePtr createStdlibModule(VM& vm, const std::string& name) {
             "runtime_info", "ffi_allow_library", "path_normalize", "retry_call"
         }},
     };
-    (void)vm;
-    auto it = MODULES.find(name);
+    auto it = MODULES.find(nameIn);
+    if (it == MODULES.end()) it = MODULES.find(name);
     if (it == MODULES.end()) return nullptr;
-    const std::vector<std::string>& builtinNames = getBuiltinNames();
     std::unordered_map<std::string, ValuePtr> out;
     for (const std::string& key : it->second) {
-        std::string lookup = key;
-        auto ait = stdlibBuiltinAliasTarget().find(key);
-        if (ait != stdlibBuiltinAliasTarget().end()) lookup = ait->second;
-        // resolve builtin index from VM globals first. This is authoritative even if
-        // getBuiltinNames ordering drifts from registration order.
-        ValuePtr gv = vm.getGlobal(lookup);
-        if (gv && gv->type == Value::Type::FUNCTION) {
-            out[key] = gv;
-            continue;
-        }
-        // fallback for defensive compatibility.
-        for (size_t i = 0; i < builtinNames.size(); ++i) {
-            if (builtinNames[i] == lookup) {
-                auto fn = std::make_shared<FunctionObject>();
-                fn->isBuiltin = true;
-                fn->builtinIndex = static_cast<int>(i);
-                out[key] = std::make_shared<Value>(Value::fromFunction(fn));
-                break;
-            }
-        }
+        bindExport(out, key, key);
     }
     if (name == "math") {
         out["PI"] = std::make_shared<Value>(Value::fromFloat(3.14159265358979323846));
@@ -285,6 +315,9 @@ ValuePtr createStdlibModule(VM& vm, const std::string& name) {
 }
 
 bool isStdlibModuleName(const std::string& name) {
+    std::string r = resolveStdlibModuleAlias(name);
+    if (r == "std" || r == "std.v1") return true;
+    if (stdV1NamedExports().find(r) != stdV1NamedExports().end()) return true;
     return name == "math" || name == "string" || name == "json" || name == "random"
         || name == "sys" || name == "io" || name == "net" || name == "web" || name == "data" || name == "array" || name == "env"
         || name == "map" || name == "types" || name == "debug" || name == "log"

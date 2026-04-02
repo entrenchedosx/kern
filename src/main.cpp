@@ -1,7 +1,7 @@
 /* *
  * kern (Kern) - Main entry point
  * compiles and runs .kn files or starts the REPL.
- * modes: kern file.kn | kern --ast file | kern --bytecode file | kern --check file | kern --fmt file
+ * modes: kern file.kn | kern --ast file | kern --bytecode file | kern --check file | kern --scan [paths] | kern --fmt file
  */
 
 #include "compiler/lexer.hpp"
@@ -15,6 +15,7 @@
 #include "vm/bytecode.hpp"
 #include "errors.hpp"
 #include "import_resolution.hpp"
+#include "scanner/scan_driver.hpp"
 #ifdef KERN_BUILD_GAME
 #include "game/game_builtins.hpp"
 #endif
@@ -140,6 +141,11 @@ static bool resolveKnScriptPath(const std::string& given, ResolvedKnPath& out, s
     if (chosen.empty()) {
         errMsg = "File not found: " + given;
         if (!p.has_extension()) errMsg += " (also tried " + (given + ".kn") + ")";
+        if (given.size() >= 2 && given[0] == '-' && given[1] == '-') {
+            errMsg += "\nHint: This looks like a CLI flag, not a script path. The `kern` you ran may be an older "
+                      "binary (no `--scan`). Run the toolchain built from this repo, e.g. "
+                      ".\\build\\Release\\kern.exe --scan (Windows), or rebuild and put that `kern` on PATH.";
+        }
         return false;
     }
 
@@ -299,7 +305,9 @@ static void printUsage(const char* prog) {
         << "  --lint <file>         Same as --check (lint/syntax check).\n"
         << "  --fmt <file>          Format script (indent by braces).\n"
         << "  --ast <file>          Dump AST and exit.\n"
-        << "  --bytecode <file>     Dump bytecode and exit.\n\n"
+        << "  --bytecode <file>     Dump bytecode and exit.\n"
+        << "  --scan [opts] [paths] Cross-layer scan: builtin registry, stdlib exports, compile + static analysis.\n"
+        << "                        Same as standalone `kern-scan`. Use --registry-only, --json, --strict-types, --test.\n\n"
         << "  --watch <file>        Re-run script when file changes.\n\n"
         << "Runtime mode flags (can precede any command):\n"
         << "  --debug / --release   Toggle runtime guard profile (debug default).\n"
@@ -735,6 +743,26 @@ int main(int argc, char** argv) {
             std::cout << "Dependencies locked from kern.json\n";
             return 0;
         }
+    }
+
+    if (argc > argBase && std::string(argv[argBase]) == "--scan") {
+        VM scanVm;
+        registerAllBuiltins(scanVm);
+        registerImportBuiltin(scanVm);
+        scanVm.setRuntimeGuards(runtimeGuards);
+        if (runtimeGuards.debugMode) {
+            scanVm.setStepLimit(5'000'000);
+            scanVm.setMaxCallDepth(2048);
+            scanVm.setCallbackStepGuard(250'000);
+        } else {
+            scanVm.setStepLimit(0);
+            scanVm.setMaxCallDepth(8192);
+            scanVm.setCallbackStepGuard(0);
+        }
+        std::vector<std::string> scanArgs;
+        for (int i = 0; i < argc; ++i) scanArgs.push_back(argv[i]);
+        scanVm.setCliArgs(std::move(scanArgs));
+        return runScanFromArgv(argc, argv, argBase + 1, scanVm, prog);
     }
 
     VM vm;

@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Docs:** GitHub-oriented [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), [docs/LANGUAGE_SYNTAX.md](docs/LANGUAGE_SYNTAX.md), [docs/BUILTIN_REFERENCE.md](docs/BUILTIN_REFERENCE.md), [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md).
+- **CI:** [`.github/workflows/release.yml`](.github/workflows/release.yml) builds `kern`, `kernc`, `kern-scan` on `v*` tags and uploads a Windows zip artifact; [windows-kern.yml](.github/workflows/windows-kern.yml) now builds `kern-scan`, runs `kern --scan --registry-only`, and `tests/std_v1_builtins_smoke.kn`.
+
 ### Changed
 
 - **Repository layout:** Language toolchain and **Kern-IDE** are split in-tree: editor sources live under **`Kern-IDE/`** (desktop Tk, `native-qt`, `vscode-extension`). The nested duplicate **`kern/`** tree and **`editors/vscode-kern/`** were removed; Qt IDE is **`Kern-IDE/native-qt/`** (`kern-ide-qt.exe`). Root **CMake** no longer builds a native IDE; **`vcpkg.json`** drops the `native-ide` feature. Added root **`LICENSE`** (MIT). See **`docs/NESTED_KERN_TREE_REMOVED.md`**.
@@ -95,10 +100,3 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - CMake 3.14+; C++17. Optional Raylib for g2d/game (vcpkg or RAYLIB_ROOT).
 - Version from root `VERSION` file; reflected in `--version` and `kern_version()`.
-
----
-
-## [Unreleased]
-
-- Performance improvements and optional execution limits.
-- Additional stdlib and module APIs as needed.

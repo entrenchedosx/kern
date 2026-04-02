@@ -17,6 +17,8 @@ FINAL/
 Kern-IDE/desktop-tk/build/
 Kern-IDE/desktop-tk/dist/
 Kern-IDE/native-qt/build*/
+Kern-IDE/build/
+Kern-IDE/packaging/work_verify*/
 vcpkg_installed/
 # CI / local clone next to repo root (see .github/workflows/windows-kern.yml)
 /vcpkg/
@@ -36,6 +38,7 @@ venv/
 # Node / editor extensions
 node_modules/
 Kern-IDE/vscode-extension/node_modules/
+editors/**/*.vsix
 
 # Generated reports (contain absolute local paths)
 tests/advanced_module_suite_report.json

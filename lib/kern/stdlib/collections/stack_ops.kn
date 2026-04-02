@@ -1,0 +1,35 @@
+// Extra stack helpers (inline LIFO to avoid cross-module static-check noise).
+// import("lib/kern/stdlib/collections/stack_ops.kn")
+
+def _st_new() {
+    return array()
+}
+
+def _st_push(s, x) {
+    push(s, x)
+}
+
+def _st_pop(s) {
+    if (len(s) == 0) { throw "stack underflow" }
+    return remove_at(s, len(s) - 1)
+}
+
+def stack_clear(s) {
+    while (len(s) > 0) {
+        _st_pop(s)
+    }
+}
+
+def stack_from_array(arr) {
+    let s = _st_new()
+    let i = 0
+    while (i < len(arr)) {
+        _st_push(s, arr[i])
+        i = i + 1
+    }
+    return s
+}
+
+def stack_to_array(s) {
+    return copy(s)
+}

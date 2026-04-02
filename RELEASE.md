@@ -64,6 +64,7 @@ Use the **[Kern-IDE](Kern-IDE/README.md)** directory: Tk desktop IDE, Qt editor,
 
 2. **Changelog**
    - Update `CHANGELOG.md` with the release date and any last-minute notes.
+   - Follow [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) for a concise maintainer checklist.
 
 3. **Build**
    - Build Release (and optionally Debug) for each target platform.
@@ -110,6 +111,7 @@ Use the **[Kern-IDE](Kern-IDE/README.md)** directory: Tk desktop IDE, Qt editor,
 - [ ] With Raylib: `examples/graphics/graphics_demo.kn` (or another graphics sample) runs.
 - [ ] REPL starts and exits with `exit`/`quit`.
 - [ ] `kern --check file.kn` exits 0 for valid script.
+- [ ] `kern --scan --registry-only` exits 0.
 - [ ] Docs: README, RELEASE.md, TROUBLESHOOTING up to date.
 - [ ] CHANGELOG updated for the release.
 

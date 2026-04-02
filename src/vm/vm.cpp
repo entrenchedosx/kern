@@ -123,6 +123,13 @@ void VM::registerBuiltin(size_t index, BuiltinFn fn) {
     }
 }
 
+bool VM::builtinSlotFilled(size_t index) const {
+    if (index < builtinsVec_.size() && builtinsVec_[index])
+        return true;
+    auto it = builtins_.find(index);
+    return it != builtins_.end() && static_cast<bool>(it->second);
+}
+
 void VM::setGlobal(const std::string& name, ValuePtr value) {
     globals_[name] = ensureNonNull(std::move(value));
 }

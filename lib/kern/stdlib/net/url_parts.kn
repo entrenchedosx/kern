@@ -1,0 +1,44 @@
+// Very small URL splitter: scheme, authority, path, query, fragment.
+// import("lib/kern/stdlib/net/url_parts.kn")
+
+def url_split(url) {
+    let out = { "scheme": "", "rest": url }
+    let idx = 0
+    while (idx < len(url) - 2) {
+        if (url[idx] == ":" and url[idx + 1] == "/" and url[idx + 2] == "/") {
+            out["scheme"] = slice(url, 0, idx)
+            out["rest"] = slice(url, idx + 3, len(url))
+            break
+        }
+        idx = idx + 1
+    }
+    let rest = out["rest"]
+    let path = rest
+    let query = ""
+    let frag = ""
+    let q = 0
+    while (q < len(rest)) {
+        if (rest[q] == "?") {
+            path = slice(rest, 0, q)
+            let r = slice(rest, q + 1, len(rest))
+            let f = 0
+            while (f < len(r)) {
+                if (r[f] == "#") {
+                    query = slice(r, 0, f)
+                    frag = slice(r, f + 1, len(r))
+                    return { "scheme": out["scheme"], "path": path, "query": query, "fragment": frag }
+                }
+                f = f + 1
+            }
+            query = r
+            return { "scheme": out["scheme"], "path": path, "query": query, "fragment": frag }
+        }
+        if (rest[q] == "#") {
+            path = slice(rest, 0, q)
+            frag = slice(rest, q + 1, len(rest))
+            return { "scheme": out["scheme"], "path": path, "query": query, "fragment": frag }
+        }
+        q = q + 1
+    }
+    return { "scheme": out["scheme"], "path": path, "query": query, "fragment": frag }
+}

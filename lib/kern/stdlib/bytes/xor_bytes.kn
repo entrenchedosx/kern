@@ -1,0 +1,13 @@
+// Byte-wise XOR of equal-length numeric arrays (0–255 per element).
+// import("lib/kern/stdlib/bytes/xor_bytes.kn")
+
+def xor_bytes(a, b) {
+    if (len(a) != len(b)) { throw "xor_bytes: length mismatch" }
+    let out = array()
+    let i = 0
+    while (i < len(a)) {
+        push(out, int(a[i]) ^ int(b[i]))
+        i = i + 1
+    }
+    return out
+}

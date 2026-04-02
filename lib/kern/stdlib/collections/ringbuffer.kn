@@ -1,0 +1,45 @@
+// Fixed-capacity ring buffer overwriting oldest entries when full.
+// import("lib/kern/stdlib/collections/ringbuffer.kn")
+
+def ring_new(capacity) {
+    if (capacity <= 0) { throw "ring: capacity must be > 0" }
+    return { "cap": capacity, "buf": array(), "head": 0, "size": 0 }
+}
+
+def ring_len(r) {
+    return r["size"]
+}
+
+def ring_push(r, x) {
+    let cap = r["cap"]
+    let buf = r["buf"]
+    let head = r["head"]
+    let size = r["size"]
+    if (size < cap) {
+        push(buf, x)
+        r["buf"] = buf
+        r["size"] = size + 1
+        return
+    }
+    buf[head] = x
+    r["head"] = (head + 1) % cap
+}
+
+def ring_to_array(r) {
+    let cap = r["cap"]
+    let buf = r["buf"]
+    let head = r["head"]
+    let size = r["size"]
+    if (size == 0) { return array() }
+    if (size < cap) {
+        return copy(buf)
+    }
+    let out = array()
+    let i = 0
+    while (i < cap) {
+        let idx = (head + i) % cap
+        push(out, buf[idx])
+        i = i + 1
+    }
+    return out
+}

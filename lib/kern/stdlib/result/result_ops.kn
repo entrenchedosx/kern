@@ -1,0 +1,25 @@
+// Extra Result/Option helpers on top of lib/kern/result.kn
+// import("lib/kern/stdlib/result/result_ops.kn")
+
+import("lib/kern/result.kn")
+
+def result_flatten(r) {
+    if (has(r, "ok") and r["ok"]) {
+        let inner = r["value"]
+        return inner
+    }
+    return r
+}
+
+def opt_flatten(o) {
+    if (has(o, "some") and o["some"]) { return o["value"] }
+    return none()
+}
+
+def result_merge(a, b, combine) {
+    if (has(a, "ok") and a["ok"] and has(b, "ok") and b["ok"]) {
+        return ok(combine(a["value"], b["value"]))
+    }
+    if (has(a, "ok") and !a["ok"]) { return a }
+    return b
+}

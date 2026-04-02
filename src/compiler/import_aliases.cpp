@@ -25,7 +25,7 @@ bool isVirtualResolvedImport(const std::string& rawImport) {
     std::string p = normalizeImportKey(rawImport);
     if (p.empty()) return false;
 
-    // stdlib modules (import "math", import "sys", import "net", ...)
+    // stdlib modules (import "math", import "sys", import "std.v1.math", ...)
     if (isStdlibModuleName(p)) return true;
 
     // graphics / game — resolved at runtime when built with Raylib (still valid Kern).

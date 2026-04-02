@@ -1,0 +1,34 @@
+// Depth-first traversals (returns arrays of values).
+// import("lib/kern/stdlib/tree/traversal.kn")
+
+def bt_preorder(n) {
+    if (n == null) { return array() }
+    let out = array(n["v"])
+    let a = bt_preorder(n["left"])
+    let b = bt_preorder(n["right"])
+    let i = 0
+    while (i < len(a)) { push(out, a[i]); i = i + 1 }
+    i = 0
+    while (i < len(b)) { push(out, b[i]); i = i + 1 }
+    return out
+}
+
+def bt_inorder(n) {
+    if (n == null) { return array() }
+    let out = bt_inorder(n["left"])
+    push(out, n["v"])
+    let r = bt_inorder(n["right"])
+    let i = 0
+    while (i < len(r)) { push(out, r[i]); i = i + 1 }
+    return out
+}
+
+def bt_postorder(n) {
+    if (n == null) { return array() }
+    let out = bt_postorder(n["left"])
+    let r = bt_postorder(n["right"])
+    let i = 0
+    while (i < len(r)) { push(out, r[i]); i = i + 1 }
+    push(out, n["v"])
+    return out
+}

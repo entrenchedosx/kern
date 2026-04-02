@@ -4,6 +4,8 @@
 // bits, pairs, color, set_utils, cli_utils, log_utils, mem_utils, date_utils, graph_utils, iter_utils, hex_utils,
 // env_utils, path_utils, sort_utils, str_buf,
 // slug, lines_io, bench, safe_json, semver, shell_quote, flow, groupby, url_form, zip_dict.
+// expanded topic libraries (55+ modules): import("lib/kern/stdlib/catalog.kn") or pick under lib/kern/stdlib/
+// (collections/, text/, data/, math/, time/, fun/, sys/, util/, alg/, iter/, graph/, bytes/, result/, string/, tree/, random/, debug/, net/, encoding/, fs/). See lib/kern/stdlib/README.md.
 
 import("lib/kern/algo.kn")
 import("lib/kern/result.kn")

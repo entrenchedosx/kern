@@ -1,0 +1,24 @@
+// Smoke test for std.v1.* modules — run: kern tests/std_v1_builtins_smoke.kn
+
+let math = import("std.v1.math")
+// fmod may return float; compare as string for stability
+assert_eq(str(math["fmod"](5.0, 2.0)), "1", "std.v1.math fmod")
+
+let str = import("std.v1.string")
+assert_eq(str["index_of"]("hello", "l"), 2, "index_of")
+
+let bytes = import("std.v1.bytes")
+let crc = bytes["crc32"](array(1, 2, 3, 4))
+assert_eq(crc != 0, true, "crc32 nonzero")
+
+let col = import("std.v1.collections")
+assert_eq(col["array_index_of"](array(1, 2, 3), 2), 1, "array_index_of")
+
+let fs = import("std.v1.fs")
+assert_eq(type(fs["read_text"]), "function", "fs re-export")
+
+let std = import("std")
+// VM reports map values as type "dictionary"
+assert_eq(type(std["v1"]), "dictionary", "std root")
+
+print("std_v1_builtins_smoke: ok")

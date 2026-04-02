@@ -1,0 +1,84 @@
+// RFC 4648 Base64 encode/decode for byte arrays (0–255 per element).
+// import("lib/kern/stdlib/encoding/base64.kn")
+
+def _b64_table() {
+    return "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+}
+
+def _b64_val(c) {
+    let t = _b64_table()
+    let i = 0
+    while (i < 64) {
+        if (slice(t, i, i + 1) == c) { return i }
+        i = i + 1
+    }
+    return -1
+}
+
+def base64_encode_bytes(arr) {
+    let t = _b64_table()
+    let out = ""
+    let i = 0
+    while (i < len(arr)) {
+        let rem = len(arr) - i
+        let b1 = int(arr[i]) % 256
+        if (rem >= 3) {
+            let b2 = int(arr[i + 1]) % 256
+            let b3 = int(arr[i + 2]) % 256
+            let n = int(b1 * 65536 + b2 * 256 + b3)
+            let c1 = int(int(n / 262144) % 64)
+            let c2 = int(int(n / 4096) % 64)
+            let c3 = int(int(n / 64) % 64)
+            let c4 = int(int(n) % 64)
+            out = out + slice(t, c1, c1 + 1) + slice(t, c2, c2 + 1) + slice(t, c3, c3 + 1) + slice(t, c4, c4 + 1)
+            i = i + 3
+        }
+        else {
+            if (rem == 2) {
+                let b2 = int(arr[i + 1]) % 256
+                let n = int(b1 * 65536 + b2 * 256)
+                let c1 = int(int(n / 262144) % 64)
+                let c2 = int(int(n / 4096) % 64)
+                let c3 = int(int(n / 64) % 64)
+                out = out + slice(t, c1, c1 + 1) + slice(t, c2, c2 + 1) + slice(t, c3, c3 + 1) + "="
+                i = i + 2
+            }
+            else {
+                let n = int(b1 * 65536)
+                let c1 = int(int(n / 262144) % 64)
+                let c2 = int(int(n / 4096) % 64)
+                out = out + slice(t, c1, c1 + 1) + slice(t, c2, c2 + 1) + "=="
+                i = i + 1
+            }
+        }
+    }
+    return out
+}
+
+def base64_decode_bytes(s) {
+    if (len(s) % 4 != 0) { throw "base64: input length must be multiple of 4" }
+    let out = array()
+    let i = 0
+    while (i < len(s)) {
+        let c1 = slice(s, i, i + 1)
+        let c2 = slice(s, i + 1, i + 2)
+        let c3 = slice(s, i + 2, i + 3)
+        let c4 = slice(s, i + 3, i + 4)
+        let v1 = _b64_val(c1)
+        let v2 = _b64_val(c2)
+        let v3 = c3 == "=" ? 0 : _b64_val(c3)
+        let v4 = c4 == "=" ? 0 : _b64_val(c4)
+        if (v1 < 0 or v2 < 0) { throw "base64: invalid char" }
+        if (c3 != "=" and v3 < 0) { throw "base64: invalid char" }
+        if (c4 != "=" and v4 < 0) { throw "base64: invalid char" }
+        let n = int(v1 * 262144 + v2 * 4096 + v3 * 64 + v4)
+        let b1 = int(int(n / 65536) % 256)
+        let b2 = int(int(n / 256) % 256)
+        let b3 = int(int(n) % 256)
+        push(out, b1)
+        if (c3 != "=") { push(out, b2) }
+        if (c4 != "=") { push(out, b3) }
+        i = i + 4
+    }
+    return out
+}
