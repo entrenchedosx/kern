@@ -4,8 +4,8 @@ import "./tasks.kn"
 tasks = array()
 next_id = 1
 
-def task_spawn(fn) {
-    let t = {"id": next_id, "done": false, "fn": fn}
+def task_spawn(f) {
+    let t = {"id": next_id, "done": false, "fn": f}
     next_id = next_id + 1
     push(tasks, t)
     return t.id

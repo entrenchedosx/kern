@@ -84,8 +84,8 @@ def filter_keys(m, pred) {
     return out
 }
 
-def map_values(m, fn) {
+def map_values(m, f) {
     let out = {}
-    for k in keys(m) { out[k] = fn(m[k]) }
+    for k in keys(m) { out[k] = f(m[k]) }
     return out
 }

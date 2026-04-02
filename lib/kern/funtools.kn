@@ -48,9 +48,9 @@ def pipe3(x, f, g, h) {
     return h(g(f(x)))
 }
 
-// tap(x, fn) – call fn(x) for side effect (e.g. print), then return x. Great in pipelines: x |> tap(print) |> next
-def tap(x, fn) {
-    fn(x)
+// tap(x, f) – call f(x) for side effect (e.g. print), then return x. Great in pipelines: x |> tap(print) |> next
+def tap(x, f) {
+    f(x)
     return x
 }
 

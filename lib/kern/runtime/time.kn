@@ -13,7 +13,7 @@ def sleep_until(target_ms) {
     }
 }
 
-def every(interval_ms, state, key, fn) {
+def every(interval_ms, state, key, f) {
     let k = str(key)
     let n = now_ms()
     if (!has_key(state, k)) {
@@ -22,7 +22,7 @@ def every(interval_ms, state, key, fn) {
     }
     if ((n - int(state[k])) >= int(interval_ms)) {
         state[k] = n
-        fn()
+        f()
         return true
     }
     return false

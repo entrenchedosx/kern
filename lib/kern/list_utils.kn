@@ -60,11 +60,11 @@ def all_indexes(arr, val) {
     return out
 }
 
-def zip_with(a, b, fn) {
+def zip_with(a, b, f) {
     let out = array()
     let i = 0
     while (i < len(a) and i < len(b)) {
-        push(out, fn(a[i], b[i]))
+        push(out, f(a[i], b[i]))
         i = i + 1
     }
     return out

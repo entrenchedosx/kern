@@ -22,9 +22,9 @@ def unlock(name) {
     return true
 }
 
-def with_lock(name, fn) {
+def with_lock(name, f) {
     if (!lock(name)) { return null }
-    let out = fn()
+    let out = f()
     unlock(name)
     return out
 }

@@ -48,26 +48,26 @@ def opt_or(o, default_val) {
     return default_val
 }
 
-// map_result(r, fn) -> ok(fn(value)) or pass through err
-def map_result(r, fn) {
-    if (has(r, "ok") and r["ok"]) { return ok(fn(r["value"])) }
+// map_result(r, f) -> ok(f(value)) or pass through err
+def map_result(r, f) {
+    if (has(r, "ok") and r["ok"]) { return ok(f(r["value"])) }
     return r
 }
 
-// map_opt(o, fn) -> some(fn(value)) or pass through none
-def map_opt(o, fn) {
-    if (has(o, "some") and o["some"]) { return some(fn(o["value"])) }
+// map_opt(o, f) -> some(f(value)) or pass through none
+def map_opt(o, f) {
+    if (has(o, "some") and o["some"]) { return some(f(o["value"])) }
     return o
 }
 
-// and_then(r, fn) -> if ok then fn(value) else r
-def and_then(r, fn) {
-    if (has(r, "ok") and r["ok"]) { return fn(r["value"]) }
+// and_then(r, f) -> if ok then f(value) else r
+def and_then(r, f) {
+    if (has(r, "ok") and r["ok"]) { return f(r["value"]) }
     return r
 }
 
-// or_else(r, fn) -> if err then fn(error) else r
-def or_else(r, fn) {
-    if (has(r, "ok") and !r["ok"]) { return fn(r["error"]) }
+// or_else(r, f) -> if err then f(error) else r
+def or_else(r, f) {
+    if (has(r, "ok") and !r["ok"]) { return f(r["error"]) }
     return r
 }

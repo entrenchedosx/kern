@@ -25,9 +25,9 @@ def assert_struct(value, type_name) {
     return value
 }
 
-def safe_call(fn, fallback_value) {
+def safe_call(f, fallback_value) {
     try {
-        return fn()
+        return f()
     } catch (e) {
         log_warn("gamekit.core.safe_call: " + error_message(e))
         return fallback_value

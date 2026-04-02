@@ -1,7 +1,7 @@
 // kern test helpers — import("lib/kern/testing.kn")
-// run_test(name, fn) | run_tests([[name, fn], ...]) returns fail count
-// assert_throws(fn) | assert_throws_msg(fn, substring) | assert_true(cond) | assert_true_msg(cond, msg)
-// assert_near(a, b) | assert_near_eps(a, b, eps) | skip_test(name, fn) | test_suite(name, fn)
+// run_test(name, f) | run_tests([[name, f], ...]) returns fail count
+// assert_throws(f) | assert_throws_msg(f, substring) | assert_true(cond) | assert_true_msg(cond, msg)
+// assert_near(a, b) | assert_near_eps(a, b, eps) | skip_test(name, f) | test_suite(name, f)
 // use builtin assert_eq(a, b, msg?) for equality checks.
 
 def _string_contains(s, sub) {
@@ -17,25 +17,25 @@ def _string_contains(s, sub) {
     return false
 }
 
-// run a single test: run_test("name", fn). Calls fn(); prints " name: pass" or fails with throw.
-def run_test(name, fn) {
-    fn()
+// run a single test: run_test("name", f). Calls f(); prints " name: pass" or fails with throw.
+def run_test(name, f) {
+    f()
     print("  " + name + ": pass")
 }
 
-// assert that fn() throws. Optional second arg: message must contain this substring.
-def assert_throws(fn) {
+// assert that f() throws. Optional second arg: message must contain this substring.
+def assert_throws(f) {
     try {
-        fn()
+        f()
         throw "assert_throws: expected function to throw"
     } catch (e) {
         return
     }
 }
 
-def assert_throws_msg(fn, expected_sub) {
+def assert_throws_msg(f, expected_sub) {
     try {
-        fn()
+        f()
         throw "assert_throws: expected function to throw"
     } catch (e) {
         let msg = str(e)
@@ -46,16 +46,16 @@ def assert_throws_msg(fn, expected_sub) {
     }
 }
 
-// run multiple tests: run_tests([["name1", fn1], ["name2", fn2], ...]). Returns number of failures.
+// run multiple tests: run_tests([["name1", f1], ["name2", f2], ...]). Returns number of failures.
 def run_tests(tests) {
     let failed = 0
     let i = 0
     while (i < len(tests)) {
         let pair = tests[i]
         let name = pair[0]
-        let fn = pair[1]
+        let f = pair[1]
         try {
-            fn()
+            f()
             print("  " + name + ": pass")
         } catch (e) {
             failed = failed + 1
@@ -83,10 +83,10 @@ def assert_near_eps(a, b, eps) {
     if (abs(a - b) > eps) { throw "assert_near failed: " + str(a) + " ~= " + str(b) + " (eps " + str(eps) + ")" }
 }
 
-// skip_test(name, fn) – run fn(); on throw, print " name: skip" and continue (returns true if skipped)
-def skip_test(name, fn) {
+// skip_test(name, f) – run f(); on throw, print " name: skip" and continue (returns true if skipped)
+def skip_test(name, f) {
     try {
-        fn()
+        f()
         return false
     } catch (e) {
         print("  " + name + ": skip - " + str(e))
@@ -94,10 +94,10 @@ def skip_test(name, fn) {
     }
 }
 
-// test_suite(name, fn) – run fn(); print "=== name ===" before, "name: N passed" after
-def test_suite(name, fn) {
+// test_suite(name, f) – run f(); print "=== name ===" before, "name: N passed" after
+def test_suite(name, f) {
     print("=== " + name + " ===")
-    fn()
+    f()
     print(name + ": passed")
 }
 
