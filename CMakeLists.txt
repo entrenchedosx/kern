@@ -55,11 +55,16 @@ option(KERN_PREFER_STATIC_RAYLIB "Prefer static Raylib so kern.exe has no raylib
 option(KERN_AUTO_FETCH_RAYLIB "Auto-download/build Raylib when not found locally" ON)
 option(KERN_BUILD_DOC_FRAMEWORK_DEMO "Build modular document runtime framework demo" ON)
 option(KERN_DISTRIBUTION_STATIC_CRT "Build the Kern toolchain with a static MSVC runtime (/MT) for portable drops" ON)
+option(KERN_WERROR "Treat compiler warnings as errors (GCC/Clang, Debug configs only)" OFF)
 
 # For public/shareable Windows drops we want the toolchain to run with no MSVC runtime installs.
 # Use /MT(/MTd) for the Kern toolchain when enabled.
 if(MSVC AND KERN_DISTRIBUTION_STATIC_CRT)
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
+if(KERN_WERROR AND NOT MSVC)
+  add_compile_options($<$<CONFIG:Debug>:-Werror>)
 endif()
 
 if(KERN_BUILD_DOC_FRAMEWORK_DEMO)

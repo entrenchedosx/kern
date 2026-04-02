@@ -88,6 +88,8 @@ kern                             # REPL
 kern --check [--json] [--strict-types] script.kn   # compile only; optional strict typing
 kern --scan [.kn files or dirs]  # cross-layer scan (see docs/KERN_SCAN.md)
 kern test [options] [directory]  # --grep, --list, --fail-fast; default tests/coverage
+kern docs                        # documentation paths + optional MkDocs
+kern build                       # CMake build hints (toolchain is CMake-built)
 kern verify                      # kern.lock matches kern.json (CI)
 kern --trace script.kn           # verbose VM trace (noisy)
 kern --version / --help
@@ -173,7 +175,8 @@ See [docs/TESTING.md](docs/TESTING.md) for example sweeps, `kernc` tests, and st
 - **Version:** `VERSION` at repo root (e.g. `1.0.5`).
 - **Changelog:** [CHANGELOG.md](CHANGELOG.md) follows [Keep a Changelog](https://keepachangelog.com/).
 - **Tags:** release tags look like `v1.0.5` (see [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)).
-- **CI:** [`.github/workflows/windows-kern.yml`](.github/workflows/windows-kern.yml) builds and smoke-tests on pushes and PRs; [`.github/workflows/release.yml`](.github/workflows/release.yml) attaches Windows binaries when a `v*` tag is pushed.
+- **CI:** [`.github/workflows/windows-kern.yml`](.github/workflows/windows-kern.yml), [`.github/workflows/linux-kern.yml`](.github/workflows/linux-kern.yml), and [`.github/workflows/macos-kern.yml`](.github/workflows/macos-kern.yml) build and smoke-test on pushes and PRs.
+- **Releases:** Pushing a `v*` tag runs [`.github/workflows/release.yml`](.github/workflows/release.yml), which uploads **Windows** (zip, Raylib-enabled), **Linux** (`.tar.gz`, headless), and **macOS** (`.tar.gz`, headless) assets to the GitHub Release.
 
 ---
 

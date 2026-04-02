@@ -6,6 +6,7 @@ build-native-ide/
 build-pass2/
 out/
 dist/
+site/
 cmake-build-*/
 CMakeUserPresets.json
 *.vcxproj.user

@@ -1,0 +1,36 @@
+# Build Kern on macOS without Raylib (headless CI).
+name: macOS Kern
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: macos-kern-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-smoke:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (Release, no game / no doc demo)
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release \
+            -DKERN_BUILD_GAME=OFF \
+            -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF
+
+      - name: Build
+        run: cmake --build build --parallel 4 --target kern kernc kern-scan
+
+      - name: Smoke
+        run: |
+          ./build/kern --version
+          ./build/kern docs
+          ./build/kern build
+          ./build/kern --scan --registry-only
+          ./build/kern tests/std_v1_builtins_smoke.kn
+          ./build/kern examples/basic/01_hello_world.kn

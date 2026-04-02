@@ -321,6 +321,8 @@ static void printUsage(const char* prog) {
         << "  " << prog << " test [options] [path]\n"
         << "                        Run all .kn files under directory recursively (default: tests/coverage).\n"
         << "                        Options: --grep <substr>, --list, --fail-fast (-x). See: " << prog << " test --help\n"
+        << "  " << prog << " docs             Print paths to documentation and optional MkDocs hint.\n"
+        << "  " << prog << " build            Show CMake build instructions (toolchain is built with CMake).\n"
         << "  " << prog << " doctor           Print runtime/tooling diagnostics.\n"
         << "  " << prog << " init             Bootstrap kern.json and src/main.kn.\n"
         << "  " << prog << " add <dep>        Add dependency to kern.json.\n"
@@ -533,6 +535,32 @@ static int cmdDoctor(const char* prog) {
     std::cout << "  env: KERNC_TRACE_IMPORTS logs embedded import resolution to stderr.\n";
     std::cout << "  tip: kern test [dir] runs .kn files recursively (default tests/coverage).\n";
     std::cout << "  tip: kern verify checks kern.lock matches kern.json dependencies.\n";
+    return 0;
+}
+
+static int cmdDocs(const char* /*prog*/) {
+    std::cout << "Kern documentation\n\n"
+              << "Handbook: docs/GETTING_STARTED.md\n"
+              << "Testing: docs/TESTING.md\n"
+              << "Troubleshooting: docs/TROUBLESHOOTING.md\n"
+              << "Language sketch: docs/LANGUAGE_SYNTAX.md\n"
+              << "Stdlib (std.v1): docs/STDLIB_STD_V1.md\n"
+              << "Adoption roadmap: docs/ADOPTION_ROADMAP.md\n"
+              << "Contributing: CONTRIBUTING.md\n"
+              << "Code of Conduct: CODE_OF_CONDUCT.md\n\n"
+              << "Optional browsable site (requires Python):\n"
+              << "  pip install mkdocs\n"
+              << "  mkdocs serve    # from repo root; opens http://127.0.0.1:8000\n\n"
+              << "Online: https://github.com/entrenchedosx/kern/tree/main/docs\n";
+    return 0;
+}
+
+static int cmdBuildHint() {
+    std::cout << "The Kern toolchain is built with CMake (compiler + VM + CLI).\n\n"
+              << "Typical release build (no Raylib / headless):\n"
+              << "  cmake -B build -DCMAKE_BUILD_TYPE=Release -DKERN_BUILD_GAME=OFF -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF\n"
+              << "  cmake --build build --parallel --target kern kernc kern-scan\n\n"
+              << "See docs/GETTING_STARTED.md for OS-specific steps (vcpkg, Raylib, portable packaging).\n";
     return 0;
 }
 
@@ -892,6 +920,12 @@ int main(int argc, char** argv) {
         }
         if (arg == "doctor") {
             return cmdDoctor(prog);
+        }
+        if (arg == "docs") {
+            return cmdDocs(prog);
+        }
+        if (arg == "build") {
+            return cmdBuildHint();
         }
         if (arg == "init") {
             return cmdInit();

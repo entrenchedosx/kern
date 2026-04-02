@@ -1,11 +1,11 @@
-# Build Windows Release binaries when a version tag (v*) is pushed.
-# Publishes a GitHub Release and attaches the zip (also uploaded as a workflow artifact).
-name: Release (Windows)
+# On version tag (v*): build Windows (Raylib), Linux/macOS (headless), attach archives to GitHub Release.
+# workflow_dispatch: build + artifacts only (no release unless ref is a tag).
+name: Release
 
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
 
 permissions:
@@ -64,7 +64,6 @@ jobs:
         shell: cmd
         run: cmake --build build --config Release --target kern kernc kern-scan --parallel 4
 
-      # Headless runners have no OpenGL window; skip full coverage (includes g3d window tests).
       - name: Verify
         shell: cmd
         run: |
@@ -92,14 +91,97 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: kern-windows-x64
+          name: kern-release-windows
           path: ${{ steps.zip.outputs.zip_path }}
 
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure & build (Release, headless)
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release \
+            -DKERN_BUILD_GAME=OFF \
+            -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF
+          cmake --build build --parallel 4 --target kern kernc kern-scan
+
+      - name: Verify
+        run: |
+          ./build/kern --version
+          ./build/kern --scan --registry-only
+          ./build/kern tests/std_v1_builtins_smoke.kn
+          ./build/kern examples/basic/01_hello_world.kn
+
+      - name: Package tarball
+        id: tgz
+        run: |
+          ver=$(tr -d ' \t\r\n' < VERSION)
+          out="kern-linux-x64-v${ver}.tar.gz"
+          mkdir -p "pkg/kern-${ver}-linux-x64"
+          chmod +x build/kern build/kernc build/kern-scan
+          cp build/kern build/kernc build/kern-scan "pkg/kern-${ver}-linux-x64/"
+          cp LICENSE README.md VERSION "pkg/kern-${ver}-linux-x64/" 2>/dev/null || true
+          tar -czvf "$out" -C pkg "kern-${ver}-linux-x64"
+          echo "tgz_path=$out" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kern-release-linux
+          path: ${{ steps.tgz.outputs.tgz_path }}
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure & build (Release, headless)
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release \
+            -DKERN_BUILD_GAME=OFF \
+            -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF
+          cmake --build build --parallel 4 --target kern kernc kern-scan
+
+      - name: Verify
+        run: |
+          ./build/kern --version
+          ./build/kern --scan --registry-only
+          ./build/kern tests/std_v1_builtins_smoke.kn
+          ./build/kern examples/basic/01_hello_world.kn
+
+      - name: Package tarball
+        id: tgz
+        run: |
+          ver=$(tr -d ' \t\r\n' < VERSION)
+          out="kern-macos-v${ver}.tar.gz"
+          mkdir -p "pkg/kern-${ver}-macos"
+          chmod +x build/kern build/kernc build/kern-scan
+          cp build/kern build/kernc build/kern-scan "pkg/kern-${ver}-macos/"
+          cp LICENSE README.md VERSION "pkg/kern-${ver}-macos/" 2>/dev/null || true
+          tar -czvf "$out" -C pkg "kern-${ver}-macos"
+          echo "tgz_path=$out" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kern-release-macos
+          path: ${{ steps.tgz.outputs.tgz_path }}
+
+  publish:
+    needs: [windows, linux, macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: kern-release-*
+          merge-multiple: true
+
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.zip.outputs.zip_path }}
+          files: release-assets/*
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,67 @@
+# Build Kern on Ubuntu without Raylib (headless CI). Validates cross-platform core toolchain.
+name: Linux Kern
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: linux-kern-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (Release, no game / no doc demo)
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release \
+            -DKERN_BUILD_GAME=OFF \
+            -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF
+
+      - name: Build
+        run: cmake --build build --parallel 4 --target kern kernc kern-scan
+
+      - name: Smoke
+        run: |
+          ./build/kern --version
+          ./build/kern docs
+          ./build/kern build
+          ./build/kern --scan --registry-only
+          ./build/kern tests/std_v1_builtins_smoke.kn
+          ./build/kern examples/basic/01_hello_world.kn
+
+  # GCC/Clang only: enforce -Werror on Debug builds (see KERN_WERROR in CMakeLists.txt).
+  debug-werror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (Debug, -Werror)
+        run: |
+          cmake -B build-dbg -DCMAKE_BUILD_TYPE=Debug \
+            -DKERN_BUILD_GAME=OFF \
+            -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF \
+            -DKERN_WERROR=ON
+
+      - name: Build
+        run: cmake --build build-dbg --parallel 4 --target kern kernc kern-scan
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install MkDocs
+        run: pip install mkdocs
+
+      - name: Build docs (strict)
+        run: mkdocs build --strict

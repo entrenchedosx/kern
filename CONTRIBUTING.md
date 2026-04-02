@@ -8,6 +8,10 @@ Thanks for helping improve Kern. This document sets expectations so reviews stay
 - **In scope:** compiler, VM, builtins, `lib/kern/` stdlib, CLI (`kern`, `kernc`, `kern-scan`), tests, docs, CMake, CI workflows.
 - **Editors / IDE UI:** live under [`Kern-IDE/`](Kern-IDE/README.md). Changes there are welcome but are packaged and released separately from the core `kern` binary.
 
+## Community standards
+
+This project follows the **[Code of Conduct](CODE_OF_CONDUCT.md)**. Be respectful and constructive in issues and pull requests.
+
 ## Before you open a PR
 
 1. **Build** in Release and ensure the tree compiles without new warnings you introduced.

@@ -1,0 +1,42 @@
+# Browsable docs: pip install mkdocs && mkdocs serve
+# Published separately from CI by maintainers (optional GitHub Pages).
+
+site_name: Kern
+site_description: Kern language & toolchain documentation
+repo_url: https://github.com/entrenchedosx/kern
+edit_uri: edit/main/docs/
+
+theme:
+  name: readthedocs
+  highlightjs: true
+
+nav:
+  - Home: index.md
+  - Getting started: GETTING_STARTED.md
+  - Testing: TESTING.md
+  - Troubleshooting: TROUBLESHOOTING.md
+  - Language syntax: LANGUAGE_SYNTAX.md
+  - Standard library (std.v1): STDLIB_STD_V1.md
+  - Builtin reference: BUILTIN_REFERENCE.md
+  - Error codes: ERROR_CODES.md
+  - Trust model: TRUST_MODEL.md
+  - Adoption roadmap: ADOPTION_ROADMAP.md
+  - More:
+      - Language roadmap: LANGUAGE_ROADMAP.md
+      - Memory model: MEMORY_MODEL.md
+      - Strict types: STRICT_TYPES.md
+      - Kern scan: KERN_SCAN.md
+      - Implementation summary: IMPLEMENTATION_SUMMARY.md
+      - Release checklist: RELEASE_CHECKLIST.md
+      - Stress tests plan: STRESS_TESTS_PLAN.md
+      - Nested kern tree removed: NESTED_KERN_TREE_REMOVED.md
+
+# Docs link to repo-root files (README, src/, RELEASE.md); those live outside docs_dir.
+validation:
+  links:
+    not_found: ignore
+    unrecognized_links: ignore
+
+markdown_extensions:
+  - toc:
+      permalink: true
