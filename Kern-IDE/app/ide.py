@@ -1,16 +1,42 @@
 from __future__ import annotations
 
 import os
-import threading
+import platform
+import shutil
+import subprocess
+from collections.abc import Callable
 from pathlib import Path
-from tkinter import BOTH, BOTTOM, END, HORIZONTAL, LEFT, RIGHT, TOP, VERTICAL, X, Y, BooleanVar, Menu, Text, Tk, filedialog, messagebox, simpledialog
-from tkinter import ttk
+from tkinter import (
+    BOTH,
+    BOTTOM,
+    END,
+    HORIZONTAL,
+    LEFT,
+    Listbox,
+    RIGHT,
+    TOP,
+    VERTICAL,
+    X,
+    BooleanVar,
+    Menu,
+    Text,
+    Tk,
+    Toplevel,
+    filedialog,
+    messagebox,
+    simpledialog,
+    ttk,
+)
+
+from services.diagnostics import format_problem_line
 
 from .editor import EditorTab
 from .filesystem import FileExplorer
 from .runner import KernRunner
 from .state import load_state, save_state
 from .theme import Theme, resolve_theme
+from ui.command_palette import show_command_palette
+from ui.tooltip import ToolTip
 
 
 def default_workspace_root() -> Path:
@@ -31,16 +57,28 @@ class KernIDE:
         self.workspace_root = default_workspace_root()
         self.state_path = self.workspace_root / ".kern-ide-state.json"
         self.state = load_state(self.state_path)
+        ws = self.state.get("workspace_root")
+        if ws:
+            p = Path(str(ws))
+            if p.is_dir():
+                self.workspace_root = p.resolve()
+        self.state_path = self.workspace_root / ".kern-ide-state.json"
+        self.state = load_state(self.state_path)
 
         self.dark_mode = bool(self.state.get("dark_mode", True))
         self.show_explorer = BooleanVar(value=bool(self.state.get("show_explorer", True)))
         self.show_console = BooleanVar(value=bool(self.state.get("show_console", True)))
         self.show_debug = BooleanVar(value=bool(self.state.get("show_debug", False)))
+        self.editor_font_size = int(self.state.get("editor_font_size", 11))
+        self.autosave_ms = int(self.state.get("autosave_ms", 4000))
+        self._autosave_job: str | None = None
 
         self.theme: Theme = resolve_theme(self.dark_mode)
         self.runner = KernRunner()
         self.editors: dict[str, EditorTab] = {}
         self.untitled_count = 1
+        self._problem_items: list[dict[str, object]] = []
+        self._tooltips: list[ToolTip] = []
 
         self._build_styles()
         self._build_menu()
@@ -50,6 +88,7 @@ class KernIDE:
         self._update_layout()
         self.explorer.refresh()
         self.new_file()
+        self.root.after(300, self._maybe_show_onboarding)
 
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -66,9 +105,12 @@ class KernIDE:
         file_menu = Menu(menubar, tearoff=0)
         file_menu.add_command(label="New", command=self.new_file, accelerator="Ctrl+N")
         file_menu.add_command(label="Open...", command=self.open_file, accelerator="Ctrl+O")
+        file_menu.add_command(label="Open workspace…", command=self.choose_workspace)
         file_menu.add_separator()
         file_menu.add_command(label="Save", command=self.save_current, accelerator="Ctrl+S")
         file_menu.add_command(label="Save As...", command=self.save_current_as)
+        file_menu.add_separator()
+        file_menu.add_command(label="Preferences…", command=self.show_preferences)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self._on_close)
         menubar.add_cascade(label="File", menu=file_menu)
@@ -83,7 +125,7 @@ class KernIDE:
 
         run_menu = Menu(menubar, tearoff=0)
         run_menu.add_command(label="Run", command=self.run_current, accelerator="F5")
-        run_menu.add_command(label="Check", command=self.check_current)
+        run_menu.add_command(label="Check", command=self.check_current, accelerator="Ctrl+K")
         run_menu.add_command(label="Stop", command=self.stop_run, accelerator="Shift+F5")
         run_menu.add_separator()
         run_menu.add_command(label="Clear Output", command=self.clear_output)
@@ -94,10 +136,14 @@ class KernIDE:
         view_menu.add_checkbutton(label="Show console", variable=self.show_console, command=self._update_layout)
         view_menu.add_checkbutton(label="Show debugger panel", variable=self.show_debug, command=self._update_layout)
         view_menu.add_separator()
-        view_menu.add_command(label="Toggle light/dark mode", command=self.toggle_theme)
+        view_menu.add_command(label="Toggle light/dark mode", command=self.toggle_theme, accelerator="Ctrl+Shift+T")
+        view_menu.add_command(label="Command Palette…", command=self.open_command_palette, accelerator="Ctrl+Shift+P")
         menubar.add_cascade(label="View", menu=view_menu)
 
         help_menu = Menu(menubar, tearoff=0)
+        help_menu.add_command(label="Quick start", command=self.show_quick_start)
+        help_menu.add_command(label="Keyboard shortcuts", command=self.show_shortcuts_help)
+        help_menu.add_separator()
         help_menu.add_command(label="About Kern IDE", command=self._show_about)
         menubar.add_cascade(label="Help", menu=help_menu)
         self.root.config(menu=menubar)
@@ -107,10 +153,22 @@ class KernIDE:
         self.toolbar.pack(side=TOP, fill=X, padx=8, pady=(8, 4))
         self.app_title = ttk.Label(self.toolbar, text="Kern IDE", anchor="w")
         self.app_title.pack(side=LEFT, padx=(0, 12))
-        ttk.Button(self.toolbar, text="Run", command=self.run_current).pack(side=LEFT, padx=(0, 6))
-        ttk.Button(self.toolbar, text="Check", command=self.check_current).pack(side=LEFT, padx=(0, 6))
-        ttk.Button(self.toolbar, text="Stop", command=self.stop_run).pack(side=LEFT, padx=(0, 10))
-        ttk.Button(self.toolbar, text="Clear output", command=self.clear_output).pack(side=LEFT)
+        self.btn_run = ttk.Button(self.toolbar, text="Run", command=self.run_current)
+        self.btn_run.pack(side=LEFT, padx=(0, 6))
+        self.btn_check = ttk.Button(self.toolbar, text="Check", command=self.check_current)
+        self.btn_check.pack(side=LEFT, padx=(0, 6))
+        self.btn_stop = ttk.Button(self.toolbar, text="Stop", command=self.stop_run)
+        self.btn_stop.pack(side=LEFT, padx=(0, 10))
+        self.btn_clear = ttk.Button(self.toolbar, text="Clear output", command=self.clear_output)
+        self.btn_clear.pack(side=LEFT, padx=(0, 10))
+        ttk.Button(self.toolbar, text="Palette", command=self.open_command_palette).pack(side=LEFT)
+
+        self._tooltips = [
+            ToolTip(self.btn_run, "Run the current file with kern.exe (F5)"),
+            ToolTip(self.btn_check, "Run kern --check on the current file (Ctrl+K)"),
+            ToolTip(self.btn_stop, "Stop the running process (Shift+F5)"),
+            ToolTip(self.btn_clear, "Clear console and problems list"),
+        ]
 
         self.main_vertical = ttk.Panedwindow(self.root, orient=VERTICAL)
         self.main_vertical.pack(side=TOP, fill=BOTH, expand=True, padx=8, pady=(0, 6))
@@ -125,11 +183,14 @@ class KernIDE:
         self.tree = ttk.Treeview(self.explorer_frame, show="tree")
         self.tree.pack(fill=BOTH, expand=True, padx=8, pady=(0, 8))
         self.tree.bind("<Double-1>", self._on_tree_open)
+        self.tree.bind("<Button-3>", self._explorer_context)
         self.explorer = FileExplorer(self.tree, self.workspace_root)
         self.tree.bind("<<TreeviewOpen>>", lambda e: self.explorer.on_tree_open(e))
 
         self.editor_frame = ttk.Frame(self.top_horizontal)
         self.top_horizontal.add(self.editor_frame, weight=6)
+        self.breadcrumb = ttk.Label(self.editor_frame, anchor="w", style="Section.TLabel")
+        self.breadcrumb.pack(fill=X, padx=6, pady=(2, 0))
         self.tabs = ttk.Notebook(self.editor_frame)
         self.tabs.pack(fill=BOTH, expand=True)
         self.tabs.bind("<<NotebookTabChanged>>", lambda _e: self._refresh_status())
@@ -139,13 +200,21 @@ class KernIDE:
         self.debug_label.pack(fill=X, padx=6, pady=(8, 4))
         self.debug_text = Text(self.debug_frame, height=8, wrap="word", relief="flat")
         self.debug_text.pack(fill=BOTH, expand=True, padx=6, pady=(0, 6))
-        self.debug_text.insert("1.0", "Debugger panel\n\nVariables and stack info will appear here while running.")
+        self.debug_text.insert("1.0", "Debugger panel\n\nBreakpoints / step execution are not wired yet.\nShows file + cursor context when enabled.")
         self.debug_text.configure(state="disabled")
 
         self.console_frame = ttk.Frame(self.main_vertical, height=180)
         self.main_vertical.add(self.console_frame, weight=1)
-        self.console_label = ttk.Label(self.console_frame, text="Console output", anchor="w")
+        self.console_label = ttk.Label(self.console_frame, text="Output", anchor="w")
         self.console_label.pack(fill=X, padx=8, pady=(6, 2))
+
+        self.problems_frame = ttk.Frame(self.console_frame)
+        self.problems_label = ttk.Label(self.problems_frame, text="Problems (double-click to jump)", anchor="w", style="Section.TLabel")
+        self.problems_label.pack(fill=X, padx=0, pady=(0, 2))
+        self.problems_list = Listbox(self.problems_frame, height=4, relief="flat", borderwidth=0, highlightthickness=0)
+        self.problems_list.pack(fill=X)
+        self.problems_list.bind("<Double-Button-1>", self._on_problem_double_click)
+
         self.console = Text(self.console_frame, height=10, wrap="word", relief="flat")
         self.console.pack(fill=BOTH, expand=True, padx=8, pady=(0, 8))
         self.console.configure(state="disabled")
@@ -157,8 +226,239 @@ class KernIDE:
         self.root.bind("<Control-n>", lambda e: (self.new_file(), "break")[1])
         self.root.bind("<Control-o>", lambda e: (self.open_file(), "break")[1])
         self.root.bind("<Control-s>", lambda e: (self.save_current(), "break")[1])
+        self.root.bind("<Control-k>", lambda e: (self.check_current(), "break")[1])
         self.root.bind("<F5>", lambda e: (self.run_current(), "break")[1])
         self.root.bind("<Shift-F5>", lambda e: (self.stop_run(), "break")[1])
+        self.root.bind("<Control-Shift-P>", lambda e: (self.open_command_palette(), "break")[1])
+        self.root.bind("<Control-grave>", lambda e: (self._toggle_console(), "break")[1])
+        self.root.bind("<Control-Shift-T>", lambda e: (self.toggle_theme(), "break")[1])
+
+    def _toggle_console(self) -> None:
+        self.show_console.set(not self.show_console.get())
+        self._update_layout()
+
+    def open_command_palette(self) -> None:
+        cmds: list[tuple[str, Callable[[], None]]] = [
+            ("Run: Run current program", self.run_current),
+            ("Run: Check current file (kern --check)", self.check_current),
+            ("Run: Stop", self.stop_run),
+            ("Run: Clear output", self.clear_output),
+            ("File: New", self.new_file),
+            ("File: Open…", self.open_file),
+            ("File: Save", self.save_current),
+            ("File: Save As…", self.save_current_as),
+            ("File: Open workspace…", self.choose_workspace),
+            ("File: Preferences…", self.show_preferences),
+            ("View: Toggle file explorer", lambda: (self.show_explorer.set(not self.show_explorer.get()), self._update_layout())),
+            ("View: Toggle console", self._toggle_console),
+            ("View: Toggle debugger panel", lambda: (self.show_debug.set(not self.show_debug.get()), self._update_layout())),
+            ("View: Toggle light/dark theme", self.toggle_theme),
+            ("Help: Quick start", self.show_quick_start),
+            ("Help: Keyboard shortcuts", self.show_shortcuts_help),
+            ("System: Open workspace folder in file manager", self.open_workspace_in_os),
+        ]
+        show_command_palette(self.root, self.theme, "Command Palette", cmds)
+
+    def choose_workspace(self) -> None:
+        d = filedialog.askdirectory(title="Choose workspace folder", initialdir=str(self.workspace_root))
+        if not d:
+            return
+        self.workspace_root = Path(d).resolve()
+        self.state_path = self.workspace_root / ".kern-ide-state.json"
+        merged = load_state(self.state_path)
+        self.state.update(merged)
+        self.explorer.set_root(self.workspace_root)
+        self.explorer.refresh()
+        self._save_state()
+        self._refresh_status()
+
+    def open_workspace_in_os(self) -> None:
+        p = str(self.workspace_root)
+        try:
+            if platform.system() == "Windows":
+                os.startfile(p)  # noqa: S606
+            elif platform.system() == "Darwin":
+                subprocess.Popen(["open", p])
+            else:
+                subprocess.Popen(["xdg-open", p])
+        except Exception as exc:
+            messagebox.showerror("Open folder", str(exc))
+
+    def show_preferences(self) -> None:
+        win = Toplevel(self.root)
+        win.title("Preferences")
+        win.transient(self.root)
+        win.configure(bg=self.theme.panel)
+        fsize = ttk.Scale(win, from_=9, to=22, orient=HORIZONTAL)
+        fsize.set(self.editor_font_size)
+        ttk.Label(win, text="Editor font size").pack(anchor="w", padx=12, pady=(12, 4))
+        fsize.pack(fill=X, padx=12)
+        auto_var = ttk.Entry(win)
+        auto_var.insert(0, str(self.autosave_ms))
+        ttk.Label(win, text="Autosave delay (ms, 0 = off)").pack(anchor="w", padx=12, pady=(12, 4))
+        auto_var.pack(fill=X, padx=12)
+
+        def save_prefs() -> None:
+            try:
+                self.editor_font_size = int(round(float(fsize.get())))
+            except Exception:
+                self.editor_font_size = 11
+            try:
+                self.autosave_ms = max(0, int(auto_var.get().strip() or "0"))
+            except Exception:
+                self.autosave_ms = 4000
+            for ed in self.editors.values():
+                ed.set_font_size(self.editor_font_size)
+            self._save_state()
+            win.destroy()
+
+        ttk.Button(win, text="OK", command=save_prefs).pack(pady=12)
+
+    def show_quick_start(self) -> None:
+        win = Toplevel(self.root)
+        win.title("Welcome to Kern IDE")
+        win.transient(self.root)
+        win.geometry("520x420")
+        txt = Text(win, wrap="word", font=("Segoe UI", 10), padx=12, pady=12)
+        txt.pack(fill=BOTH, expand=True)
+        body = (
+            "Welcome\n\n"
+            "1. This window is your workspace — use File → Open workspace… to point at a Kern checkout "
+            "(the folder that contains lib/kern and your examples).\n\n"
+            "2. Create or open a .kn file, edit in the center, and press Run (or F5) to execute with kern.exe.\n\n"
+            "3. Check (Ctrl+K) runs the compiler diagnostics; issues appear under Problems — double-click to jump.\n\n"
+            "4. Set KERN_EXE in the environment if kern.exe is not found next to the IDE.\n\n"
+            "5. Command Palette: Ctrl+Shift+P for all actions.\n"
+        )
+        txt.insert("1.0", body)
+        txt.configure(state="disabled")
+
+        def ok() -> None:
+            self.state["onboarding_done"] = True
+            self._save_state()
+            win.destroy()
+
+        ttk.Button(win, text="Got it", command=ok).pack(pady=8)
+
+    def _maybe_show_onboarding(self) -> None:
+        if self.state.get("onboarding_done"):
+            return
+        self.show_quick_start()
+
+    def show_shortcuts_help(self) -> None:
+        messagebox.showinfo(
+            "Keyboard shortcuts",
+            "Ctrl+N — New file\n"
+            "Ctrl+O — Open file\n"
+            "Ctrl+S — Save\n"
+            "Ctrl+K — Check (kern --check)\n"
+            "F5 — Run\n"
+            "Shift+F5 — Stop\n"
+            "Ctrl+Shift+P — Command palette\n"
+            "Ctrl+` — Toggle console\n"
+            "Ctrl+Shift+T — Toggle theme\n"
+            "Ctrl+Space — Autocomplete",
+        )
+
+    def _explorer_context(self, event: object) -> None:
+        row = self.tree.identify_row(event.y)  # type: ignore[attr-defined]
+        if not row:
+            return
+        path = self.explorer.path_for_node(row)
+        if not path:
+            return
+        menu = Menu(self.root, tearoff=0)
+        if path.is_dir():
+            menu.add_command(label="New file here…", command=lambda: self._explorer_new_file(path))
+        else:
+            menu.add_command(label="Open", command=lambda: self._open_path(path))
+        menu.add_command(label="Rename…", command=lambda: self._explorer_rename(path))
+        menu.add_command(label="Delete…", command=lambda: self._explorer_delete(path))
+        try:
+            menu.tk_popup(event.x_root, event.y_root)  # type: ignore[attr-defined]
+        finally:
+            menu.grab_release()
+
+    def _explorer_new_file(self, dir_path: Path) -> None:
+        name = simpledialog.askstring("New file", "File name (e.g. main.kn):", parent=self.root)
+        if not name:
+            return
+        name = name.strip()
+        if not name.endswith(".kn"):
+            name += ".kn"
+        dest = (dir_path / name).resolve()
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if dest.exists():
+                messagebox.showerror("New file", "File already exists.")
+                return
+            dest.write_text('print("hello")\n', encoding="utf-8")
+        except Exception as exc:
+            messagebox.showerror("New file", str(exc))
+            return
+        self.explorer.refresh()
+        self._open_path(dest)
+
+    def _explorer_rename(self, path: Path) -> None:
+        new_name = simpledialog.askstring("Rename", "New name:", initialvalue=path.name, parent=self.root)
+        if not new_name or new_name.strip() == path.name:
+            return
+        dest = path.parent / new_name.strip()
+        try:
+            path.rename(dest)
+        except Exception as exc:
+            messagebox.showerror("Rename", str(exc))
+            return
+        for ed in self.editors.values():
+            if ed.file_path == path:
+                ed.file_path = dest
+                self._refresh_tab_title(ed)
+        self.explorer.refresh()
+
+    def _explorer_delete(self, path: Path) -> None:
+        if not messagebox.askyesno("Delete", f"Delete {path.name}?"):
+            return
+        try:
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+        except Exception as exc:
+            messagebox.showerror("Delete", str(exc))
+            return
+        to_close = [tid for tid, ed in self.editors.items() if ed.file_path == path]
+        for tid in to_close:
+            self.tabs.forget(tid)
+            del self.editors[tid]
+        if not self.editors:
+            self.new_file()
+        else:
+            self.tabs.select(list(self.editors.keys())[0])
+        self.explorer.refresh()
+        self._refresh_status()
+
+    def _schedule_autosave(self) -> None:
+        if self.autosave_ms <= 0:
+            return
+        if self._autosave_job is not None:
+            try:
+                self.root.after_cancel(self._autosave_job)
+            except Exception:
+                pass
+        self._autosave_job = self.root.after(self.autosave_ms, self._do_autosave)
+
+    def _do_autosave(self) -> None:
+        self._autosave_job = None
+        ed = self._current_editor()
+        if not ed.is_dirty or ed.file_path is None:
+            return
+        try:
+            ed.file_path.write_text(ed.get_content(), encoding="utf-8")
+            ed.is_dirty = False
+            self._refresh_tab_title(ed)
+            self._append_output(f"[autosave] {ed.file_path.name}\n")
+        except Exception as exc:
+            self._append_output(f"[autosave failed] {exc}\n")
 
     def _apply_theme(self) -> None:
         t = self.theme
@@ -172,6 +472,8 @@ class KernIDE:
         self.explorer_label.configure(style="Section.TLabel")
         self.console_label.configure(style="Section.TLabel")
         self.debug_label.configure(style="Section.TLabel")
+        self.problems_label.configure(style="Section.TLabel")
+        self.breadcrumb.configure(style="Section.TLabel")
         self.style.configure("TButton", background=t.button, foreground=t.text, padding=(10, 6))
         self.style.map("TButton", background=[("active", t.button_hover)])
         self.style.configure("Treeview", background=t.editor, fieldbackground=t.editor, foreground=t.text)
@@ -186,6 +488,7 @@ class KernIDE:
         )
 
         self.console.configure(bg=t.editor, fg=t.text, insertbackground=t.text)
+        self.problems_list.configure(bg=t.editor, fg=t.text, selectbackground=t.accent, selectforeground="#ffffff")
         self.debug_text.configure(bg=t.editor, fg=t.text, insertbackground=t.text)
         self.status.configure(background=t.status_bg, foreground=t.text, padding=(8, 4))
         for ed in self.editors.values():
@@ -218,10 +521,17 @@ class KernIDE:
         self.dark_mode = not self.dark_mode
         self.theme = resolve_theme(self.dark_mode)
         self._apply_theme()
+        self._save_state()
 
     def _new_editor_tab(self, title: str, content: str = "", file_path: Path | None = None) -> EditorTab:
         container = ttk.Frame(self.tabs)
-        editor = EditorTab(container, self.theme, on_cursor_change=self._refresh_status)
+        editor = EditorTab(
+            container,
+            self.theme,
+            on_cursor_change=self._refresh_status,
+            on_buffer_change=self._schedule_autosave,
+        )
+        editor.set_font_size(self.editor_font_size)
         editor.container.pack(fill=BOTH, expand=True)
         editor.load_content(content, file_path)
         self.tabs.add(container, text=title)
@@ -239,6 +549,16 @@ class KernIDE:
         if editor.file_path:
             return editor.file_path.name + (" *" if editor.is_dirty else "")
         return f"untitled-{self.untitled_count}" + (" *" if editor.is_dirty else "")
+
+    def _refresh_breadcrumb(self, editor: EditorTab) -> None:
+        try:
+            rel = editor.file_path.relative_to(self.workspace_root) if editor.file_path else None
+        except Exception:
+            rel = editor.file_path
+        if rel:
+            self.breadcrumb.configure(text=f"{self.workspace_root.name}  ›  {rel}")
+        else:
+            self.breadcrumb.configure(text=f"{self.workspace_root.name}  ›  (unsaved buffer)")
 
     def _refresh_tab_title(self, editor: EditorTab) -> None:
         for tab_id, ed in self.editors.items():
@@ -334,18 +654,48 @@ class KernIDE:
         if err:
             self._append_output(f"check failed: {err}\n")
             editor.apply_diagnostics([])
+            self._set_problems([])
             return
         editor.apply_diagnostics(diagnostics)
+        self._set_problems(diagnostics)
         err_count = len([d for d in diagnostics if str(d.get("kind", "error")).lower() in {"error", "critical"}])
         if diagnostics:
             self._append_output(f"check completed: {len(diagnostics)} issue(s), {err_count} error(s)\n")
         else:
             self._append_output("check completed: no issues\n")
 
+    def _set_problems(self, items: list[dict[str, object]]) -> None:
+        self._problem_items = list(items)
+        self.problems_list.delete(0, END)
+        fp = ""
+        ed = self._current_editor()
+        if ed.file_path:
+            fp = str(ed.file_path)
+        for it in items:
+            self.problems_list.insert(END, format_problem_line(it, fallback_file=fp))
+        if items:
+            self.problems_frame.pack(fill=X, padx=8, pady=(0, 4), before=self.console)
+        else:
+            self.problems_frame.pack_forget()
+
+    def _on_problem_double_click(self, _event: object) -> None:
+        sel = self.problems_list.curselection()
+        if not sel:
+            return
+        i = int(sel[0])
+        if i < 0 or i >= len(self._problem_items):
+            return
+        it = self._problem_items[i]
+        line = int(it.get("line", 0) or 0)
+        col = int(it.get("column", 0) or 0)
+        if line > 0:
+            self._current_editor().jump_to_line(line, max(1, col))
+
     def clear_output(self) -> None:
         self.console.configure(state="normal")
         self.console.delete("1.0", END)
         self.console.configure(state="disabled")
+        self._set_problems([])
 
     def _append_output(self, text: str) -> None:
         self.console.configure(state="normal")
@@ -388,7 +738,13 @@ class KernIDE:
         line, col = idx.split(".")
         file_name = str(editor.file_path.name) if editor.file_path else "untitled"
         self._refresh_tab_title(editor)
-        self.status.configure(text=f"{file_name}    line {line}, col {int(col) + 1}    root: {self.workspace_root}")
+        self._refresh_breadcrumb(editor)
+        hint = editor.diagnostic_at_cursor()
+        base = f"{file_name}    line {line}, col {int(col) + 1}    {self.workspace_root}"
+        if hint:
+            self.status.configure(text=f"{base}    |    {hint}")
+        else:
+            self.status.configure(text=base)
         if self.show_debug.get():
             self.debug_text.configure(state="normal")
             self.debug_text.delete("1.0", END)
@@ -405,8 +761,25 @@ class KernIDE:
     def _show_about(self) -> None:
         messagebox.showinfo(
             "About Kern IDE",
-            "Kern IDE\n\nMinimal, beginner-friendly editor for Kern.\n\nShortcuts:\n- F5 run\n- Shift+F5 stop\n- Ctrl+N new file\n- Ctrl+O open file\n- Ctrl+S save",
+            "Kern IDE — Tk-based editor for the Kern language.\n\n"
+            "F5 run · Ctrl+K check · Ctrl+Shift+P palette · Ctrl+` toggle console\n"
+            "See Help → Quick start for a short tour.",
         )
+
+    def _persist_dict(self) -> dict:
+        return {
+            "dark_mode": self.dark_mode,
+            "show_explorer": self.show_explorer.get(),
+            "show_console": self.show_console.get(),
+            "show_debug": self.show_debug.get(),
+            "workspace_root": str(self.workspace_root),
+            "editor_font_size": self.editor_font_size,
+            "autosave_ms": self.autosave_ms,
+            "onboarding_done": bool(self.state.get("onboarding_done", False)),
+        }
+
+    def _save_state(self) -> None:
+        save_state(self.state_path, self._persist_dict())
 
     def _on_close(self) -> None:
         unsaved = [ed for ed in self.editors.values() if ed.is_dirty]
@@ -414,16 +787,7 @@ class KernIDE:
             ok = messagebox.askyesno("Unsaved changes", "You have unsaved files. Close anyway?")
             if not ok:
                 return
-        save_state(
-            self.state_path,
-            {
-                "dark_mode": self.dark_mode,
-                "show_explorer": self.show_explorer.get(),
-                "show_console": self.show_console.get(),
-                "show_debug": self.show_debug.get(),
-                "workspace_root": str(self.workspace_root),
-            },
-        )
+        self._save_state()
         self.stop_run()
         self.root.destroy()
 
@@ -433,4 +797,3 @@ def launch() -> int:
     KernIDE(root)
     root.mainloop()
     return 0
-

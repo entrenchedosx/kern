@@ -4,36 +4,6 @@ on:
   push:
     branches: [main, master]
     paths:
-      - "kern-ide/**"
-      - ".github/workflows/kern-ide-tk.yml"
-  pull_request:
-    branches: [main, master]
-    paths:
-      - "kern-ide/**"
-      - ".github/workflows/kern-ide-tk.yml"
-
-jobs:
-  desktop-tk:
-    runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: kern-ide
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Compile and import smoke
-        run: |
-          python -m compileall -q .
-          python -c "from app.ide import KernIDE; from tkinter import Tk; r=Tk(); r.withdraw(); KernIDE(r); r.destroy(); print('ok')"
-
-name: Kern-IDE (Tk smoke)
-
-on:
-  push:
-    branches: [main, master]
-    paths:
       - "Kern-IDE/app/**"
       - "Kern-IDE/main.py"
       - "Kern-IDE/packaging/**"

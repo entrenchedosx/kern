@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from tkinter import END, INSERT, RIGHT, VERTICAL, Y, Canvas, Frame, Listbox, Scrollbar, Text, Toplevel
-from typing import Callable
+from collections.abc import Callable
 
 from .theme import Theme
 
@@ -28,11 +28,18 @@ class EditorDiagnostics:
 
 
 class EditorTab:
-    def __init__(self, parent: Frame, theme: Theme, on_cursor_change: Callable[[], None]) -> None:
+    def __init__(
+        self,
+        parent: Frame,
+        theme: Theme,
+        on_cursor_change: Callable[[], None],
+        on_buffer_change: Callable[[], None] | None = None,
+    ) -> None:
         self.file_path: Path | None = None
         self.is_dirty = False
         self._theme = theme
         self._on_cursor_change = on_cursor_change
+        self._on_buffer_change = on_buffer_change
         self._autocomplete: Toplevel | None = None
         self._autocomplete_list: Listbox | None = None
         self._diagnostics: list[EditorDiagnostics] = []
@@ -122,6 +129,8 @@ class EditorTab:
         self.highlight_syntax()
         self.refresh_line_numbers()
         self._on_cursor_change()
+        if self._on_buffer_change:
+            self._on_buffer_change()
 
     def _on_return(self, _event: object) -> str:
         line_start = self.text.index("insert linestart")
@@ -185,9 +194,40 @@ class EditorTab:
             line_end = int(item.get("lineEnd", line) or line)
             col_end = int(item.get("columnEnd", col + 1) or (col + 1))
             message = str(item.get("message", ""))
+            hint = str(item.get("hint", "") or "").strip()
+            if hint:
+                message = f"{message} — {hint}"
             if line > 0:
                 self._diagnostics.append(EditorDiagnostics(line, max(1, col), max(line, line_end), max(1, col_end), message))
         self._apply_diagnostic_tags()
+
+    def diagnostic_at_cursor(self) -> str | None:
+        idx = self.text.index("insert")
+        line = int(idx.split(".")[0])
+        for d in self._diagnostics:
+            if d.line <= line <= d.line_end:
+                return d.message
+        return None
+
+    def jump_to_line(self, line: int, col: int = 1) -> None:
+        if line < 1:
+            line = 1
+        col = max(1, col)
+        pos = f"{line}.{col - 1}"
+        try:
+            self.text.see(pos)
+            self.text.mark_set("insert", pos)
+            self.text.focus_set()
+            self.refresh_line_numbers()
+            self._on_cursor_change()
+        except Exception:
+            pass
+
+    def set_font_size(self, size: int) -> None:
+        size = max(8, min(28, int(size)))
+        self.text.configure(font=("Consolas", size))
+        self.line_canvas.delete("all")
+        self.refresh_line_numbers()
 
     def _apply_diagnostic_tags(self) -> None:
         self.text.tag_remove("error", "1.0", END)
