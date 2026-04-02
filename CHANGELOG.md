@@ -8,9 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.4] - 2026-04-02
+
+### Fixed
+
+- **CI:** Windows **Release** and **Windows Kern** workflows no longer run `kern test tests/coverage` or g3d window smokes on GitHub-hosted runners (no OpenGL / GLFW window). Use a local machine for full graphics + coverage runs.
+- **CI:** Release workflow publishes the Windows zip to **GitHub Releases** via `softprops/action-gh-release` (tag push or manual dispatch).
+
 ### Changed
 
-- **CI:** Windows workflows skip full `tests/coverage` and g3d smoke on GitHub-hosted runners (no OpenGL window); use local `kern test tests/coverage` for full suite.
+- Version bump only (supersedes failed automated publish for `v1.0.3` on headless runners).
 
 ---
 
