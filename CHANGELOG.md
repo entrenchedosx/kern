@@ -8,14 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.3] - 2026-04-02
+
 ### Added
 
-- **Docs:** GitHub-oriented [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), [docs/LANGUAGE_SYNTAX.md](docs/LANGUAGE_SYNTAX.md), [docs/BUILTIN_REFERENCE.md](docs/BUILTIN_REFERENCE.md), [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md).
-- **CI:** [`.github/workflows/release.yml`](.github/workflows/release.yml) builds `kern`, `kernc`, `kern-scan` on `v*` tags and uploads a Windows zip artifact; [windows-kern.yml](.github/workflows/windows-kern.yml) now builds `kern-scan`, runs `kern --scan --registry-only`, and `tests/std_v1_builtins_smoke.kn`.
+- **VM / modules:** Versioned **`std.v1.*`** stdlib modules (`std.v1.math`, `std.v1.string`, `std.v1.bytes`, `std.v1.collections`, plus fs/process/time re-exports); append-only **`std_*`** native builtins ([`src/vm/std_builtins_v1.inl`](src/vm/std_builtins_v1.inl), [`src/stdlib_stdv1_exports.hpp`](src/stdlib_stdv1_exports.hpp)).
+- **CLI / tooling:** **`kern --scan`** and **`kern-scan`** — builtin registry + stdlib export validation + compile-time static analysis ([`docs/KERN_SCAN.md`](docs/KERN_SCAN.md)).
+- **Kern library:** Large **`lib/kern/stdlib/`** catalog (algorithms, collections, graph helpers, encoding, text, time, …).
+- **IDE sources:** **`Kern-IDE/`** desktop IDE layout (Python); VS Code extension under **`editors/vscode-kern/`**.
+- **Docs:** [README](README.md) refresh, [CONTRIBUTING](CONTRIBUTING.md), [LANGUAGE_SYNTAX](docs/LANGUAGE_SYNTAX.md), [BUILTIN_REFERENCE](docs/BUILTIN_REFERENCE.md), [RELEASE_CHECKLIST](docs/RELEASE_CHECKLIST.md), [STDLIB_STD_V1](docs/STDLIB_STD_V1.md).
+- **CI:** [`.github/workflows/release.yml`](.github/workflows/release.yml) — Windows build + zip artifact on **`v*`** tags; [windows-kern.yml](.github/workflows/windows-kern.yml) builds **`kern-scan`**, runs **`kern --scan --registry-only`** and smoke tests.
 
 ### Changed
 
-- **Repository layout:** Language toolchain and **Kern-IDE** are split in-tree: editor sources live under **`Kern-IDE/`** (desktop Tk, `native-qt`, `vscode-extension`). The nested duplicate **`kern/`** tree and **`editors/vscode-kern/`** were removed; Qt IDE is **`Kern-IDE/native-qt/`** (`kern-ide-qt.exe`). Root **CMake** no longer builds a native IDE; **`vcpkg.json`** drops the `native-ide` feature. Added root **`LICENSE`** (MIT). See **`docs/NESTED_KERN_TREE_REMOVED.md`**.
+- **Layout:** Editor and toolchain boundaries documented; see [NESTED_KERN_TREE_REMOVED.md](docs/NESTED_KERN_TREE_REMOVED.md) for history.
 
 ---
 
