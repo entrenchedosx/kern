@@ -1,6 +1,7 @@
 #ifndef KERN_UTILS_BUILD_CACHE_HPP
 #define KERN_UTILS_BUILD_CACHE_HPP
 
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 
