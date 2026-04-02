@@ -22,6 +22,7 @@ This repository is the **language and toolchain** (compiler, VM, stdlib, tests, 
 - [Testing](#testing)
 - [Releases & versioning](#releases--versioning)
 - [Contributing](#contributing)
+- [Donations](#donations)
 - [License](#license)
 
 ---
@@ -183,6 +184,18 @@ See [docs/TESTING.md](docs/TESTING.md) for example sweeps, `kernc` tests, and st
 ## Contributing
 
 See **[CONTRIBUTING.md](CONTRIBUTING.md)** for coding expectations, how to run tests, and pull request basics.
+
+---
+
+## Donations
+
+If Kern is useful to you, optional tips are welcome. **Always verify** the address in your wallet before sending; on-chain transfers are irreversible.
+
+| Network | Address |
+|---------|---------|
+| **Bitcoin** | `bc1qpzg22xmhzkchkwc96wxm9ge5x4a8kat7gxs6u7` |
+| **Ethereum** | `0xE2F8Ac9D4e636115a47f0c12B42292a2A9E37f8F` |
+| **Solana** | `9ivTpFL42Y7qJ8W66J1uycZyQXubHiyaWTv3o5Mj2gab` |
 
 ---
 
