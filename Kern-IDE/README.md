@@ -2,6 +2,8 @@
 
 A **small, self-contained** desktop editor for the [Kern](https://github.com/entrenchedosx/kern) language: tabbed editor, workspace file tree, integrated run/check against `kern.exe`, syntax highlighting, diagnostics, and a command palette.
 
+**Standalone home (Tk + Qt + VS Code tooling):** [github.com/entrenchedosx/kern-IDE](https://github.com/entrenchedosx/kern-IDE) — this Tk app is published there under **`desktop-tk/`** (see *Publishing* below).
+
 ## Requirements
 
 - **Python 3.10+** with Tkinter (included with the official Windows/macOS installers; on Linux install `python3-tk`).
@@ -43,17 +45,31 @@ The IDE picks a default **workspace root** (the Kern repo root when running from
 
 See `packaging/` for PyInstaller specs (`kern-ide.spec`). Build a one-folder or one-file bundle after installing PyInstaller.
 
-## Publishing to a dedicated **kern-IDE** GitHub repo
+## Publishing to [entrenchedosx/kern-IDE](https://github.com/entrenchedosx/kern-IDE.git)
 
-This tree often lives under the main Kern repository as `Kern-IDE/`. To mirror **only** this subtree to another remote (replace URL and branch names as needed):
+That repository uses a multi-package layout:
 
-```bash
-git subtree split --prefix=Kern-IDE -b kern-ide-export
-git remote add kern-ide https://github.com/YOUR_ORG/kern-IDE.git
-git push kern-ide kern-ide-export:main
+| Folder | Contents |
+|--------|----------|
+| **`desktop-tk/`** | This Tk desktop IDE (mirror of monorepo `Kern-IDE/`) |
+| `native-qt/` | Native Qt tooling |
+| `vscode-extension/` | VS Code extension |
+
+**Recommended:** clone the standalone repo, **sync** the monorepo `Kern-IDE/` into `desktop-tk/`, then commit and push:
+
+```powershell
+# From the main kern repo root (adjust -Destination to your clone path):
+git clone https://github.com/entrenchedosx/kern-IDE.git
+.\scripts\sync_kern_ide_to_desktop_tk.ps1 -Destination "D:\path\to\kern-IDE\desktop-tk"
+cd D:\path\to\kern-IDE
+git add desktop-tk
+git commit -m "Sync desktop-tk from kern monorepo"
+git push origin main
 ```
 
-Or use `git filter-repo` / manual copy. Ensure CI (`.github/workflows/kern-ide-tk.yml`) runs from the split repo root if you split it out.
+`git subtree push` from the monorepo targets the **root** of the remote and does **not** match `desktop-tk/`; use the script or a manual copy instead.
+
+CI for the Tk editor lives in the main kern repo (`.github/workflows/kern-ide-tk.yml`) and runs against `Kern-IDE/`.
 
 ## Code layout
 
