@@ -1,5 +1,9 @@
 # Getting started
 
+## Community
+
+**Discord:** [discord.gg/JBa4RfT2tE](https://discord.gg/JBa4RfT2tE) — official Kern server for help, language discussion, and tooling.
+
 ## Build
 
 From repo root:

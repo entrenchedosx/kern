@@ -1,0 +1,8 @@
+// Array module: avoid binding name "array" so the builtin array() stays usable.
+// Here we alias the module to Arr.
+let Arr = import("array")
+let xs = Arr.array(1, 2, 3, 4, 5)
+let doubled = Arr.map(xs, lambda (x) => x * 2)
+let evens = Arr.filter(xs, lambda (x) => x % 2 == 0)
+print("len doubled", len(doubled))
+print("evens first", evens[0])

@@ -29,6 +29,7 @@
 #include <vector>
 #include <algorithm>
 #include <cctype>
+#include <cstring>
 #include <cstdlib>
 #include <filesystem>
 #include <thread>
@@ -36,6 +37,7 @@
 #include <regex>
 #ifdef _WIN32
 #include <windows.h>
+#include "platform/win32_associate_kn.hpp"
 #endif
 
 using namespace kern;
@@ -299,6 +301,9 @@ static void printUsage(const char* prog) {
         << "Options:\n"
         << "  --version, -v          Show version and exit.\n"
         << "  --help, -h            Show this help and exit.\n"
+#ifdef _WIN32
+        << "  --repair-association  (Windows) Re-apply per-user .kn association, icon, and shell verbs; exit.\n"
+#endif
         << "  --check <file>        Compile only; exit 0 if OK.\n"
         << "  --check [--json] [--strict-types] <file>\n"
         << "                        Optional flags before or after the path. --json: stdout JSON only (no stderr spam).\n"
@@ -758,6 +763,15 @@ static int cmdWatch(VM& vm, const std::string& scriptPath) {
 }
 
 int main(int argc, char** argv) {
+#ifdef _WIN32
+    if (argc >= 2 && std::strcmp(argv[1], "--repair-association") == 0) {
+        kern::win32::repairKnFileAssociation();
+        return 0;
+    }
+    // One-time per-user: .kn → kern.exe, optional kern_logo.ico, Explorer refresh. No-op after
+    // %APPDATA%\\kern\\setup_done.flag exists, or if KERN_SKIP_FILE_ASSOCIATION is set.
+    kern::win32::maybeRegisterKnFileAssociation();
+#endif
     const char* prog = argc >= 1 ? argv[0] : "kern";
     int argBase = 1;
     bool vmTraceCli = false;

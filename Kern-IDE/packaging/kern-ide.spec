@@ -21,6 +21,8 @@ a = Analysis(
         "app.version_panel",
         "app.editor",
         "app.filesystem",
+        "app.ide_paths",
+        "app.ide_paths",
         "app.runner",
         "app.theme",
         "app.state",

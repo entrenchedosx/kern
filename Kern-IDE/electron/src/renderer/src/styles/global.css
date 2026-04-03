@@ -1,0 +1,70 @@
+:root {
+  --kern-bg: #1e1e1e;
+  --kern-surface: #252526;
+  --kern-border: #3c3c3c;
+  --kern-fg: #cccccc;
+  --kern-fg-muted: #858585;
+  --kern-accent: #007fd4;
+  --kern-activity: #333333;
+  --kern-tab-active: #1e1e1e;
+  --kern-tab-inactive: #2d2d2d;
+  --kern-status: #007acc;
+  --kern-font: 'Segoe UI', system-ui, sans-serif;
+  --kern-mono: 'Cascadia Code', 'Consolas', monospace;
+}
+
+[data-theme='light'] {
+  --kern-bg: #ffffff;
+  --kern-surface: #f3f3f3;
+  --kern-border: #e5e5e5;
+  --kern-fg: #3b3b3b;
+  --kern-fg-muted: #616161;
+  --kern-accent: #0066bf;
+  --kern-activity: #ececec;
+  --kern-tab-active: #ffffff;
+  --kern-tab-inactive: #ececec;
+  --kern-status: #0066bf;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--kern-font);
+  font-size: 13px;
+  color: var(--kern-fg);
+  background: var(--kern-bg);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: inherit;
+}
+
+button:focus-visible,
+[role='treeitem']:focus-visible,
+.palette-item:focus-visible {
+  outline: 2px solid var(--kern-accent);
+  outline-offset: 1px;
+}
+
+.kern-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.kern-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--kern-border);
+  border-radius: 5px;
+}
+.kern-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}

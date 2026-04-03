@@ -2,6 +2,18 @@
 
 A **small, self-contained** desktop editor for the [Kern](https://github.com/entrenchedosx/kern) language: tabbed editor, workspace file tree, integrated run/check against `kern.exe`, syntax highlighting, diagnostics, and a command palette.
 
+**Discord:** [Official Kern server — discord.gg/JBa4RfT2tE](https://discord.gg/JBa4RfT2tE)
+
+## Electron workbench (experimental)
+
+A separate **VS Code–like** shell lives under **[`electron/`](electron/)**: **Electron + React + TypeScript + Vite**, **Monaco** editing, activity bar / sidebar / tabs / bottom panel, **Ctrl+Shift+P** command palette, **Ctrl+P** quick open (workspace scan in a **worker thread**), **chokidar** file watching, virtualized lists, light/dark + custom themes, and `window.kernAPI` from a **preload** bridge. See **[electron/README.md](electron/README.md)** for scripts and extension format.
+
+```powershell
+cd Kern-IDE\electron
+npm install
+npm run dev
+```
+
 **Standalone home (Tk + Qt + VS Code tooling):** [github.com/entrenchedosx/kern-IDE](https://github.com/entrenchedosx/kern-IDE) — this Tk app is published there under **`desktop-tk/`** (see *Publishing* below). Release version is in **`VERSION`** (shown in the window title and About).
 
 ## Requirements
@@ -25,6 +37,15 @@ python -c "from app import launch; launch()"
 
 Working directory should be **`Kern-IDE`** so imports (`app`, `services`, `ui`) resolve.
 
+## Tests (Tk IDE)
+
+```powershell
+cd Kern-IDE
+python -m unittest discover -s tests -t . -v
+```
+
+These cover path canonicalization and UTF-8 read behavior used when opening files. For release QA, manually verify: open/save/reopen the same `.kn`, switch workspace with and without dirty buffers, double‑click a file in the explorer (should focus an existing tab instead of duplicating it), F5 run and Ctrl+K check.
+
 ## What’s included
 
 | Area | Behavior |
@@ -34,7 +55,7 @@ Working directory should be **`Kern-IDE`** so imports (`app`, `services`, `ui`) 
 | **Layout** | Explorer · editor + breadcrumbs · optional debugger · bottom tabs **Output** (console + problems) and **Kern versions** |
 | **Run / Check** | F5 / Ctrl+K use the **active** `kern.exe` under `kern_versions/<tag>/` or dev PATH |
 | **Command palette** | Ctrl+Shift+P — filtered list of actions |
-| **Explorer** | Right-click: new file, rename, delete (under the workspace root) |
+| **Explorer** | Right-click: new file, rename, delete (under the workspace root); double‑click opens file and **reuses** an existing tab when already open |
 | **Preferences** | Font size, autosave interval (ms; `0` = off) |
 | **Theme** | Light/dark (View menu or palette); persisted in `.kern-ide-state.json` |
 | **Onboarding** | First-run welcome dialog (dismiss with “Got it”) |

@@ -1,0 +1,43 @@
+{
+  "name": "kern-electron-ide",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build && node scripts/build-worker.mjs",
+    "preview": "electron-vite preview",
+    "pack": "electron-builder --dir",
+    "dist": "electron-vite build && electron-builder"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.6.0",
+    "@tanstack/react-virtual": "^3.11.2",
+    "chokidar": "^4.0.3",
+    "monaco-editor": "^0.52.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "esbuild": "^0.24.0",
+    "typescript": "~5.6.3",
+    "vite": "^5.4.11"
+  },
+  "build": {
+    "appId": "dev.kern.electron.ide",
+    "productName": "Kern IDE",
+    "directories": { "output": "release" },
+    "files": ["out/**/*"],
+    "extraResources": [{ "from": "extensions", "to": "extensions", "filter": ["**/*"] }],
+    "mac": { "category": "public.app-category.developer-tools" },
+    "win": { "target": ["zip"] },
+    "linux": { "target": ["AppImage"] }
+  }
+}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import tkinter
 from dataclasses import dataclass
 from pathlib import Path
 from tkinter import END, INSERT, RIGHT, VERTICAL, Y, Canvas, Frame, Listbox, Scrollbar, Text, Toplevel
@@ -36,6 +37,7 @@ class EditorTab:
         on_buffer_change: Callable[[], None] | None = None,
     ) -> None:
         self.file_path: Path | None = None
+        self.untitled_seq: int | None = None
         self.is_dirty = False
         self._theme = theme
         self._on_cursor_change = on_cursor_change
@@ -43,6 +45,7 @@ class EditorTab:
         self._autocomplete: Toplevel | None = None
         self._autocomplete_list: Listbox | None = None
         self._diagnostics: list[EditorDiagnostics] = []
+        self._ui_refresh_job: str | None = None
 
         self.container = Frame(parent, bg=theme.editor, highlightthickness=0, bd=0)
         self.line_canvas = Canvas(self.container, width=46, bg=theme.panel, highlightthickness=0)
@@ -93,7 +96,9 @@ class EditorTab:
     def _bind_events(self) -> None:
         self.text.bind("<KeyRelease>", self._on_key_release)
         self.text.bind("<ButtonRelease-1>", self._on_cursor_event)
-        self.text.bind("<MouseWheel>", self._on_scroll_event)
+        self.text.bind("<MouseWheel>", self._on_scroll_event, add="+")
+        self.text.bind("<Button-4>", self._on_scroll_event_linux, add="+")
+        self.text.bind("<Button-5>", self._on_scroll_event_linux, add="+")
         self.text.bind("<Return>", self._on_return)
         self.text.bind("<Control-space>", self._open_autocomplete)
         self.text.bind("<Tab>", self._autocomplete_accept_or_tab)
@@ -118,6 +123,18 @@ class EditorTab:
         self.refresh_line_numbers()
 
     def _on_scroll_event(self, _event: object) -> None:
+        # Default Text binding still scrolls; we only sync the gutter.
+        self.refresh_line_numbers()
+
+    def _on_scroll_event_linux(self, event: object) -> None:
+        try:
+            n = int(getattr(event, "num", 0) or 0)
+            if n == 4:
+                self.text.yview_scroll(-3, "units")
+            elif n == 5:
+                self.text.yview_scroll(3, "units")
+        except (TypeError, ValueError, tkinter.TclError):
+            pass
         self.refresh_line_numbers()
 
     def _on_cursor_event(self, _event: object) -> None:
@@ -126,11 +143,24 @@ class EditorTab:
 
     def _on_key_release(self, _event: object) -> None:
         self.is_dirty = True
-        self.highlight_syntax()
-        self.refresh_line_numbers()
         self._on_cursor_change()
         if self._on_buffer_change:
             self._on_buffer_change()
+        self._schedule_syntax_and_gutter()
+
+    def _schedule_syntax_and_gutter(self) -> None:
+        if self._ui_refresh_job is not None:
+            try:
+                self.text.after_cancel(self._ui_refresh_job)
+            except (tkinter.TclError, ValueError):
+                pass
+            self._ui_refresh_job = None
+        self._ui_refresh_job = self.text.after(55, self._apply_syntax_and_gutter)
+
+    def _apply_syntax_and_gutter(self) -> None:
+        self._ui_refresh_job = None
+        self.highlight_syntax()
+        self.refresh_line_numbers()
 
     def _on_return(self, _event: object) -> str:
         line_start = self.text.index("insert linestart")
@@ -175,12 +205,17 @@ class EditorTab:
         return f"1.0+{offset}c"
 
     def get_content(self) -> str:
-        return self.text.get("1.0", END).rstrip("\n")
+        # Tk Text always ends with a synthetic newline; end-1c is the real document end.
+        try:
+            return self.text.get("1.0", "end-1c")
+        except tkinter.TclError:
+            return ""
 
     def load_content(self, text: str, file_path: Path | None) -> None:
         self.text.delete("1.0", END)
         self.text.insert("1.0", text)
         self.file_path = file_path
+        self.untitled_seq = None if file_path is not None else self.untitled_seq
         self.is_dirty = False
         self._diagnostics = []
         self.highlight_syntax()
@@ -295,7 +330,7 @@ class EditorTab:
         self.text.insert(INSERT, value)
         self._close_autocomplete()
         self.is_dirty = True
-        self.highlight_syntax()
+        self._schedule_syntax_and_gutter()
         return "break"
 
     def _close_autocomplete(self, _event: object = None) -> str:

@@ -1,0 +1,10 @@
+// Three ways to use stdlib modules (run from repo root; set KERN_LIB to the repo root if needed).
+import "math"
+import "sys"
+from "math" import sqrt, cos
+
+print("import \"math\": module is global `math`; selective import adds sqrt, cos")
+print("math.sqrt(4)", math.sqrt(4))
+print("sqrt(4)", sqrt(4))
+print("cos(0)", cos(0))
+print("kern_version:", sys.kern_version())

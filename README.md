@@ -2,15 +2,19 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.0.6-blue.svg)](KERN_VERSION.txt)
+[![Discord](https://img.shields.io/badge/discord-Kern-5865F2?logo=discord&logoColor=white)](https://discord.gg/JBa4RfT2tE)
 
 **Kern** is a small, compiled scripting language: an explicit lexer → parser → bytecode pipeline and a bytecode **VM**, with a growing **standard library** (`lib/kern/`) and a **`kern`** CLI for running scripts, linting, and the REPL.
 
 This repository is the **language and toolchain** (compiler, VM, stdlib, tests, docs). **Editors** (desktop IDE, VS Code extension) live under **[`Kern-IDE/`](Kern-IDE/)** and are published separately.
 
+**Discord:** [discord.gg/JBa4RfT2tE](https://discord.gg/JBa4RfT2tE) — official server for help and discussion.
+
 ---
 
 ## Table of contents
 
+- [Community](#community)
 - [Why Kern](#why-kern)
 - [Quick start](#quick-start)
 - [Features](#features)
@@ -24,6 +28,12 @@ This repository is the **language and toolchain** (compiler, VM, stdlib, tests, 
 - [Contributing](#contributing)
 - [Donations](#donations)
 - [License](#license)
+
+---
+
+## Community
+
+Official Kern Discord: **[discord.gg/JBa4RfT2tE](https://discord.gg/JBa4RfT2tE)** — help, language discussion, and tooling chatter.
 
 ---
 

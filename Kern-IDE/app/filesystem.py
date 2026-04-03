@@ -43,14 +43,16 @@ class FileExplorer:
                 # Insert a placeholder so the directory can be expanded.
                 self.tree.insert(node, "end", text=self._placeholder_text, open=False)
 
-    def on_tree_open(self, _event: object = None) -> None:
+    def on_tree_open(self, node_id: str | None = None) -> None:
         """
         Lazy-load directory children on expansion (`<<TreeviewOpen>>`).
 
-        We load only immediate children and replace the placeholder child.
+        Pass the Treeview item id (e.g. ``tree.focus()`` right after the event).
         """
-        node_id = self.tree.focus() or (self.tree.selection()[0] if self.tree.selection() else "")
-        if not node_id or node_id in self._loaded_dirs:
+        if not node_id:
+            return
+        if node_id in self._loaded_dirs:
+        if node_id in self._loaded_dirs:
             return
 
         path = self.path_for_node(node_id)

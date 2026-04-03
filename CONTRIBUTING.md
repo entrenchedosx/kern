@@ -12,6 +12,8 @@ Thanks for helping improve Kern. This document sets expectations so reviews stay
 
 This project follows the **[Code of Conduct](CODE_OF_CONDUCT.md)**. Be respectful and constructive in issues and pull requests.
 
+For real-time chat, use the **official Kern Discord**: [discord.gg/JBa4RfT2tE](https://discord.gg/JBa4RfT2tE).
+
 ## Before you open a PR
 
 1. **Build** in Release and ensure the tree compiles without new warnings you introduced.

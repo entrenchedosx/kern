@@ -15,6 +15,7 @@ a = Analysis(
     binaries=[],
     datas=[],
     hiddenimports=[
+        "app.ide_paths",
         "services.process_runner",
         "services.repl_session",
         "ui.layout",

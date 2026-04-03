@@ -1,0 +1,8 @@
+// Lambdas use (args) before =>. Nested lambdas = lightweight “currying”.
+let times = lambda (n) => lambda (x) => x * n
+let triple = times(3)
+print("triple(4)", triple(4))
+
+let xs = array(1, 2, 3, 4)
+let doubled = map(xs, lambda (x) => x * 2)
+print("map len", len(doubled), "first", doubled[0])

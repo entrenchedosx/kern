@@ -22,6 +22,7 @@ from tkinter import (
     Menu,
     Text,
     Tk,
+    TclError,
     Toplevel,
     filedialog,
     messagebox,
@@ -38,6 +39,7 @@ from services.portable_env import ensure_portable_layout, kern_versions_dir
 
 from .editor import EditorTab
 from .filesystem import FileExplorer
+from .ide_paths import read_text_flexible, resolve_existing, same_file_path
 from .runner import KernRunner, locate_dev_kern_exe
 from .state import load_state, save_state
 from .theme import Theme, resolve_theme
@@ -137,11 +139,21 @@ class KernIDE:
         menubar.add_cascade(label="File", menu=file_menu)
 
         edit_menu = Menu(menubar, tearoff=0)
-        edit_menu.add_command(label="Undo", command=lambda: self._current_editor().text.event_generate("<<Undo>>"))
-        edit_menu.add_command(label="Redo", command=lambda: self._current_editor().text.event_generate("<<Redo>>"))
+        edit_menu.add_command(
+            label="Undo",
+            command=lambda: self._safe_editor_action(lambda ed: ed.text.event_generate("<<Undo>>")),
+        )
+        edit_menu.add_command(
+            label="Redo",
+            command=lambda: self._safe_editor_action(lambda ed: ed.text.event_generate("<<Redo>>")),
+        )
         edit_menu.add_separator()
         edit_menu.add_command(label="Find", command=self._open_find_dialog, accelerator="Ctrl+F")
-        edit_menu.add_command(label="Autocomplete", command=lambda: self._current_editor()._open_autocomplete(), accelerator="Ctrl+Space")
+        edit_menu.add_command(
+            label="Autocomplete",
+            command=lambda: self._safe_editor_action(lambda ed: ed._open_autocomplete()),
+            accelerator="Ctrl+Space",
+        )
         menubar.add_cascade(label="Edit", menu=edit_menu)
 
         run_menu = Menu(menubar, tearoff=0)
@@ -206,7 +218,7 @@ class KernIDE:
         self.tree.bind("<Double-1>", self._on_tree_open)
         self.tree.bind("<Button-3>", self._explorer_context)
         self.explorer = FileExplorer(self.tree, self.workspace_root)
-        self.tree.bind("<<TreeviewOpen>>", lambda e: self.explorer.on_tree_open(e))
+        self.tree.bind("<<TreeviewOpen>>", self._on_explorer_expand)
 
         self.editor_frame = ttk.Frame(self.top_horizontal)
         self.top_horizontal.add(self.editor_frame, weight=6)
@@ -290,6 +302,13 @@ class KernIDE:
         show_command_palette(self.root, self.theme, "Command Palette", cmds)
 
     def choose_workspace(self) -> None:
+        if any(ed.is_dirty for ed in self.editors.values()):
+            if not messagebox.askyesno(
+                "Unsaved changes",
+                "You have unsaved files. Switch workspace anyway?\n\n"
+                "Unsaved buffers stay open but paths stay as-is.",
+            ):
+                return
         d = filedialog.askdirectory(title="Choose workspace folder", initialdir=str(self.workspace_root))
         if not d:
             return
@@ -556,7 +575,14 @@ class KernIDE:
         self._apply_theme()
         self._save_state()
 
-    def _new_editor_tab(self, title: str, content: str = "", file_path: Path | None = None) -> EditorTab:
+    def _new_editor_tab(
+        self,
+        title: str,
+        content: str = "",
+        file_path: Path | None = None,
+        *,
+        untitled_seq: int | None = None,
+    ) -> EditorTab:
         container = ttk.Frame(self.tabs)
         editor = EditorTab(
             container,
@@ -564,6 +590,7 @@ class KernIDE:
             on_cursor_change=self._refresh_status,
             on_buffer_change=self._schedule_autosave,
         )
+        editor.untitled_seq = untitled_seq
         editor.set_font_size(self.editor_font_size)
         editor.container.pack(fill=BOTH, expand=True)
         editor.load_content(content, file_path)
@@ -575,13 +602,42 @@ class KernIDE:
         return editor
 
     def _current_editor(self) -> EditorTab:
-        tab_id = self.tabs.select()
-        return self.editors[tab_id]
+        """Active editor tab; recovers from empty selection by selecting the first tab or opening a new one."""
+        try:
+            tid = self.tabs.select()
+            if tid:
+                sid = str(tid)
+                if sid in self.editors:
+                    return self.editors[sid]
+        except TclError:
+            pass
+        if self.editors:
+            first = next(iter(self.editors))
+            try:
+                self.tabs.select(first)
+            except TclError:
+                pass
+            return self.editors[first]
+        self.new_file()
+        return self._current_editor()
+
+    def _safe_editor_action(self, fn: Callable[[EditorTab], None]) -> None:
+        try:
+            fn(self._current_editor())
+        except (TclError, KeyError, RuntimeError) as exc:
+            append_log("ui_errors.log", f"editor action: {exc}", portable_root=self.portable_root)
+            messagebox.showerror("Kern IDE", f"Editor action failed:\n{exc}")
+
+    def _on_explorer_expand(self, _event: object) -> None:
+        self.explorer.on_tree_open(self.tree.focus())
 
     def _title_for_editor(self, editor: EditorTab) -> str:
+        dirty = " *" if editor.is_dirty else ""
         if editor.file_path:
-            return editor.file_path.name + (" *" if editor.is_dirty else "")
-        return f"untitled-{self.untitled_count}" + (" *" if editor.is_dirty else "")
+            return editor.file_path.name + dirty
+        if editor.untitled_seq is not None:
+            return f"untitled-{editor.untitled_seq}{dirty}"
+        return "untitled" + dirty
 
     def _refresh_breadcrumb(self, editor: EditorTab) -> None:
         try:
@@ -600,8 +656,9 @@ class KernIDE:
                 return
 
     def new_file(self) -> None:
-        self._new_editor_tab(f"untitled-{self.untitled_count}", "")
+        n = self.untitled_count
         self.untitled_count += 1
+        self._new_editor_tab(f"untitled-{n}", "", None, untitled_seq=n)
 
     def open_file(self) -> None:
         path = filedialog.askopenfilename(
@@ -614,12 +671,31 @@ class KernIDE:
         self._open_path(Path(path))
 
     def _open_path(self, path: Path) -> None:
-        try:
-            content = path.read_text(encoding="utf-8")
-        except Exception as exc:
-            messagebox.showerror("Open failed", f"Could not open file:\n{path}\n\n{exc}")
+        path = resolve_existing(path)
+        for tid, ed in self.editors.items():
+            if ed.file_path and same_file_path(ed.file_path, path):
+                try:
+                    self.tabs.select(tid)
+                except TclError:
+                    pass
+                if not ed.is_dirty:
+                    content, warn = read_text_flexible(path)
+                    if content is None:
+                        messagebox.showerror("Open failed", f"Could not open file:\n{path}\n\n{warn or 'unknown error'}")
+                        return
+                    ed.load_content(content, path)
+                    if warn:
+                        self._append_output(f"[open] {warn}\n")
+                self._refresh_status()
+                return
+
+        content, warn = read_text_flexible(path)
+        if content is None:
+            messagebox.showerror("Open failed", f"Could not open file:\n{path}\n\n{warn or 'unknown error'}")
             return
         self._new_editor_tab(path.name, content, path)
+        if warn:
+            self._append_output(f"[open] {warn}\n")
 
     def save_current(self) -> None:
         editor = self._current_editor()
@@ -641,12 +717,16 @@ class KernIDE:
         self._save_editor(editor, Path(path))
 
     def _save_editor(self, editor: EditorTab, path: Path) -> None:
+        path = resolve_existing(path)
         try:
+            path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(editor.get_content(), encoding="utf-8")
-        except Exception as exc:
+        except OSError as exc:
+            append_log("ui_errors.log", f"save failed {path}: {exc}", portable_root=self.portable_root)
             messagebox.showerror("Save failed", f"Could not save file:\n{path}\n\n{exc}")
             return
         editor.file_path = path
+        editor.untitled_seq = None
         editor.is_dirty = False
         self._refresh_tab_title(editor)
         self.explorer.refresh()

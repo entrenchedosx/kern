@@ -19,6 +19,8 @@ This guide is for **users** who want to run Kern (run scripts, use the REPL) and
 
 The Windows portable build is intended to be self-contained: no extra runtime installs are required. Graphics support (when included) is bundled as part of the distribution.
 
+**First run (Windows):** The first time you start `kern.exe` for your user account, Kern self-registers under **HKCU** (no admin): **`.kn`** → **KernFile**, type name **“Kern Script”**, **Content Type** `text/x-kern`, **DefaultIcon** from **`<exe_dir>\\kern_logo.ico`** when present else **`kern.exe,0`**, **open** command **`\"path\\to\\kern.exe\" \"%1\"`**, optional context menu **Edit with Kern**, then **`SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, …)`** (plus a flush notify). It writes **`%APPDATA%\\kern\\setup_done.flag`** so later launches only stat that file and skip. Run **`kern --repair-association`** to re-apply if something breaks. Set **`KERN_SKIP_FILE_ASSOCIATION`** to any value (e.g. in CI) to disable auto setup. Set **`KERN_RESTART_EXPLORER_AFTER_ASSOC`** to force **Explorer restart** after association (brief desktop blink; last resort for stubborn icon cache). Errors go to **`%APPDATA%\\kern\\setup.log`**; Kern keeps running.
+
 ### Option B: Build from source
 
 **Requirements:** C++17 compiler (e.g. MSVC 2022, GCC 7+, Clang 5+), CMake 3.14+.

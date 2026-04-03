@@ -20,6 +20,9 @@ Kern-IDE/desktop-tk/dist/
 Kern-IDE/kern-ide-windows-x64-portable-v*.zip
 Kern-IDE/native-qt/build*/
 Kern-IDE/build/
+Kern-IDE/electron/node_modules/
+Kern-IDE/electron/out/
+Kern-IDE/electron/release/
 Kern-IDE/packaging/work_verify*/
 vcpkg_installed/
 # CI / local clone next to repo root (see .github/workflows/windows-kern.yml)

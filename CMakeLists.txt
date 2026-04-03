@@ -156,7 +156,11 @@ set(KERNC_SUPPORT_SOURCES
     src/utils/build_cache.cpp
 )
 
-add_executable(kern src/main.cpp ${KERN_WIN32_RESOURCES} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES} ${SCANNER_SOURCES})
+set(KERN_MAIN_SOURCES src/main.cpp)
+if(WIN32)
+  list(APPEND KERN_MAIN_SOURCES src/platform/win32_associate_kn.cpp)
+endif()
+add_executable(kern ${KERN_MAIN_SOURCES} ${KERN_WIN32_RESOURCES} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES} ${SCANNER_SOURCES})
 target_include_directories(kern PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(kern PRIVATE KERN_VERSION="${KERN_VERSION}")
 
@@ -186,8 +190,16 @@ kern_apply_strict_warnings(kern-scan)
 if(WIN32)
   target_link_libraries(kernc PRIVATE psapi winhttp wininet)
   target_link_libraries(kern_repl PRIVATE psapi winhttp wininet)
-  target_link_libraries(kern PRIVATE psapi winhttp wininet)
+  target_link_libraries(kern PRIVATE psapi winhttp wininet advapi32 shell32)
   target_link_libraries(kern-scan PRIVATE psapi winhttp wininet)
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/kern_logo.ico")
+    add_custom_command(
+      TARGET kern
+      POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/kern_logo.ico"
+              "$<TARGET_FILE_DIR:kern>/kern_logo.ico"
+      COMMENT "Copy kern_logo.ico next to kern.exe (Windows shell icon)")
+  endif()
   target_link_libraries(kern_lsp PRIVATE winhttp wininet)
   # Compiler binary is kern-impl.exe; kern.exe is a tiny launcher (tools/kernc_launcher.c) that runs
   # cmake --build ... --target kern then execs kern-impl.exe (stale-compiler issue when only kern.exe was run).

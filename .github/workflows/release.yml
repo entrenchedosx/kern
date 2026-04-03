@@ -18,6 +18,8 @@ concurrency:
 jobs:
   windows:
     runs-on: windows-latest
+    env:
+      KERN_SKIP_FILE_ASSOCIATION: "1"
     defaults:
       run:
         working-directory: ${{ github.workspace }}

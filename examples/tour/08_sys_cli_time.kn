@@ -1,0 +1,6 @@
+// sys: CLI args, version, monotonic clock (all on the imported module).
+import "sys"
+print("kern_version:", sys.kern_version())
+let args = sys.cli_args()
+print("cli_args len:", len(args))
+print("monotonic_time:", sys.monotonic_time())

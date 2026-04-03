@@ -1,0 +1,6 @@
+// JSON encode/decode (no network).
+import "json"
+let raw = "{\"name\":\"Kern\",\"n\":42}"
+let obj = json.json_parse(raw)
+print("parsed name", obj["name"])
+print("stringify", json.json_stringify(obj))
