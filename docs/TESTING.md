@@ -27,6 +27,14 @@ From repo root (prints resolved `.kn` modules and edges; add `--json` for toolin
 .\build\Release\kern.exe graph --json examples\basic\modules.kn
 ```
 
+## Lockfile + `kern test` / `--check`
+
+If the current working directory has **`kern.json`**, **`kern test`** and **`kern --check`** require **`kern.lock`** to list the same dependency names as the manifest (same rules as **`kern verify`**). Use **`--skip-lock-verify`** only for local debugging.
+
+## Version output
+
+**`kern --version`** prints the release string, a **`bytecode-schema:`** integer (`kBytecodeSchemaVersion` in `src/vm/bytecode.hpp`), and **`build:`** (git short hash) when the binary was configured from a **`.git`** checkout.
+
 ## Useful options
 
 - `-TimeoutSeconds 60` to increase per-test timeout

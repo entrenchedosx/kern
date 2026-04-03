@@ -329,11 +329,12 @@ static void printUsage(const char* prog) {
         << "  --repair-association  (Windows) Re-apply per-user .kn association, icon, and shell verbs; exit.\n"
 #endif
         << "  --check <file>        Compile only; exit 0 if OK.\n"
-        << "  --check [--json] [--strict-types] <file>\n"
+        << "  --check [--json] [--strict-types] [--skip-lock-verify] <file>\n"
         << "                        Optional flags before or after the path. --json: stdout JSON only (no stderr spam).\n"
         << "                        --strict-types: run semantic strict typing pass (preview).\n"
+        << "                        If cwd has kern.json, lockfile must match kern.lock unless --skip-lock-verify.\n"
         << "  --lint <file>         Same as --check (lint/syntax check).\n"
-        << "  --fmt <file>          Format script (indent by braces).\n"
+        << "  --fmt <file>          Format script (indent by braces; ignores braces in //, /* */, and strings).\n"
         << "  --ast <file>          Dump AST and exit.\n"
         << "  --bytecode <file>     Dump bytecode and exit.\n"
         << "  --bytecode-normalized <file>  Dump bytecode without source locations (stable for golden tests).\n"
@@ -353,7 +354,8 @@ static void printUsage(const char* prog) {
         << "Commands:\n"
         << "  " << prog << " test [options] [path]\n"
         << "                        Run all .kn files under directory recursively (default: tests/coverage).\n"
-        << "                        Options: --grep <substr>, --list, --fail-fast (-x). See: " << prog << " test --help\n"
+        << "                        Options: --grep <substr>, --list, --fail-fast (-x), --skip-lock-verify.\n"
+        << "                        See: " << prog << " test --help\n"
         << "  " << prog << " docs             Print paths to documentation and optional MkDocs hint.\n"
         << "  " << prog << " build            Show CMake build instructions (toolchain is built with CMake).\n"
         << "  " << prog << " doctor           Print runtime/tooling diagnostics.\n"
@@ -453,14 +455,19 @@ static std::vector<std::string> parseLockDependencyNames(const std::string& lock
     return out;
 }
 
-static int cmdVerify() {
+// requireKernJson: true for `kern verify` (missing kern.json is an error). false for test/check (no project → skip).
+// printSuccessOnOk: only used when requireKernJson (verify command success line).
+static int verifyLockfileAgainstManifest(bool requireKernJson, const char* label, bool printSuccessOnOk) {
     namespace fs = std::filesystem;
     if (!fs::exists("kern.json")) {
-        std::cerr << "verify: kern.json not found in current directory\n";
-        return 1;
+        if (requireKernJson) {
+            std::cerr << label << ": kern.json not found in current directory\n";
+            return 1;
+        }
+        return 0;
     }
     if (!fs::exists("kern.lock")) {
-        std::cerr << "verify: kern.lock not found (run `kern install` to generate it)\n";
+        std::cerr << label << ": kern.lock not found (run `kern install` to generate it)\n";
         return 1;
     }
     std::string man = readTextFile("kern.json");
@@ -470,7 +477,7 @@ static int cmdVerify() {
     ma.erase(std::unique(ma.begin(), ma.end()), ma.end());
     std::vector<std::string> lo = parseLockDependencyNames(lock);
     if (ma != lo) {
-        std::cerr << "verify: kern.json dependency set does not match kern.lock\n";
+        std::cerr << label << ": kern.json dependency set does not match kern.lock\n";
         std::cerr << "  kern.json: ";
         for (size_t i = 0; i < ma.size(); ++i) std::cerr << (i ? ", " : "") << ma[i];
         if (ma.empty()) std::cerr << "(empty)";
@@ -480,8 +487,13 @@ static int cmdVerify() {
         std::cerr << "\n";
         return 1;
     }
-    std::cout << "verify: kern.lock matches kern.json\n";
+    if (printSuccessOnOk)
+        std::cout << "verify: kern.lock matches kern.json\n";
     return 0;
+}
+
+static int cmdVerify() {
+    return verifyLockfileAgainstManifest(true, "verify", true);
 }
 
 static int cmdInit() {
@@ -605,6 +617,7 @@ struct TestCliOptions {
     std::string grep;
     bool failFast = false;
     bool listOnly = false;
+    bool skipLockVerify = false;
 };
 
 static std::string graphJsonEscape(const std::string& s) {
@@ -788,6 +801,7 @@ static void printTestUsage(const char* prog) {
               << "  --grep <substr>   Only run tests whose relative path contains the substring.\n"
               << "  --fail-fast, -x   Stop on first unexpected failure.\n"
               << "  --list            List tests that would run (after --grep) and exit.\n"
+              << "  --skip-lock-verify Skip kern.json/kern.lock consistency check (not for CI).\n"
               << "  -h, --help        Show this help.\n";
 }
 
@@ -810,6 +824,10 @@ static int parseTestCli(int argc, char** argv, int argBase, TestCliOptions& out,
             out.listOnly = true;
             continue;
         }
+        if (a == "--skip-lock-verify") {
+            out.skipLockVerify = true;
+            continue;
+        }
         if (a == "--help" || a == "-h") {
             return 2;
         }
@@ -826,6 +844,105 @@ static int parseTestCli(int argc, char** argv, int argBase, TestCliOptions& out,
     if (!positionals.empty())
         dirPath = positionals[0];
     return 0;
+}
+
+// Brace-based indent for --fmt: only `{` / `}` outside //, /* */, "" / '', and """ / ''' strings affect depth.
+static void appendSignificantBracesFromLine(const std::string& line, bool& inBlockComment, bool& inTripleString,
+                                            char& tripleQuote, std::string& sig) {
+    size_t i = 0;
+    while (i < line.size()) {
+        if (inTripleString) {
+            while (i + 2 < line.size()) {
+                if (line[i] == tripleQuote && line[i + 1] == tripleQuote && line[i + 2] == tripleQuote) {
+                    i += 3;
+                    inTripleString = false;
+                    break;
+                }
+                ++i;
+            }
+            if (inTripleString)
+                return;
+            continue;
+        }
+        if (inBlockComment) {
+            const size_t end = line.find("*/", i);
+            if (end == std::string::npos)
+                return;
+            inBlockComment = false;
+            i = end + 2;
+            continue;
+        }
+        if (line[i] == '/' && i + 1 < line.size() && line[i + 1] == '/')
+            return;
+        if (line[i] == '/' && i + 1 < line.size() && line[i + 1] == '*') {
+            inBlockComment = true;
+            i += 2;
+            continue;
+        }
+        if ((line[i] == '"' || line[i] == '\'') && i + 2 < line.size() && line[i + 1] == line[i] && line[i + 2] == line[i]) {
+            tripleQuote = line[i];
+            inTripleString = true;
+            i += 3;
+            continue;
+        }
+        if (line[i] == '"' || line[i] == '\'') {
+            const char q = line[i++];
+            while (i < line.size()) {
+                if (line[i] == '\\') {
+                    i += 2;
+                    continue;
+                }
+                if (line[i] == q) {
+                    ++i;
+                    break;
+                }
+                ++i;
+            }
+            continue;
+        }
+        if (line[i] == '{')
+            sig += '{';
+        else if (line[i] == '}')
+            sig += '}';
+        ++i;
+    }
+}
+
+static std::string formatSourceBraceIndentAware(const std::string& source) {
+    bool inBlockComment = false;
+    bool inTripleString = false;
+    char tripleQuote = '"';
+    int indent = 0;
+    const int indentStep = 2;
+    std::string out;
+    std::istringstream is(source);
+    std::string line;
+    while (std::getline(is, line)) {
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+        std::string sig;
+        appendSignificantBracesFromLine(line, inBlockComment, inTripleString, tripleQuote, sig);
+        size_t start = 0;
+        while (start < line.size() && (line[start] == ' ' || line[start] == '\t'))
+            ++start;
+        const std::string stripped = line.substr(start);
+        for (char c : sig) {
+            if (c == '}' && indent >= indentStep)
+                indent -= indentStep;
+        }
+        if (!stripped.empty()) {
+            out += std::string(static_cast<size_t>(indent), ' ');
+            out += stripped;
+        }
+        for (char c : sig) {
+            if (c == '{')
+                indent += indentStep;
+            else if (c == '}' && indent >= indentStep)
+                indent -= indentStep;
+        }
+        out += '\n';
+    }
+    return out;
 }
 
 static int cmdTest(int argc, char** argv, int argBase, const char* prog) {
@@ -892,6 +1009,10 @@ static int cmdTest(int argc, char** argv, int argBase, const char* prog) {
             std::cout << path.lexically_relative(p).generic_string() << "\n";
         }
         return 0;
+    }
+    if (!opts.skipLockVerify) {
+        if (int lr = verifyLockfileAgainstManifest(false, "test", false); lr != 0)
+            return lr;
     }
     int pass = 0;
     int fail = 0;
@@ -1141,7 +1262,11 @@ int main(int argc, char** argv) {
                 }
             }
 #endif
-            std::cout << "Kern " << ver << std::endl;
+            std::cout << "Kern " << ver << "\n";
+            std::cout << "bytecode-schema: " << kBytecodeSchemaVersion << "\n";
+#ifdef KERN_BUILD_ID
+            std::cout << "build: " << KERN_BUILD_ID << "\n";
+#endif
             return 0;
         }
         if (arg == "--help" || arg == "-h") {
@@ -1380,11 +1505,13 @@ int main(int argc, char** argv) {
     if (argc > argBase + 1 && (std::string(argv[argBase]) == "--check" || std::string(argv[argBase]) == "--lint")) {
         bool json = false;
         bool strictTypes = false;
+        bool skipLockVerify = false;
         std::string path;
         for (int i = argBase + 1; i < argc; ++i) {
             std::string a = argv[i];
             if (a == "--json") json = true;
             else if (a == "--strict-types") strictTypes = true;
+            else if (a == "--skip-lock-verify") skipLockVerify = true;
             else if (!a.empty() && a[0] == '-') {
                 std::cerr << "Unknown --check flag: " << a << "\n";
                 return 1;
@@ -1397,6 +1524,10 @@ int main(int argc, char** argv) {
         if (path.empty()) {
             std::cerr << "--check: missing file path\n";
             return 1;
+        }
+        if (!skipLockVerify) {
+            if (int lr = verifyLockfileAgainstManifest(false, "check", false); lr != 0)
+                return lr;
         }
 
         ResolvedKnPath rs;
@@ -1495,28 +1626,7 @@ int main(int argc, char** argv) {
         buf << f.rdbuf();
         std::string source = buf.str();
         normalizeKernSourceText(source, path);
-        int indent = 0;
-        const int indentStep = 2;
-        std::string out;
-        std::string line;
-        std::istringstream is(source);
-        while (std::getline(is, line)) {
-            size_t start = 0;
-            while (start < line.size() && (line[start] == ' ' || line[start] == '\t')) ++start;
-            std::string stripped = line.substr(start);
-            for (char c : stripped) {
-                if (c == '}' && indent >= indentStep) indent -= indentStep;
-            }
-            if (!stripped.empty()) {
-                out += std::string(indent, ' ');
-                out += stripped;
-            }
-            for (char c : stripped) {
-                if (c == '{') indent += indentStep;
-                else if (c == '}' && indent >= indentStep) indent -= indentStep;
-            }
-            out += '\n';
-        }
+        std::string out = formatSourceBraceIndentAware(source);
         std::ofstream of(path);
         if (!of) { std::cerr << "fmt: could not write " << path << std::endl; return 1; }
         of << out;

@@ -46,6 +46,20 @@ list(GET _kern_version_parts 0 KERN_VERSION_MAJOR)
 list(GET _kern_version_parts 1 KERN_VERSION_MINOR)
 list(GET _kern_version_parts 2 KERN_VERSION_PATCH)
 set(KERN_VERSION_BUILD 0)
+
+set(KERN_BUILD_ID "")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+  find_package(Git QUIET)
+  if(GIT_FOUND)
+    execute_process(
+      COMMAND "${GIT_EXECUTABLE}" rev-parse --short HEAD
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+      OUTPUT_VARIABLE KERN_BUILD_ID
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET
+    )
+  endif()
+endif()
 # Windows PE version resource only (Apple Clang / Unix toolchains must not compile .rc).
 set(KERN_WIN32_RESOURCES "")
 if(WIN32)
@@ -172,6 +186,9 @@ add_executable(kern ${KERN_MAIN_SOURCES} ${KERN_WIN32_RESOURCES} ${COMPILER_SOUR
     src/compiler/import_aliases.cpp)
 target_include_directories(kern PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(kern PRIVATE KERN_VERSION="${KERN_VERSION}")
+if(KERN_BUILD_ID)
+  target_compile_definitions(kern PRIVATE KERN_BUILD_ID="${KERN_BUILD_ID}")
+endif()
 
 # REPL (same binary with repl mode; we use one binary that does both)
 add_executable(kern_repl src/repl/repl_main.cpp ${KERN_WIN32_RESOURCES} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES})

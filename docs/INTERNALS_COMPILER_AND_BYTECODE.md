@@ -12,6 +12,8 @@
 
 **Static import graph (CLI):** `kern graph <entry.kn>` uses [`resolveProjectGraph`](../src/compiler/project_resolver.cpp) (same resolver as `kernc` packaging) for a file-only dependency view; `--json` for tools.
 
+**Bytecode schema id:** `kern::kBytecodeSchemaVersion` in [`bytecode.hpp`](../src/vm/bytecode.hpp) is printed by **`kern --version`** as `bytecode-schema:`; bump it when changing serialized bytecode or opcode semantics incompatibly.
+
 ## Bytecode model
 
 - **Instruction set** — `enum class Opcode` in [`src/vm/bytecode.hpp`](../src/vm/bytecode.hpp): stack ops, arithmetic, control flow (`JMP*`, `LOOP`), calls (`CALL`, `RETURN`, closures), objects (`GET_FIELD`, `NEW_OBJECT`), exceptions (`TRY_*`, `THROW`), `BUILTIN`, `UNSAFE_BEGIN/END`, `HALT`, etc.

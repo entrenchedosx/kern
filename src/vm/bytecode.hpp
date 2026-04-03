@@ -13,6 +13,9 @@
 
 namespace kern {
 
+/** Bump when serialized bytecode or opcode semantics change incompatibly. Reported by `kern --version`. */
+inline constexpr int kBytecodeSchemaVersion = 1;
+
 enum class Opcode : uint8_t {
     // constants
     CONST_I64,

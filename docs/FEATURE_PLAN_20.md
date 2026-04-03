@@ -23,10 +23,10 @@ This is a **concrete backlog** of twenty additive capabilities. It **does not re
 | # | Feature | Value | Notes / deps |
 |---|---------|--------|----------------|
 | **6** | **`kern graph` (static import graph)** | IDE, CI, and “what did I pull in?” | **Shipped:** `kern graph [--json] [--include-path dir]* <entry.kn>` uses `resolveProjectGraph`. Complements `kern-scan`. |
-| **7** | **Lockfile enforcement everywhere** | Same guarantees for `kernc`, `kern test`, IDE | Unify with `kern verify`; fail CI when lock stale. |
+| **7** | **Lockfile enforcement everywhere** | Same guarantees for `kernc`, `kern test`, IDE | **`kern test`** and **`kern --check`** run the same dependency-set check as **`kern verify`** when **`kern.json`** exists in cwd (use **`--skip-lock-verify`** to opt out). **`kernc --pkg-validate`** unchanged for package manifests. |
 | **8** | **Gradual typing: file or block pragma** | Safety without full-file strictness | Builds on `--strict-types` + semantic engine flags. |
 | **9** | **Diagnostic spans: multi-token highlights** | Better UX for “this whole call is wrong” | Reporter + LSP range consistency. |
-| **10** | **Stable bytecode / build IDs in `--version`** | Support + crash triage | Embed `KERN_VERSION` + optional bytecode schema id in artifacts. |
+| **10** | **Stable bytecode / build IDs in `--version`** | Support + crash triage | **Shipped:** `kern --version` prints **`bytecode-schema:`** (`kern::kBytecodeSchemaVersion` in `bytecode.hpp`). Optional **`build:`** line when CMake sees a **`.git`** short hash (`KERN_BUILD_ID`). |
 
 ---
 
@@ -46,7 +46,7 @@ This is a **concrete backlog** of twenty additive capabilities. It **does not re
 | # | Feature | Value | Notes / deps |
 |---|---------|--------|----------------|
 | **15** | **`kern watch`** | Rerun `--check` or `kern test --grep` on save | Simple file watcher; defer to IDE for complex cases. |
-| **16** | **`kern fmt` completeness** | Format new syntax (`match`, `\|>`, comprehensions) | Single formatter path; golden tests. |
+| **16** | **`kern fmt` completeness** | Format new syntax (`match`, `\|>`, comprehensions) | **Partial:** `--fmt` still brace-indents only, but **`{` / `}` inside `//`, `/* */`, `"` / `'`, and `"""` / `'''`** no longer change depth (fewer broken reformats). Full AST-aware formatting + goldens still TBD. |
 | **17** | **LSP: cross-file go-to-definition** | Jump from symbol to defining `.kn` | Project root + resolver; reuse scan graph. |
 | **18** | **LSP / IDE: doc comments → hover** | `///` or agreed comment form → markdown hover | Parser trivia or lightweight preparse. |
 | **19** | **Test runner: stdout / stderr snapshots** | Regress CLI programs without brittle string compares | Golden files next to `tests/`. |
