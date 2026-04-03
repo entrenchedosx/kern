@@ -1,0 +1,8 @@
+{
+  "entry": "tests/compile_pipeline_fixture/main.kn",
+  "output": "tests/compile_pipeline_fixture/dist/fixture.exe",
+  "include_paths": ["tests/compile_pipeline_fixture"],
+  "release": true,
+  "optimization": 2,
+  "console": true
+}

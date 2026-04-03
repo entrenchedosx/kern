@@ -58,7 +58,7 @@ The CLI tool **`kernc`** calls this pipeline so behavior stays unified.
 ## Testing
 
 - **Automated:** `kern --check` over examples + coverage suites (existing CI).
-- **Standalone smoke (manual):** from repo root, with `kernc` built, use `kernc --config <kernconfig.json>` where `entry` / `output` / `include_paths` point at a tiny project (see `kern-to-exe` Python driver for recipe JSON → `kernconfig` generation).
+- **Standalone smoke (manual):** from repo root, with `kernc` built, run `kernc --config tests/compile_pipeline_fixture/kernconfig.example.json` (paths are repo-relative) or copy that file and adjust. For richer recipes, see `kern-to-exe` (Python) which writes `kernconfig.json`.
 - **Invalid input:** pipeline should return `Result::success == false` with diagnostics; **no VM execution** occurs if semantic errors stop the pipeline before codegen.
 
 ## Future work (roadmap hooks)
