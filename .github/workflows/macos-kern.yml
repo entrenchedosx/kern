@@ -41,6 +41,14 @@ jobs:
           ./build/kern tests/std_v1_builtins_smoke.kn
           ./build/kern examples/basic/01_hello_world.kn
 
+      # Some macOS images omit pwsh from PATH; install via Homebrew only when missing.
+      - name: Ensure PowerShell (pwsh)
+        run: |
+          if ! command -v pwsh >/dev/null 2>&1; then
+            brew install powershell
+          fi
+          pwsh --version
+
       - name: Stable suite (contract, bytecode golden, coverage)
         env:
           KERN_COVERAGE_SKIP_GRAPHICS: "1"
