@@ -18,6 +18,15 @@ From repo root (uses `build\Release\kernc.exe` by default):
 
 `-Splc` is accepted as an alias for `-Kernc` (legacy name).
 
+## Static import graph (`kern graph`)
+
+From repo root (prints resolved `.kn` modules and edges; add `--json` for tooling):
+
+```powershell
+.\build\Release\kern.exe graph tests\compile_pipeline_fixture\main.kn
+.\build\Release\kern.exe graph --json examples\basic\modules.kn
+```
+
 ## Useful options
 
 - `-TimeoutSeconds 60` to increase per-test timeout

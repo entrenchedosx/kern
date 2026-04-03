@@ -10,6 +10,8 @@
 6. **Optimize (optional)** — [`bytecode_peephole`](../src/vm/bytecode_peephole.cpp) applies safe, local rewrites after codegen.
 7. **Verify (optional)** — [`bytecode_verifier`](../src/vm/bytecode_verifier.cpp) checks invariants before execution.
 
+**Static import graph (CLI):** `kern graph <entry.kn>` uses [`resolveProjectGraph`](../src/compiler/project_resolver.cpp) (same resolver as `kernc` packaging) for a file-only dependency view; `--json` for tools.
+
 ## Bytecode model
 
 - **Instruction set** — `enum class Opcode` in [`src/vm/bytecode.hpp`](../src/vm/bytecode.hpp): stack ops, arithmetic, control flow (`JMP*`, `LOOP`), calls (`CALL`, `RETURN`, closures), objects (`GET_FIELD`, `NEW_OBJECT`), exceptions (`TRY_*`, `THROW`), `BUILTIN`, `UNSAFE_BEGIN/END`, `HALT`, etc.

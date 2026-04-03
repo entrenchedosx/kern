@@ -1,12 +1,13 @@
 /* *
  * kern (Kern) - Main entry point
  * compiles and runs .kn files or starts the REPL.
- * modes: kern file.kn | kern --ast file | kern --bytecode file | kern --check file | kern --scan [paths] | kern --fmt file
+ * modes: kern file.kn | kern --ast file | kern --bytecode file | kern --check file | kern --scan [paths] | kern --fmt file | kern graph <entry.kn>
  */
 
 #include "compiler/lexer.hpp"
 #include "compiler/parser.hpp"
 #include "compiler/codegen.hpp"
+#include "compiler/project_resolver.hpp"
 #include "compiler/semantic.hpp"
 #include "compiler/ast.hpp"
 #include "vm/vm.hpp"
@@ -360,7 +361,9 @@ static void printUsage(const char* prog) {
         << "  " << prog << " add <dep>        Add dependency to kern.json.\n"
         << "  " << prog << " remove <dep>     Remove dependency from kern.json.\n"
         << "  " << prog << " install          Refresh lockfile from kern.json (not system install; see ./install.sh).\n"
-        << "  " << prog << " verify           Exit 0 if kern.lock matches kern.json dependencies (CI-friendly).\n\n"
+        << "  " << prog << " verify           Exit 0 if kern.lock matches kern.json dependencies (CI-friendly).\n"
+        << "  " << prog << " graph [opts] <entry.kn>\n"
+        << "                        Static .kn import graph from entry (JSON with --json). See docs/FEATURE_PLAN_20.md.\n\n"
         << "Modules: import \"math\"; from \"math\" import sqrt; import(\"path\") (expression form) still works.\n"
         << "Docs: docs/GETTING_STARTED.md\n"
         << "Testing docs: docs/TESTING.md\n";
@@ -567,6 +570,7 @@ static int cmdDoctor(const char* prog) {
     std::cout << "  env: KERNC_TRACE_IMPORTS logs embedded import resolution to stderr.\n";
     std::cout << "  tip: kern test [dir] runs .kn files recursively (default tests/coverage).\n";
     std::cout << "  tip: kern verify checks kern.lock matches kern.json dependencies.\n";
+    std::cout << "  tip: kern graph <entry.kn> prints static import graph (--json for tools).\n";
     return 0;
 }
 
@@ -578,6 +582,7 @@ static int cmdDocs(const char* /*prog*/) {
               << "Language sketch: docs/LANGUAGE_SYNTAX.md\n"
               << "Stdlib (std.v1): docs/STDLIB_STD_V1.md\n"
               << "Adoption roadmap: docs/ADOPTION_ROADMAP.md\n"
+              << "Feature backlog: docs/FEATURE_PLAN_20.md\n"
               << "Contributing: CONTRIBUTING.md\n"
               << "Code of Conduct: CODE_OF_CONDUCT.md\n\n"
               << "Optional browsable site (requires Python):\n"
@@ -601,6 +606,180 @@ struct TestCliOptions {
     bool failFast = false;
     bool listOnly = false;
 };
+
+static std::string graphJsonEscape(const std::string& s) {
+    std::string o;
+    o.reserve(s.size() + 8);
+    for (unsigned char c : s) {
+        switch (c) {
+        case '\\':
+            o += "\\\\";
+            break;
+        case '"':
+            o += "\\\"";
+            break;
+        case '\n':
+            o += "\\n";
+            break;
+        case '\r':
+            o += "\\r";
+            break;
+        case '\t':
+            o += "\\t";
+            break;
+        default:
+            if (c < 0x20) {
+                char buf[7];
+                std::snprintf(buf, sizeof(buf), "\\u%04x", c);
+                o += buf;
+            } else
+                o += static_cast<char>(c);
+            break;
+        }
+    }
+    return o;
+}
+
+/* * Walk upward from entry file dir; if .../lib/kern exists, return that directory's parent (repo root).*/
+static std::string detectRepoRootWithLibKern(const std::filesystem::path& entryFile) {
+    namespace fs = std::filesystem;
+    fs::path dir = entryFile.has_parent_path() ? entryFile.parent_path() : fs::current_path();
+    for (int i = 0; i < 16 && !dir.empty(); ++i) {
+        if (fs::exists(dir / "lib" / "kern")) return dir.string();
+        fs::path parent = dir.parent_path();
+        if (parent == dir) break;
+        dir = std::move(parent);
+    }
+    return {};
+}
+
+static void printGraphUsage(const char* prog) {
+    std::cout << "Usage:\n  " << prog << " graph [--json] [--include-path <dir>]... <entry.kn>\n\n"
+              << "Statically resolve import(\"...\") / import \"...\" from entry and print the .kn module graph.\n"
+              << "  --json              Machine-readable JSON on stdout.\n"
+              << "  --include-path      Extra search root (repeatable); also auto-detected when repo contains lib/kern/.\n";
+}
+
+// Returns 0 = ok, 1 = error, 2 = help.
+static int cmdGraph(int argc, char** argv, int argBase, const char* prog) {
+    namespace fs = std::filesystem;
+    bool jsonOut = false;
+    std::vector<std::string> extraIncludes;
+    int i = argBase + 1;
+    for (; i < argc; ++i) {
+        std::string a = argv[i];
+        if (a == "--help" || a == "-h") {
+            printGraphUsage(prog);
+            return 2;
+        }
+        if (a == "--json") {
+            jsonOut = true;
+            continue;
+        }
+        if (a == "--include-path" && i + 1 < argc) {
+            extraIncludes.push_back(argv[++i]);
+            continue;
+        }
+        if (!a.empty() && a[0] == '-') {
+            std::cerr << "graph: unknown option: " << a << "\n";
+            printGraphUsage(prog);
+            return 1;
+        }
+        break;
+    }
+    if (i >= argc) {
+        std::cerr << "graph: missing entry .kn path\n";
+        printGraphUsage(prog);
+        return 1;
+    }
+
+    ResolvedKnPath rs;
+    std::string resolveErr;
+    if (!resolveKnScriptPath(argv[i], rs, resolveErr)) {
+        if (jsonOut)
+            std::cout << "{\"ok\":false,\"errors\":[\"" << graphJsonEscape(resolveErr) << "\"]}\n";
+        else
+            std::cerr << "graph: " << resolveErr << "\n";
+        return 1;
+    }
+    if (rs.warnedNonKn && !jsonOut)
+        std::cerr << "warning: not a .kn file; continuing: " << rs.path << "\n";
+
+    fs::path entry(rs.path);
+    std::error_code ec;
+    entry = fs::weakly_canonical(entry, ec);
+    if (ec) entry = fs::path(rs.path);
+
+    ResolveOptions ro;
+    ro.projectRoot = entry.has_parent_path() ? entry.parent_path().string() : fs::current_path().string();
+    ro.includePaths.push_back(ro.projectRoot);
+    std::string repoRoot = detectRepoRootWithLibKern(entry);
+    if (!repoRoot.empty()) ro.includePaths.push_back(repoRoot);
+    for (const auto& inc : extraIncludes) {
+        fs::path p(inc);
+        std::error_code ec2;
+        fs::path can = fs::weakly_canonical(p, ec2);
+        ro.includePaths.push_back(ec2 ? inc : can.string());
+    }
+
+    ResolveResult rr = resolveProjectGraph(entry.string(), ro);
+
+    if (!rr.errors.empty()) {
+        if (jsonOut) {
+            std::cout << "{\"ok\":false,\"entry\":\"" << graphJsonEscape(entry.string()) << "\",\"errors\":[";
+            for (size_t e = 0; e < rr.errors.size(); ++e) {
+                if (e) std::cout << ',';
+                std::cout << "\"" << graphJsonEscape(rr.errors[e]) << "\"";
+            }
+            std::cout << "]}\n";
+        } else {
+            std::cerr << "graph: resolve failed:\n";
+            for (const auto& err : rr.errors) std::cerr << "  " << err << "\n";
+        }
+        return 1;
+    }
+
+    if (jsonOut) {
+        std::cout << "{\"ok\":true,\"entry\":\"" << graphJsonEscape(entry.string()) << "\",\"module_count\":"
+                  << rr.modules.size() << ",\"order\":[";
+        for (size_t o = 0; o < rr.topologicalOrder.size(); ++o) {
+            if (o) std::cout << ',';
+            std::cout << "\"" << graphJsonEscape(rr.topologicalOrder[o]) << "\"";
+        }
+        std::cout << "],\"modules\":[";
+        bool firstMod = true;
+        std::vector<std::string> keys;
+        keys.reserve(rr.modules.size());
+        for (const auto& kv : rr.modules) keys.push_back(kv.first);
+        std::sort(keys.begin(), keys.end());
+        for (const std::string& k : keys) {
+            const ResolvedModule& m = rr.modules.at(k);
+            if (!firstMod) std::cout << ',';
+            firstMod = false;
+            std::cout << "{\"path\":\"" << graphJsonEscape(m.canonicalPath) << "\",\"dependencies\":[";
+            for (size_t d = 0; d < m.dependencies.size(); ++d) {
+                if (d) std::cout << ',';
+                std::cout << "\"" << graphJsonEscape(m.dependencies[d]) << "\"";
+            }
+            std::cout << "]}";
+        }
+        std::cout << "]}\n";
+        return 0;
+    }
+
+    std::cout << "entry: " << entry.string() << "\n";
+    std::cout << "modules: " << rr.modules.size() << "\n";
+    std::vector<std::string> sortedKeys;
+    sortedKeys.reserve(rr.modules.size());
+    for (const auto& kv : rr.modules) sortedKeys.push_back(kv.first);
+    std::sort(sortedKeys.begin(), sortedKeys.end());
+    for (const std::string& k : sortedKeys) {
+        const ResolvedModule& m = rr.modules.at(k);
+        std::cout << "\n" << m.canonicalPath << "\n";
+        for (const std::string& dep : m.dependencies) std::cout << "  -> " << dep << "\n";
+    }
+    return 0;
+}
 
 static void printTestUsage(const char* prog) {
     std::cout << "Usage:\n  " << prog << " test [options] [dir]\n\n"
@@ -972,6 +1151,11 @@ int main(int argc, char** argv) {
         if (arg == "--vm-error-codes-json") {
             std::cout << formatVmErrorCatalogJson();
             return 0;
+        }
+        if (arg == "graph") {
+            const int gr = cmdGraph(argc, argv, argBase, prog);
+            if (gr == 2) return 0;
+            return gr;
         }
         if (arg == "test") {
             return cmdTest(argc, argv, argBase, prog);

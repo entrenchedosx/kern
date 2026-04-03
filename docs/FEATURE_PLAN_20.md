@@ -22,7 +22,7 @@ This is a **concrete backlog** of twenty additive capabilities. It **does not re
 
 | # | Feature | Value | Notes / deps |
 |---|---------|--------|----------------|
-| **6** | **`kern graph` (static import graph)** | IDE, CI, and “what did I pull in?” | Reuse resolver + scanner; JSON out; complements `kern-scan`. |
+| **6** | **`kern graph` (static import graph)** | IDE, CI, and “what did I pull in?” | **Shipped:** `kern graph [--json] [--include-path dir]* <entry.kn>` uses `resolveProjectGraph`. Complements `kern-scan`. |
 | **7** | **Lockfile enforcement everywhere** | Same guarantees for `kernc`, `kern test`, IDE | Unify with `kern verify`; fail CI when lock stale. |
 | **8** | **Gradual typing: file or block pragma** | Safety without full-file strictness | Builds on `--strict-types` + semantic engine flags. |
 | **9** | **Diagnostic spans: multi-token highlights** | Better UX for “this whole call is wrong” | Reporter + LSP range consistency. |

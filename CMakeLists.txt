@@ -166,7 +166,10 @@ set(KERN_MAIN_SOURCES src/main.cpp)
 if(WIN32)
   list(APPEND KERN_MAIN_SOURCES src/platform/win32_associate_kn.cpp)
 endif()
-add_executable(kern ${KERN_MAIN_SOURCES} ${KERN_WIN32_RESOURCES} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES} ${SCANNER_SOURCES})
+# project_resolver + import_aliases: `kern graph` static import graph (same resolver as kernc packaging).
+add_executable(kern ${KERN_MAIN_SOURCES} ${KERN_WIN32_RESOURCES} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES} ${SCANNER_SOURCES}
+    src/compiler/project_resolver.cpp
+    src/compiler/import_aliases.cpp)
 target_include_directories(kern PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(kern PRIVATE KERN_VERSION="${KERN_VERSION}")
 
