@@ -74,4 +74,6 @@ jobs:
 
       - name: Stable suite (contract, bytecode golden, coverage)
         shell: pwsh
+        env:
+          KERN_COVERAGE_SKIP_GRAPHICS: "1"
         run: pwsh -NoProfile -File ./tests/run_stable.ps1

@@ -42,4 +42,6 @@ jobs:
           ./build/kern examples/basic/01_hello_world.kn
 
       - name: Stable suite (contract, bytecode golden, coverage)
+        env:
+          KERN_COVERAGE_SKIP_GRAPHICS: "1"
         run: pwsh -NoProfile -File tests/run_stable.ps1

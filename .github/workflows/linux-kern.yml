@@ -55,7 +55,10 @@ jobs:
           ./build/kern tests/std_v1_builtins_smoke.kn
           ./build/kern examples/basic/01_hello_world.kn
 
+      # Headless runner: Raylib may load, but GLFW window tests must not run (same as release.yml).
       - name: Stable suite (contract, bytecode golden, coverage)
+        env:
+          KERN_COVERAGE_SKIP_GRAPHICS: "1"
         run: pwsh -NoProfile -File tests/run_stable.ps1
 
   # GCC/Clang only: enforce -Werror on Debug builds (see KERN_WERROR in CMakeLists.txt).
