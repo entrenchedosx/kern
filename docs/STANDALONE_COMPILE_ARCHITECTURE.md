@@ -58,7 +58,7 @@ The CLI tool **`kernc`** calls this pipeline so behavior stays unified.
 ## Testing
 
 - **Automated:** `kern --check` over examples + coverage suites (existing CI).
-- **Standalone smoke (manual):** from repo root, with `kernc` built, run `kernc --config tests/compile_pipeline_fixture/kernconfig.example.json` (paths are repo-relative) or copy that file and adjust. For richer recipes, see `kern-to-exe` (Python) which writes `kernconfig.json`.
+- **Standalone smoke (manual):** from repo root, with `kernc` built, run `kernc --config tests/compile_pipeline_fixture/kernconfig.example.json` (paths are repo-relative) or copy that file and adjust. On Windows, `powershell -File scripts/run_standalone_fixture.ps1` runs the same config; `-CheckOnly` uses `kern --check` on the fixture entry (fast); `-RunInterpreter` runs `kern main.kn` from the fixture folder so the sample `import "helper.kn"` resolves. For richer recipes, see `kern-to-exe` (Python) which writes `kernconfig.json`.
 - **Invalid input:** pipeline should return `Result::success == false` with diagnostics; **no VM execution** occurs if semantic errors stop the pipeline before codegen.
 
 ## Future work (roadmap hooks)

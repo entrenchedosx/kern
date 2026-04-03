@@ -1,0 +1,4 @@
+// Second module for the standalone compile fixture (multi-file resolve).
+def fixture_greeting() {
+    return "compile_fixture_helper_ok"
+}
