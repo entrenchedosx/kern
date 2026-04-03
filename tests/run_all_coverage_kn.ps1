@@ -67,6 +67,20 @@ function Test-ShouldSkipGraphicsTest {
     return $false
 }
 
+function Test-IsWindowsOs {
+    if ($PSVersionTable.PSVersion.Major -ge 6) { return $IsWindows }
+    return $env:OS -eq "Windows_NT"
+}
+
+function Test-ShouldSkipWindowsOnlyTest {
+    param([string]$BaseName)
+    if (Test-IsWindowsOs) { return $false }
+    # These scripts spawn cmd.exe / Windows-only automation paths (no cmd on Linux/macOS CI).
+    if ($BaseName -eq "test_module_automation_timeout.kn") { return $true }
+    if ($BaseName -eq "test_process_runtime_wave1.kn") { return $true }
+    return $false
+}
+
 function Build-KernArguments {
     param([string]$ScriptPath, [string]$ExtraArgs)
     if ([string]::IsNullOrWhiteSpace($ExtraArgs)) { return "`"$ScriptPath`"" }
@@ -114,6 +128,11 @@ foreach ($f in $files) {
     $base = [System.IO.Path]::GetFileName($f.FullName)
     if (Test-ShouldSkipGraphicsTest -BaseName $base -HasGraphics $hasGraphics) {
         Write-Host "[SKIP] $name (g2d/g3d not in this binary)" -ForegroundColor DarkYellow
+        $skipped++
+        continue
+    }
+    if (Test-ShouldSkipWindowsOnlyTest -BaseName $base) {
+        Write-Host "[SKIP] $name (Windows-only: cmd.exe / automation)" -ForegroundColor DarkYellow
         $skipped++
         continue
     }
