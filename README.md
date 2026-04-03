@@ -158,6 +158,7 @@ The canonical version string is the root **`KERN_VERSION.txt`** file (used by `k
 | [STDLIB_STD_V1.md](docs/STDLIB_STD_V1.md) | `std.v1.*` native modules |
 | [KERN_SCAN.md](docs/KERN_SCAN.md) | `kern --scan` / `kern-scan` |
 | [TRUST_MODEL.md](docs/TRUST_MODEL.md) | **Trust-the-programmer** stance and optional safety layers |
+| [FEATURE_PLAN_20.md](docs/FEATURE_PLAN_20.md) | Backlog of 20 concrete features (phased) |
 | [LANGUAGE_SYNTAX.md](docs/LANGUAGE_SYNTAX.md) | Short syntax overview + pointers to examples |
 | [BUILTIN_REFERENCE.md](docs/BUILTIN_REFERENCE.md) | Where builtins are defined and how to look them up |
 | [RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) | Maintainer pre-release checklist |

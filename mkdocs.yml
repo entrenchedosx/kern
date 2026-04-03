@@ -34,6 +34,7 @@ nav:
       - Virtual machine: INTERNALS_VM.md
       - Modules and security: INTERNALS_MODULES_AND_SECURITY.md
   - More:
+      - Feature plan (20): FEATURE_PLAN_20.md
       - Production vision: PRODUCTION_VISION.md
       - Language roadmap: LANGUAGE_ROADMAP.md
       - Memory model: MEMORY_MODEL.md
