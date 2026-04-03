@@ -8,7 +8,7 @@ This guide is for **users** who want to run Kern (run scripts, use the REPL) and
 
 ### Option A: Pre-built binaries (when available)
 
-1. Download the latest release for your OS (e.g. `kern-1.0.0-win64.zip`).
+1. Download the latest release for your OS (e.g. `kern-windows-x64-v1.0.7.zip`, `kern-linux-x64-v1.0.7.tar.gz`, or `kern-macos-v1.0.7.tar.gz` from the GitHub **Releases** page).
 2. Unzip to a folder (e.g. `C:\Program Files\Kern` or `~/bin`).
 3. Add that folder to your PATH (optional but recommended).
 4. Run:
@@ -62,7 +62,7 @@ Use the **[Kern-IDE](Kern-IDE/README.md)** directory: Tk desktop IDE, Qt editor,
 ## For maintainers: preparing a release
 
 1. **Version**
-   - Set the version in the root `KERN_VERSION.txt` file (e.g. `1.0.0`). This is used by `kern --version` and the `kern_version()` builtin.
+   - Set the version in the root `KERN_VERSION.txt` file (e.g. `1.0.7`). This is used by `kern --version` and the `kern_version()` builtin.
 
 2. **Changelog**
    - Update `CHANGELOG.md` with the release date and any last-minute notes.
@@ -77,13 +77,13 @@ Use the **[Kern-IDE](Kern-IDE/README.md)** directory: Tk desktop IDE, Qt editor,
    - Smoke-test: `kern --version`, `kern --help`, `kern examples/basic/01_hello_world.kn`, `kern` (REPL: exit), and if built with game: `kern examples/graphics/graphics_demo.kn`.
 
 5. **Package**
-   - Create archives (e.g. `kern-1.0.0-win64.zip`, `kern-1.0.0-linux64.tar.gz`) containing:
+   - Create archives (e.g. `kern-windows-x64-v1.0.7.zip`, `kern-linux-x64-v1.0.7.tar.gz`, `kern-macos-v1.0.7.tar.gz`) containing:
      - `kern` (or `kern.exe`), `kern_repl` (or `kern_repl.exe`), and optionally `kern_game`.
      - Optional: `examples/`, `docs/`, `LICENSE`, `README.md`.
    - Optionally coordinate a **Kern-IDE** release (separate repository) for editor binaries.
 
 6. **Publish**
-   - Create a Git tag (e.g. `v1.0.0`).
+   - Create a Git tag (e.g. `v1.0.7`).
    - Attach the package(s) to the GitHub (or other) release and copy the relevant part of `CHANGELOG.md` into the release notes.
 
 ### shareable drops used in this repository
