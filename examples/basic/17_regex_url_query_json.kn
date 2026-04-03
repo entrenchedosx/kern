@@ -1,0 +1,21 @@
+// Builtins: regex, URL, query string, JSON (pretty), TOML — no network.
+
+let line = "alpha-beta-gamma"
+let pieces = regex_split(line, "-")
+print("split:", pieces)
+
+let rx = regex_compile("[0-9]+")
+print("digits in 'a1b2'?", regex_match_pattern(rx, "a1b2"))
+print("replace:", regex_replace_pattern(rx, "x9y", "#"))
+
+let u = url_parse("https://docs.example.dev:8080/api?v=2&q=kern")
+print("url host=", u.host, "port=", u.port, "path=", u.path)
+
+let q = parse_query("mode=fast&dry_run=1")
+print("query mode =", q.mode)
+
+let doc = { "name": "kern", "tags": ["lang", "vm"] }
+print("json:\n" + json_stringify(doc, 2))
+
+let cfg = { "version": 1, "ok": true }
+print("toml-ish:\n" + toml_stringify(cfg))

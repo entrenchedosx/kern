@@ -1,0 +1,16 @@
+// Pipeline operator |> (unary callees) + funtools helpers (repo root or KERN_LIB for import).
+
+let ft = import("lib/kern/funtools.kn")
+
+def twice(x) {
+    return x * 2
+}
+
+def inc(x) {
+    return x + 1
+}
+
+let v = 5 |> twice |> inc
+print("pipeline result =", v)
+let after_tap = ft["tap"](v, print)
+print("tap returns value =", after_tap)

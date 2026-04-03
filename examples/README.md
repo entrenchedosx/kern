@@ -16,7 +16,7 @@ Set **`KERN_LIB`** to this repo’s `lib` folder when examples import under `lib
 
 ## Suggested learning path
 
-1. **`basic/`** — syntax, stdlib, small scripts. Start with `01_hello_world.kn`, then follow **[basic/README.md](basic/README.md)**.
+1. **`basic/`** — syntax, stdlib, small scripts. Start with `01_hello_world.kn`, then follow **[basic/README.md](basic/README.md)** (includes generators, regex/URL/JSON, `std.v1`, pipelines, `defer`, and related features in `16_`–`22_`).
 2. **`golden/`** — modern runtime, async, events (curated “best current” samples). See **[golden/README.md](golden/README.md)**.
 3. **`graphics/`** — 2D/3D when you have a game-enabled build. See **[graphics/README.md](graphics/README.md)**.
 4. **`system/`** — OS/FFI/process samples; some Windows-only. See **[system/README.md](system/README.md)**.

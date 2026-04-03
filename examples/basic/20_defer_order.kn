@@ -1,0 +1,22 @@
+// defer runs when leaving the block (after normal body); LIFO for multiple defers.
+
+let trace = []
+
+def note(tag) {
+    push(trace, tag)
+}
+
+def work() {
+    defer note("second")
+    defer note("first")
+    note("body")
+}
+
+work()
+
+print("trace =", trace)
+if len(trace) == 3 && trace[0] == "body" && trace[1] == "first" && trace[2] == "second" {
+    print("defer order OK")
+} else {
+    print("unexpected defer order")
+}

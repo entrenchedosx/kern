@@ -1,0 +1,22 @@
+// Generators (yield) and enums — run from repo root.
+
+enum LogLevel {
+    DEBUG,
+    INFO = 10,
+    WARN
+}
+
+print("WARN ordinal =", LogLevel.WARN)
+
+def count_down(n) {
+    while n >= 0 {
+        yield n
+        n = n - 1
+    }
+}
+
+let parts = []
+for x in count_down(3) {
+    push(parts, x)
+}
+print("count_down(3) ->", parts)

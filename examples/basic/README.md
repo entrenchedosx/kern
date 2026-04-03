@@ -19,6 +19,13 @@ Suggested order for learning the language:
 | 11 | `14_match.kn` | `match` / `case` |
 | 12 | `modules.kn` | small `import("math")` smoke |
 | 13 | `15_net_url_parse.kn` | `net.url_parse`, `net.build_query` (no network) |
+| 14 | `16_generators_enums.kn` | `enum`, `yield`, `for` over a generator |
+| 15 | `17_regex_url_query_json.kn` | `regex_*`, `url_parse`, `parse_query`, `json_stringify` (indent), `toml_stringify` |
+| 16 | `18_modern_syntax.kn` | map comprehensions, `invoke`, `...` spread, `??=`, `repeat`/`while`, `with` |
+| 17 | `19_match_array_destructure.kn` | `match` with array patterns |
+| 18 | `20_defer_order.kn` | `defer` and unwind order |
+| 19 | `21_std_v1_math.kn` | `import("std.v1.math")` (versioned stdlib) |
+| 20 | `22_pipeline_funtools.kn` | `|>` pipeline + `import("lib/kern/funtools.kn")` |
 
 There is no `02`/`03` in this folder; control flow is covered in `04_loops.kn` and `05_functions.kn`.
 
