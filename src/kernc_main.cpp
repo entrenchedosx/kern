@@ -1,9 +1,6 @@
 #include "backend/cpp_backend.hpp"
 #include "analyzer/project_analyzer.hpp"
-#include "compiler/project_resolver.hpp"
-#include "compiler/semantic.hpp"
-#include "ir/ir_builder.hpp"
-#include "ir/passes/passes.hpp"
+#include "compile/compile_pipeline.hpp"
 #include "utils/build_cache.hpp"
 #include "utils/kernconfig.hpp"
 
@@ -49,75 +46,6 @@ static std::string kerncGetEnvStr(const char* name) {
 
 namespace fs = std::filesystem;
 using namespace kern;
-
-struct BuildDiagRecord {
-    std::string severity;
-    std::string file;
-    int line = 0;
-    int column = 0;
-    std::string code;
-    std::string message;
-};
-
-static std::string jsonEscapeJsonString(const std::string& s) {
-    std::string out;
-    out.reserve(s.size() + 8);
-    for (unsigned char c : s) {
-        switch (c) {
-        case '\\':
-            out += "\\\\";
-            break;
-        case '"':
-            out += "\\\"";
-            break;
-        case '\n':
-            out += "\\n";
-            break;
-        case '\r':
-            out += "\\r";
-            break;
-        case '\t':
-            out += "\\t";
-            break;
-        default:
-            if (c < 0x20) {
-                char buf[7];
-                std::snprintf(buf, sizeof(buf), "\\u%04x", c);
-                out += buf;
-            } else
-                out += static_cast<char>(c);
-            break;
-        }
-    }
-    return out;
-}
-
-static const char* semanticSeverityJson(SemanticSeverity s) {
-    switch (s) {
-    case SemanticSeverity::Error:
-        return "error";
-    case SemanticSeverity::Warning:
-        return "warning";
-    default:
-        return "info";
-    }
-}
-
-static bool writeBuildDiagnosticsJson(const std::string& path, const std::vector<BuildDiagRecord>& diags) {
-    std::ofstream out(path, std::ios::binary);
-    if (!out) return false;
-    out << "[";
-    for (size_t i = 0; i < diags.size(); ++i) {
-        if (i) out << ",";
-        const auto& d = diags[i];
-        out << "\n{\"severity\":\"" << jsonEscapeJsonString(d.severity) << "\""
-            << ",\"file\":\"" << jsonEscapeJsonString(d.file) << "\""
-            << ",\"line\":" << d.line << ",\"column\":" << d.column << ",\"code\":\"" << jsonEscapeJsonString(d.code)
-            << "\",\"message\":\"" << jsonEscapeJsonString(d.message) << "\"}";
-    }
-    out << "\n]\n";
-    return static_cast<bool>(out);
-}
 
 /* * kern checkout root (contains src/compiler/lexer.cpp). Not the process cwd — standalone CMake must not depend on cwd.*/
 static bool kerncIsSplRepoRoot(const fs::path& root) {
@@ -287,10 +215,6 @@ static void printUsage(const char* prog) {
         << "  KERN_REPO_ROOT     Override Kern source tree for standalone link (default: detected from kern executable)\n";
 }
 
-static int runCommand(const std::string& cmd) {
-    return std::system(cmd.c_str());
-}
-
 static bool parseArgs(int argc, char** argv, CliOptions& o, std::string& error) {
     if (argc < 2) {
         printUsage(argv[0]);
@@ -401,13 +325,6 @@ static bool fileRead(const std::string& path, std::string& out) {
     ss << in.rdbuf();
     out = ss.str();
     return true;
-}
-
-static uint64_t fileTimestamp(const std::string& path) {
-    std::error_code ec;
-    auto ft = fs::last_write_time(path, ec);
-    if (ec) return 0;
-    return static_cast<uint64_t>(ft.time_since_epoch().count());
 }
 
 static int emitError(const std::string& message, bool json) {
@@ -650,151 +567,19 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    ResolveOptions ro;
-    ro.projectRoot = entryCan.parent_path().string();
-    ro.includePaths = cfg.includePaths;
-    if (ro.includePaths.empty()) ro.includePaths.push_back(ro.projectRoot);
-    ro.excludeGlobs = cfg.exclude;
+    compile::PipelineParams pp;
+    pp.buildDiagnosticsJsonPath = cli.buildDiagnosticsJsonPath;
+    pp.emitStdoutJson = cli.json;
+    pp.quietHumanSemantic = cli.json;
 
-    std::vector<BuildDiagRecord> buildDiags;
-    auto flushDiags = [&]() {
-        if (cli.buildDiagnosticsJsonPath.empty()) return;
-        writeBuildDiagnosticsJson(cli.buildDiagnosticsJsonPath, buildDiags);
-    };
-
-    ResolveResult resolved = resolveProjectGraph(cfg.entry, ro);
-    if (!resolved.errors.empty()) {
-        for (const auto& err : resolved.errors)
-            buildDiags.push_back({"error", "", 0, 0, "resolve", err});
-        flushDiags();
-        return emitError(resolved.errors.front(), cli.json);
-    }
-
-    if (!cfg.explicitFiles.empty()) {
-        for (const std::string& efRaw : cfg.explicitFiles) {
-            fs::path ep(efRaw);
-            std::error_code ecEx;
-            fs::path efCan = fs::weakly_canonical(ep, ecEx);
-            if (ecEx || !fs::exists(efCan)) {
-                std::string msg = "explicit file not found: " + efRaw;
-                buildDiags.push_back({"error", efRaw, 0, 0, "files", msg});
-                flushDiags();
-                return emitError(msg, cli.json);
-            }
-            std::string key = efCan.generic_string();
-            if (resolved.modules.find(key) == resolved.modules.end()) {
-                std::string msg = "explicit file not reachable from entry (missing import path): " + key;
-                buildDiags.push_back({"error", key, 0, 0, "files", msg});
-                flushDiags();
-                return emitError(msg, cli.json);
-            }
-        }
-    }
-
-    // semantic analysis (module-aware, stability-first):
-    const bool strictTypes = (cfg.featureSet == "preview" || cfg.featureSet == "experimental");
-    int semWarnings = 0;
-    int semErrors = 0;
-    for (const auto& kv : resolved.modules) {
-        SemanticResult sr = analyzeSemanticSource(kv.second.source, kv.first, strictTypes);
-        for (const auto& d : sr.diagnostics) {
-            buildDiags.push_back({semanticSeverityJson(d.severity), d.file, d.line, d.column, d.code, d.message});
-            if (d.severity == SemanticSeverity::Error) ++semErrors;
-            else if (d.severity == SemanticSeverity::Warning) ++semWarnings;
-            if (!cli.json) {
-                std::cerr << "kern semantic [" << semanticSeverityName(d.severity) << "] "
-                          << d.file << ":" << d.line << ":" << d.column << " "
-                          << d.code << " " << d.message << std::endl;
-            }
-        }
-    }
-    if (semErrors > 0) {
-        flushDiags();
+    compile::Result pr;
+    if (!compile::runStandaloneExecutablePipeline(cfg, kerncDetectSourceRoot().string(), pp, nullptr, pr)) {
         if (cli.json) {
-            std::cout << "{\"ok\":false,\"error\":\"semantic analysis failed\",\"semantic_errors\":" << semErrors << "}\n";
+            std::cout << "{\"ok\":false,\"error\":\"" << jsonEscapeSmall(pr.errorSummary) << "\"}\n";
+        } else {
+            emitError(pr.errorSummary, false);
         }
         return 1;
     }
-
-    // phase1 explicit diagnostic: kernc native backend does not lower extern/FFI declarations yet.
-    for (const auto& kv : resolved.modules) {
-        if (kv.second.source.find("extern def") != std::string::npos ||
-            kv.second.source.find("extern function") != std::string::npos) {
-            std::string msg = "kernc phase1 backend does not support extern/FFI declarations yet; run with `kern` runtime path for ffi_call.";
-            buildDiags.push_back({"error", kv.first, 0, 0, "ffi-kernc-unsupported", msg});
-            flushDiags();
-            return emitError(msg + " file=" + kv.first, cli.json);
-        }
-    }
-
-    // incremental cache: detect changed modules.
-    fs::path cacheDir = outputPath.parent_path() / ".kern-cache";
-    fs::create_directories(cacheDir, ec);
-    fs::path cacheFile = cacheDir / "modules.cache";
-    BuildCache cache;
-    loadBuildCache(cacheFile.string(), cache);
-    bool anyChanged = false;
-    for (const auto& kv : resolved.modules) {
-        const std::string& p = kv.first;
-        const std::string& src = kv.second.source;
-        std::string h = hashContent(src);
-        uint64_t ts = fileTimestamp(p);
-        auto it = cache.modules.find(p);
-        if (it == cache.modules.end() || it->second.hash != h || it->second.timestamp != ts) {
-            anyChanged = true;
-        }
-        cache.modules[p] = {h, ts};
-    }
-
-    if (cli.json) {
-        std::cout << "{\"stage\":\"resolve\",\"modules\":" << resolved.modules.size() << ",\"feature_set\":\"" << cfg.featureSet << "\"}\n";
-    } else {
-        std::cout << "kern: resolved " << resolved.modules.size() << " module(s)"
-                  << " [feature-set=" << cfg.featureSet << "]" << std::endl;
-    }
-
-    IRProgram ir = buildIRFromResolvedGraph(resolved);
-    runTypedIRCanonicalization(ir);
-    runTypedIRConstantPropagation(ir);
-    runTypedIRDeadBlockElimination(ir);
-    runDeadCodeElimination(ir);
-    runConstantFolding(ir);
-    runBasicInlining(ir);
-
-    CppBackendResult gen;
-    if (!generateCppBundle(ir, cfg, gen, error)) {
-        buildDiags.push_back({"error", "", 0, 0, "codegen", error});
-        flushDiags();
-        return emitError(error, cli.json);
-    }
-    if (cli.json) std::cout << "{\"stage\":\"codegen\",\"file\":\"" << gen.generatedCpp << "\"}\n";
-
-    // plugin commands (pre-build)
-    for (const auto& cmd : cfg.preBuildCommands) {
-        if (runCommand(cmd) != 0) {
-            buildDiags.push_back({"error", "", 0, 0, "pre_build", "pre-build plugin command failed: " + cmd});
-            flushDiags();
-            return emitError("pre-build plugin command failed: " + cmd, cli.json);
-        }
-    }
-
-    if (anyChanged || !fs::exists(cfg.output)) {
-        if (!buildStandaloneExe(gen, cfg, kerncDetectSourceRoot().string(), error)) {
-            buildDiags.push_back({"error", "", 0, 0, "link", error});
-            flushDiags();
-            return emitError(error, cli.json);
-        }
-    }
-
-    for (const auto& cmd : cfg.postBuildCommands) {
-        if (runCommand(cmd) != 0) {
-            buildDiags.push_back({"error", "", 0, 0, "post_build", "post-build plugin command failed: " + cmd});
-            flushDiags();
-            return emitError("post-build plugin command failed: " + cmd, cli.json);
-        }
-    }
-
-    saveBuildCache(cacheFile.string(), cache);
-    flushDiags();
     return emitOk(cfg.output, cli.json);
 }

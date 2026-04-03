@@ -1,0 +1,2 @@
+// Minimal entry for manual `kernc --config` smoke tests (see docs/STANDALONE_COMPILE_ARCHITECTURE.md).
+print("compile_pipeline_fixture_ok")

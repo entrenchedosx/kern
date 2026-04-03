@@ -157,6 +157,7 @@ set(KERNC_SUPPORT_SOURCES
     src/ir/passes/typed_ir_passes.cpp
     src/backend/cpp_backend.cpp
     src/packager/bundle_writer.cpp
+    src/compile/compile_pipeline.cpp
     src/utils/kernconfig.cpp
     src/utils/build_cache.cpp
 )
