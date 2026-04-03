@@ -45,9 +45,9 @@ This is a **concrete backlog** of twenty additive capabilities. It **does not re
 
 | # | Feature | Value | Notes / deps |
 |---|---------|--------|----------------|
-| **15** | **`kern watch`** | Rerun `--check` or `kern test --grep` on save | **Partial:** `kern --watch [--check] [--strict-types] <file.kn>` polls mtime and re-runs the script or compile-only pipeline. Multi-file / `kern test` watch still TBD. |
+| **15** | **`kern watch`** | Rerun `--check` or `kern test --grep` on save | **Shipped (subset):** `kern --watch [--check] [--strict-types] <file.kn>` for one file; **`kern watch test [same opts as test] [dir]`** re-runs the test suite when any matching `.kn` mtime changes. |
 | **16** | **`kern fmt` completeness** | Format new syntax (`match`, `\|>`, comprehensions) | **Partial:** `--fmt` still brace-indents only, but **`{` / `}` inside `//`, `/* */`, `"` / `'`, and `"""` / `'''`** no longer change depth (fewer broken reformats). Full AST-aware formatting + goldens still TBD. |
-| **17** | **LSP: cross-file go-to-definition** | Jump from symbol to defining `.kn` | **Partial:** `textDocument/definition` resolves `import` / `from "…" import` using the same path probes as packaging (sibling file, repo root, `KERN_LIB`), virtual stdlib/game imports skipped; prefers open LSP buffers. No `import("x")` expression form yet. |
+| **17** | **LSP: cross-file go-to-definition** | Jump from symbol to defining `.kn` | **Partial:** `textDocument/definition` for `import` / `from "…" import` and **top-level** `let x = import("path")` (`__import` + string literal); same path probes as packaging; open buffers preferred. Nested scopes / dynamic paths not modeled. |
 | **18** | **LSP / IDE: doc comments → hover** | `///` or agreed comment form → markdown hover | Parser trivia or lightweight preparse. |
 | **19** | **Test runner: stdout / stderr snapshots** | Regress CLI programs without brittle string compares | Golden files next to `tests/`. |
 | **20** | **VM observability hooks** | Opcode counters or optional trace zones | Behind flag; feeds perf work in [PRODUCTION_VISION.md](PRODUCTION_VISION.md). |

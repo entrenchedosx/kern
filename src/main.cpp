@@ -1,7 +1,7 @@
 /* *
  * kern (Kern) - Main entry point
  * compiles and runs .kn files or starts the REPL.
- * modes: kern file.kn | kern --ast file | kern --bytecode file | kern --check file | kern --watch [--check] file | kern --scan [paths] | kern --fmt file | kern graph <entry.kn>
+ * modes: kern file.kn | kern --ast file | kern --bytecode file | kern --check file | kern --watch [--check] file | kern watch test [opts] [dir] | kern --scan [paths] | kern --fmt file | kern graph <entry.kn>
  */
 
 #include "compiler/lexer.hpp"
@@ -357,6 +357,8 @@ static void printUsage(const char* prog) {
         << "                        Run all .kn files under directory recursively (default: tests/coverage).\n"
         << "                        Options: --grep <substr>, --list, --fail-fast (-x), --skip-lock-verify.\n"
         << "                        See: " << prog << " test --help\n"
+        << "  " << prog << " watch test [options] [path]\n"
+        << "                        Same as test, but re-runs when any matching .kn file's mtime changes.\n"
         << "  " << prog << " docs             Print paths to documentation and optional MkDocs hint.\n"
         << "  " << prog << " build            Show CMake build instructions (toolchain is built with CMake).\n"
         << "  " << prog << " doctor           Print runtime/tooling diagnostics.\n"
@@ -803,7 +805,8 @@ static void printTestUsage(const char* prog) {
               << "  --fail-fast, -x   Stop on first unexpected failure.\n"
               << "  --list            List tests that would run (after --grep) and exit.\n"
               << "  --skip-lock-verify Skip kern.json/kern.lock consistency check (not for CI).\n"
-              << "  -h, --help        Show this help.\n";
+              << "  -h, --help        Show this help.\n\n"
+              << "Also: " << prog << " watch test [same options] — poll mtimes and re-run this suite.\n";
 }
 
 // Returns: 0 = ok, 1 = parse error, 2 = help requested.
@@ -946,88 +949,81 @@ static std::string formatSourceBraceIndentAware(const std::string& source) {
     return out;
 }
 
-static int cmdTest(int argc, char** argv, int argBase, const char* prog) {
-    TestCliOptions opts;
-    std::string dirPath;
-    const int pr = parseTestCli(argc, argv, argBase, opts, dirPath);
-    if (pr == 2) {
-        printTestUsage(prog);
-        return 0;
-    }
-    if (pr != 0)
-        return 1;
-
+// 0 = ok (outFiles non-empty), 1 = I/O or path error, 2 = no .kn files (message printed).
+static int prepareKnTestFiles(const TestCliOptions& opts, const std::string& dirPath, std::filesystem::path& outRoot,
+                              std::vector<std::filesystem::path>& outFiles) {
     namespace fs = std::filesystem;
-    fs::path p(dirPath.empty() ? "tests/coverage" : dirPath);
-    if (!fs::exists(p)) {
-        std::cerr << "test: path not found: " << p.string() << "\n";
+    outRoot = fs::path(dirPath.empty() ? "tests/coverage" : dirPath);
+    if (!fs::exists(outRoot)) {
+        std::cerr << "test: path not found: " << outRoot.string() << "\n";
         return 1;
     }
-    if (!fs::is_directory(p)) {
-        std::cerr << "test: not a directory: " << p.string() << "\n";
+    if (!fs::is_directory(outRoot)) {
+        std::cerr << "test: not a directory: " << outRoot.string() << "\n";
         return 1;
     }
-
-    // Ensure `import("lib/kern/...")` works even when the user runs `kern` from
-    // a different working directory.
-    maybeAutoSetKernLibFromEntryPath(p.string());
-
-    std::vector<fs::path> files;
+    maybeAutoSetKernLibFromEntryPath(outRoot.string());
+    outFiles.clear();
     try {
         for (const auto& entry :
-             fs::recursive_directory_iterator(p, fs::directory_options::skip_permission_denied)) {
+             fs::recursive_directory_iterator(outRoot, fs::directory_options::skip_permission_denied)) {
             if (!entry.is_regular_file() || entry.path().extension() != ".kn") continue;
-            files.push_back(entry.path());
+            outFiles.push_back(entry.path());
         }
     } catch (const fs::filesystem_error& e) {
         std::cerr << "test: " << e.what() << "\n";
         return 1;
     }
-    std::sort(files.begin(), files.end());
-    // Compile-time strict negative fixture: valid VM, fails --strict-types only (see docs/STRICT_TYPES.md).
-    files.erase(std::remove_if(files.begin(), files.end(), [&](const fs::path& path) {
-            const std::string rel = path.lexically_relative(p).generic_string();
+    std::sort(outFiles.begin(), outFiles.end());
+    outFiles.erase(std::remove_if(outFiles.begin(), outFiles.end(), [&](const fs::path& path) {
+            const std::string rel = path.lexically_relative(outRoot).generic_string();
             return rel == "strict_types_phase2/fail_mismatch.kn" || rel == "fail_mismatch.kn";
         }),
-        files.end());
+        outFiles.end());
     if (!opts.grep.empty()) {
         std::vector<fs::path> filtered;
-        filtered.reserve(files.size());
-        for (const auto& path : files) {
-            const std::string rel = path.lexically_relative(p).generic_string();
-            if (rel.find(opts.grep) != std::string::npos)
-                filtered.push_back(path);
+        filtered.reserve(outFiles.size());
+        for (const auto& path : outFiles) {
+            const std::string rel = path.lexically_relative(outRoot).generic_string();
+            if (rel.find(opts.grep) != std::string::npos) filtered.push_back(path);
         }
-        files = std::move(filtered);
+        outFiles = std::move(filtered);
     }
-    if (files.empty()) {
+    if (outFiles.empty()) {
         std::cerr << "test: no .kn files"
-                 << (opts.grep.empty() ? " found under " : " match --grep under ") << p.string() << "\n";
-        return 1;
+                 << (opts.grep.empty() ? " found under " : " match --grep under ") << outRoot.string() << "\n";
+        return 2;
     }
-    if (opts.listOnly) {
-        for (const auto& path : files) {
-            std::cout << path.lexically_relative(p).generic_string() << "\n";
+    return 0;
+}
+
+static std::filesystem::file_time_type maxMtimeOfKnFiles(const std::vector<std::filesystem::path>& files) {
+    namespace fs = std::filesystem;
+    fs::file_time_type best{};
+    bool any = false;
+    for (const auto& path : files) {
+        std::error_code ec;
+        const auto t = fs::last_write_time(path, ec);
+        if (ec) continue;
+        if (!any || t > best) {
+            best = t;
+            any = true;
         }
-        return 0;
     }
-    if (!opts.skipLockVerify) {
-        if (int lr = verifyLockfileAgainstManifest(false, "test", false); lr != 0)
-            return lr;
-    }
+    return best;
+}
+
+static int runPreparedKnTests(const std::filesystem::path& testRoot, const std::vector<std::filesystem::path>& files,
+                              const TestCliOptions& opts) {
     int pass = 0;
     int fail = 0;
     for (const auto& path : files) {
-        std::string rel = path.lexically_relative(p).generic_string();
+        std::string rel = path.lexically_relative(testRoot).generic_string();
         const bool expectFail =
-            // explicit expected-failure convention
             (rel.size() >= 9 && rel.find("_xfail.kn") != std::string::npos) ||
-            // diagnostics tests intentionally trigger failures
             (rel.rfind("test_diag_", 0) == 0) ||
-            // import-resolution negative coverage
             (rel == "test_module_loading.kn") ||
             (rel == "test_browserkit_import_fail_loud.kn") ||
-            // FFI typed tests require --ffi (disabled by default in cmdTest VMs)
             (rel == "test_phase2_ffi_typed.kn");
         std::string source = readTextFile(path.string());
         if (source.empty()) {
@@ -1061,6 +1057,90 @@ static int cmdTest(int argc, char** argv, int argBase, const char* prog) {
     }
     std::cout << "\nSummary: pass=" << pass << " fail=" << fail << "\n";
     return fail == 0 ? 0 : 1;
+}
+
+static int cmdTest(int argc, char** argv, int argBase, const char* prog) {
+    TestCliOptions opts;
+    std::string dirPath;
+    const int pr = parseTestCli(argc, argv, argBase, opts, dirPath);
+    if (pr == 2) {
+        printTestUsage(prog);
+        return 0;
+    }
+    if (pr != 0)
+        return 1;
+
+    namespace fs = std::filesystem;
+    fs::path p;
+    std::vector<fs::path> files;
+    const int prep = prepareKnTestFiles(opts, dirPath, p, files);
+    if (prep == 1 || prep == 2)
+        return 1;
+    if (opts.listOnly) {
+        for (const auto& path : files) {
+            std::cout << path.lexically_relative(p).generic_string() << "\n";
+        }
+        return 0;
+    }
+    if (!opts.skipLockVerify) {
+        if (int lr = verifyLockfileAgainstManifest(false, "test", false); lr != 0)
+            return lr;
+    }
+    return runPreparedKnTests(p, files, opts);
+}
+
+static int cmdWatchTest(int argc, char** argv, int testArgBase, const char* prog) {
+    TestCliOptions opts;
+    std::string dirPath;
+    const int pr = parseTestCli(argc, argv, testArgBase, opts, dirPath);
+    if (pr == 2) {
+        printTestUsage(prog);
+        return 0;
+    }
+    if (pr != 0)
+        return 1;
+
+    namespace fs = std::filesystem;
+    fs::path p;
+    std::vector<fs::path> files;
+    const int prep = prepareKnTestFiles(opts, dirPath, p, files);
+    if (prep == 1 || prep == 2)
+        return 1;
+    if (opts.listOnly) {
+        for (const auto& path : files) {
+            std::cout << path.lexically_relative(p).generic_string() << "\n";
+        }
+        return 0;
+    }
+    if (!opts.skipLockVerify) {
+        if (int lr = verifyLockfileAgainstManifest(false, "watch test", false); lr != 0)
+            return lr;
+    }
+
+    std::cout << "Watching .kn tests under " << p.string() << " (Ctrl+C to stop)\n";
+    fs::file_time_type lastStamp = maxMtimeOfKnFiles(files);
+    while (true) {
+        std::cout << "\n--- " << prog << " test (watch) ---\n";
+        const int tr = runPreparedKnTests(p, files, opts);
+        (void)tr;
+        while (true) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(400));
+            std::vector<fs::path> fresh;
+            fs::path root;
+            const int again = prepareKnTestFiles(opts, dirPath, root, fresh);
+            if (again != 0) {
+                std::cerr << "watch test: could not refresh file list\n";
+                return 1;
+            }
+            files = std::move(fresh);
+            p = std::move(root);
+            const fs::file_time_type now = maxMtimeOfKnFiles(files);
+            if (now != lastStamp) {
+                lastStamp = now;
+                break;
+            }
+        }
+    }
 }
 
 static bool checkKernSource(const std::string& source, const std::string& pathResolved, bool strictTypes) {
@@ -1323,6 +1403,16 @@ int main(int argc, char** argv) {
             const int gr = cmdGraph(argc, argv, argBase, prog);
             if (gr == 2) return 0;
             return gr;
+        }
+        if (arg == "watch") {
+            if (argc <= argBase + 1) {
+                std::cerr << "watch: use `kern watch test [opts] [dir]` or `kern --watch <file.kn>`\n";
+                return 1;
+            }
+            if (std::string(argv[argBase + 1]) == "test")
+                return cmdWatchTest(argc, argv, argBase + 1, prog);
+            std::cerr << "watch: unknown subcommand (expected `test`)\n";
+            return 1;
         }
         if (arg == "test") {
             return cmdTest(argc, argv, argBase, prog);

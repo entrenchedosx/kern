@@ -888,6 +888,22 @@ struct DocumentState {
     int version = 0;
 };
 
+static void collectTopLevelImportExprBindings(const Program* prog, std::unordered_map<std::string, std::string>& out) {
+    if (!prog) return;
+    for (const auto& st : prog->statements) {
+        const auto* v = dynamic_cast<const VarDeclStmt*>(st.get());
+        if (!v || !v->initializer) continue;
+        const auto* call = dynamic_cast<const CallExpr*>(v->initializer.get());
+        if (!call || !call->callee) continue;
+        const auto* calleeId = dynamic_cast<const Identifier*>(call->callee.get());
+        if (!calleeId || calleeId->name != "__import") continue;
+        if (call->args.empty() || call->args[0].spread || !call->args[0].expr) continue;
+        const auto* lit = dynamic_cast<const StringLiteral*>(call->args[0].expr.get());
+        if (!lit) continue;
+        out[v->name] = lit->value;
+    }
+}
+
 static std::string loadKnTextForResolvedPath(const std::unordered_map<std::string, DocumentState>& docs,
                                              const std::string& resolvedPath) {
     namespace fs = std::filesystem;
@@ -1105,6 +1121,20 @@ private:
                 const std::string modPath = lspResolveImportOnDisk(importerPath, imp->moduleName, root, inc);
                 if (modPath.empty()) continue;
                 SourceSpan entry = normalizeSourceSpan(1, 1, 1, 1);
+                return JsonValue::object({
+                    {"uri", JsonValue::string(pathToFileUri(modPath))},
+                    {"range", spanToLspRange(entry)}
+                });
+            }
+        }
+
+        std::unordered_map<std::string, std::string> importExprBindings;
+        collectTopLevelImportExprBindings(program.get(), importExprBindings);
+        const auto itBind = importExprBindings.find(idName);
+        if (itBind != importExprBindings.end()) {
+            const std::string modPath = lspResolveImportOnDisk(importerPath, itBind->second, root, inc);
+            if (!modPath.empty()) {
+                const SourceSpan entry = normalizeSourceSpan(1, 1, 1, 1);
                 return JsonValue::object({
                     {"uri", JsonValue::string(pathToFileUri(modPath))},
                     {"range", spanToLspRange(entry)}

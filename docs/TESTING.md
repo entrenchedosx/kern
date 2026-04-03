@@ -39,6 +39,8 @@ If the current working directory has **`kern.json`**, **`kern test`** and **`ker
 
 **`kern --watch script.kn`** re-runs the script when the file changes. Add **`--check`** for compile/semantic only (no VM), and optional **`--strict-types`** (same as **`kern --check`**).
 
+**`kern watch test [options] [dir]`** uses the same flags as **`kern test`** (`--grep`, `--fail-fast`, etc.) and re-runs the whole suite whenever any matching **`.kn`** file’s modification time changes under **`dir`** (default **`tests/coverage`**).
+
 ## Useful options
 
 - `-TimeoutSeconds 60` to increase per-test timeout
