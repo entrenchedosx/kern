@@ -1,7 +1,7 @@
 /* *
  * kern (Kern) - Main entry point
  * compiles and runs .kn files or starts the REPL.
- * modes: kern file.kn | kern --ast file | kern --bytecode file | kern --check file | kern --scan [paths] | kern --fmt file | kern graph <entry.kn>
+ * modes: kern file.kn | kern --ast file | kern --bytecode file | kern --check file | kern --watch [--check] file | kern --scan [paths] | kern --fmt file | kern graph <entry.kn>
  */
 
 #include "compiler/lexer.hpp"
@@ -341,7 +341,8 @@ static void printUsage(const char* prog) {
         << "  --vm-error-codes-json Print machine-readable VM error catalog (E### ids) and exit.\n"
         << "  --scan [opts] [paths] Cross-layer scan: builtin registry, stdlib exports, compile + static analysis.\n"
         << "                        Same as standalone `kern-scan`. Use --registry-only, --json, --strict-types, --test.\n\n"
-        << "  --watch <file>        Re-run script when file changes.\n\n"
+        << "  --watch [--check] [--strict-types] <file>\n"
+        << "                        Re-run on save; --check = compile/semantic only (no VM run).\n\n"
         << "Runtime mode flags (can precede any command):\n"
         << "  --trace               Enable VM instruction trace for the next script run or REPL (very noisy).\n"
         << "  --debug / --release   Toggle runtime guard profile (debug default).\n"
@@ -1062,7 +1063,42 @@ static int cmdTest(int argc, char** argv, int argBase, const char* prog) {
     return fail == 0 ? 0 : 1;
 }
 
-static int cmdWatch(VM& vm, const std::string& scriptPath) {
+static bool checkKernSource(const std::string& source, const std::string& pathResolved, bool strictTypes) {
+    g_errorReporter.resetCounts();
+    g_errorReporter.setSource(source);
+    g_errorReporter.setFilename(pathResolved);
+    try {
+        Lexer lexer(source);
+        std::vector<Token> tokens = lexer.tokenize();
+        Parser parser(std::move(tokens));
+        std::unique_ptr<Program> program = parser.parse();
+        CodeGenerator gen;
+        (void)gen.generate(std::move(program));
+        (void)applySemanticDiagnosticsToReporter(source, pathResolved, strictTypes);
+        return g_errorReporter.errorCount() == 0;
+    } catch (const LexerError& e) {
+        g_errorReporter.reportCompileError(ErrorCategory::SyntaxError, e.line, e.column, e.what(), lexerCompileErrorHint(),
+            "LEX-TOKENIZE", lexerCompileErrorDetail());
+        return false;
+    } catch (const ParserError& e) {
+        std::string msg(e.what());
+        g_errorReporter.reportCompileError(ErrorCategory::SyntaxError, e.line, e.column, msg, parserCompileErrorHint(msg),
+            "PARSE-SYNTAX", parserCompileErrorDetail(msg));
+        return false;
+    } catch (const std::exception& e) {
+        g_errorReporter.reportCompileError(ErrorCategory::Other, 0, 0, std::string("compile failed: ") + e.what(),
+            "This may be an internal compiler error; try simplifying the surrounding code.", "INTERNAL-COMPILE",
+            internalFailureDetail("`kern --check` (lex/parse/codegen)"));
+        return false;
+    } catch (...) {
+        g_errorReporter.reportCompileError(ErrorCategory::Other, 0, 0, "compile failed: unknown exception",
+            "This may be an internal compiler error; try simplifying the surrounding code.", "INTERNAL-COMPILE-UNKNOWN",
+            internalFailureDetail("`kern --check` (non-typed throw)"));
+        return false;
+    }
+}
+
+static int cmdWatch(VM& vm, const std::string& scriptPath, bool checkOnly, bool strictTypes) {
     namespace fs = std::filesystem;
     fs::path p(scriptPath);
     if (!fs::exists(p)) {
@@ -1074,13 +1110,19 @@ static int cmdWatch(VM& vm, const std::string& scriptPath) {
     maybeAutoSetKernLibFromEntryPath(p.string());
 
     auto last = fs::last_write_time(p);
-    std::cout << "Watching " << p.string() << " (Ctrl+C to stop)\n";
+    std::cout << "Watching " << p.string();
+    if (checkOnly) {
+        std::cout << " (compile-only";
+        if (strictTypes) std::cout << ", --strict-types";
+        std::cout << ")";
+    }
+    std::cout << " (Ctrl+C to stop)\n";
     while (true) {
         std::string source = readTextFile(p.string());
-        g_errorReporter.resetCounts();
-        bool ok = runSource(vm, source, p.string());
+        normalizeKernSourceText(source, p.string());
+        bool ok = checkOnly ? checkKernSource(source, p.string(), strictTypes) : runSource(vm, source, p.string());
         g_errorReporter.printSummary();
-        std::cout << "[watch] run -> " << (ok ? "ok" : "failed") << "\n";
+        std::cout << "[watch] " << (checkOnly ? "check" : "run") << " -> " << (ok ? "ok" : "failed") << "\n";
         while (true) {
             std::this_thread::sleep_for(std::chrono::milliseconds(350));
             auto now = fs::last_write_time(p);
@@ -1490,15 +1532,34 @@ int main(int argc, char** argv) {
     }
 
     if (argc > argBase + 1 && std::string(argv[argBase]) == "--watch") {
+        bool watchCheck = false;
+        bool watchStrict = false;
+        int wi = argBase + 1;
+        for (; wi < argc; ++wi) {
+            std::string a = argv[wi];
+            if (a == "--check") {
+                watchCheck = true;
+                continue;
+            }
+            if (a == "--strict-types") {
+                watchStrict = true;
+                continue;
+            }
+            break;
+        }
+        if (wi >= argc) {
+            std::cerr << "error: --watch: missing script path (e.g. " << prog << " --watch [--check] script.kn)\n";
+            return 1;
+        }
         ResolvedKnPath rs;
         std::string resolveErr;
-        if (!resolveKnScriptPath(argv[argBase + 1], rs, resolveErr)) {
+        if (!resolveKnScriptPath(argv[wi], rs, resolveErr)) {
             std::cerr << "error: " << resolveErr << "\n";
             return 1;
         }
         if (rs.warnedNonKn)
             std::cerr << "warning: not a .kn file; continuing: " << rs.path << "\n";
-        return cmdWatch(vm, rs.path);
+        return cmdWatch(vm, rs.path, watchCheck, watchStrict);
     }
 
     // check / --lint: compile only, no run (for CI and IDE)
@@ -1563,47 +1624,10 @@ int main(int argc, char** argv) {
         buf << f.rdbuf();
         std::string source = buf.str();
         normalizeKernSourceText(source, pathResolved);
-        g_errorReporter.setSource(source);
-        g_errorReporter.setFilename(pathResolved);
-        try {
-            Lexer lexer(source);
-            std::vector<Token> tokens = lexer.tokenize();
-            Parser parser(std::move(tokens));
-            std::unique_ptr<Program> program = parser.parse();
-            CodeGenerator gen;
-            (void)gen.generate(std::move(program));
-            (void)applySemanticDiagnosticsToReporter(source, pathResolved, strictTypes);
-            if (json) std::cout << g_errorReporter.toJson() << std::endl;
-            else g_errorReporter.printSummary();
-            return g_errorReporter.errorCount() > 0 ? 1 : 0;
-        } catch (const LexerError& e) {
-            g_errorReporter.reportCompileError(ErrorCategory::SyntaxError, e.line, e.column, e.what(), lexerCompileErrorHint(),
-                "LEX-TOKENIZE", lexerCompileErrorDetail());
-            if (json) std::cout << g_errorReporter.toJson() << std::endl;
-            else g_errorReporter.printSummary();
-            return 1;
-        } catch (const ParserError& e) {
-            std::string msg(e.what());
-            g_errorReporter.reportCompileError(ErrorCategory::SyntaxError, e.line, e.column, msg, parserCompileErrorHint(msg),
-                "PARSE-SYNTAX", parserCompileErrorDetail(msg));
-            if (json) std::cout << g_errorReporter.toJson() << std::endl;
-            else g_errorReporter.printSummary();
-            return 1;
-        } catch (const std::exception& e) {
-            g_errorReporter.reportCompileError(ErrorCategory::Other, 0, 0, std::string("compile failed: ") + e.what(),
-                "This may be an internal compiler error; try simplifying the surrounding code.", "INTERNAL-COMPILE",
-                internalFailureDetail("`kern --check` (lex/parse/codegen)"));
-            if (json) std::cout << g_errorReporter.toJson() << std::endl;
-            else g_errorReporter.printSummary();
-            return 1;
-        } catch (...) {
-            g_errorReporter.reportCompileError(ErrorCategory::Other, 0, 0, "compile failed: unknown exception",
-                "This may be an internal compiler error; try simplifying the surrounding code.", "INTERNAL-COMPILE-UNKNOWN",
-                internalFailureDetail("`kern --check` (non-typed throw)"));
-            if (json) std::cout << g_errorReporter.toJson() << std::endl;
-            else g_errorReporter.printSummary();
-            return 1;
-        }
+        (void)checkKernSource(source, pathResolved, strictTypes);
+        if (json) std::cout << g_errorReporter.toJson() << std::endl;
+        else g_errorReporter.printSummary();
+        return g_errorReporter.errorCount() > 0 ? 1 : 0;
     }
 
     // fmt: format source (indent by brace level)

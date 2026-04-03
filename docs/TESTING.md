@@ -35,6 +35,10 @@ If the current working directory has **`kern.json`**, **`kern test`** and **`ker
 
 **`kern --version`** prints the release string, a **`bytecode-schema:`** integer (`kBytecodeSchemaVersion` in `src/vm/bytecode.hpp`), and **`build:`** (git short hash) when the binary was configured from a **`.git`** checkout.
 
+## Watch mode
+
+**`kern --watch script.kn`** re-runs the script when the file changes. Add **`--check`** for compile/semantic only (no VM), and optional **`--strict-types`** (same as **`kern --check`**).
+
 ## Useful options
 
 - `-TimeoutSeconds 60` to increase per-test timeout

@@ -351,6 +351,119 @@ static std::string uriToPath(const std::string& uri) {
     return path;
 }
 
+static std::string lspDetectRepoRoot(const std::string& filePath) {
+    namespace fs = std::filesystem;
+    fs::path dir = fs::path(filePath).has_parent_path() ? fs::path(filePath).parent_path() : fs::current_path();
+    for (int i = 0; i < 16 && !dir.empty(); ++i) {
+        if (fs::exists(dir / "lib" / "kern")) return dir.generic_string();
+        fs::path parent = dir.parent_path();
+        if (parent == dir) break;
+        dir = std::move(parent);
+    }
+    return {};
+}
+
+static std::string pathToFileUri(const std::string& nativePath) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::path ap = fs::weakly_canonical(fs::path(nativePath), ec);
+    if (ec) ap = fs::path(nativePath);
+    std::string g = ap.generic_string();
+#ifdef _WIN32
+    std::string uri = "file:///";
+    for (char c : g) {
+        if (c == '\\')
+            uri += '/';
+        else
+            uri += c;
+    }
+    return uri;
+#else
+    return std::string("file://") + g;
+#endif
+}
+
+static std::string lspNormalizeImportKey(std::string s) {
+    for (char& c : s) {
+        if (c == '\\') c = '/';
+    }
+    while (!s.empty() && (s.back() == ' ' || s.back() == '\t' || s.back() == '\r' || s.back() == '\n')) s.pop_back();
+    while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) s.erase(s.begin());
+    if (s.size() >= 4 && s.compare(s.size() - 4, 4, ".kn") == 0) s.resize(s.size() - 4);
+    return s;
+}
+
+static bool lspIsStdlibNameQuick(const std::string& p) {
+    if (p == "std" || p == "std.v1") return true;
+    if (p.rfind("std.", 0) == 0) return true;
+    static const std::unordered_set<std::string> k{
+        "math",       "string",     "json",       "random",     "sys",          "io",         "net",
+        "web",        "data",       "array",      "env",        "map",          "types",      "debug",
+        "log",        "time",       "memory",     "util",       "profiling",    "path",       "errors",
+        "iter",       "collections","fs",         "regex",      "csv",          "b64",        "logging",
+        "hash",       "uuid",       "os",         "copy",       "datetime",     "secrets",    "itools",
+        "cli",        "encoding",   "run",        "interop",    "concurrency",  "observability",
+        "security",   "automation", "binary",     "websec",     "netops",       "datatools",  "runtime_controls"};
+    return k.find(p) != k.end();
+}
+
+static bool lspImportIsVirtual(const std::string& rawImport) {
+    const std::string p = lspNormalizeImportKey(rawImport);
+    if (p.empty()) return false;
+    if (lspIsStdlibNameQuick(p)) return true;
+    if (p == "game" || p == "g2d" || p == "g3d" || p == "2dgraphics") return true;
+    if (p == "process" || p == "input" || p == "vision" || p == "render") return true;
+    static const char kPrefix[] = "kern::";
+    if (p.size() > sizeof(kPrefix) - 1 && p.compare(0, sizeof(kPrefix) - 1, kPrefix) == 0) {
+        const std::string rest = p.substr(sizeof(kPrefix) - 1);
+        if (rest == "process" || rest == "input" || rest == "vision" || rest == "render") return true;
+        if (lspIsStdlibNameQuick(rest)) return true;
+    }
+    return p.find("__does_not_exist__") != std::string::npos;
+}
+
+static std::string lspResolveImportOnDisk(const std::string& importerFile, const std::string& rawImport,
+                                          const std::string& projectRoot, const std::vector<std::string>& includePaths) {
+    if (lspImportIsVirtual(rawImport)) return {};
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::path importer = fs::weakly_canonical(fs::path(importerFile), ec);
+    if (ec) importer = fs::path(importerFile);
+    fs::path r(rawImport);
+    if (r.extension().empty()) r += ".kn";
+    std::vector<fs::path> probes;
+    if (r.is_absolute()) probes.push_back(r);
+    probes.push_back(importer.parent_path() / r);
+    if (!projectRoot.empty()) probes.push_back(fs::path(projectRoot) / r);
+    for (const auto& inc : includePaths) {
+        fs::path incPath(inc);
+        if (!incPath.is_absolute() && !projectRoot.empty()) incPath = fs::path(projectRoot) / incPath;
+        probes.push_back(incPath / r);
+    }
+    for (auto& p : probes) {
+        std::error_code ec2;
+        fs::path can = fs::weakly_canonical(p, ec2);
+        if (!ec2 && fs::exists(can)) return can.generic_string();
+    }
+    return {};
+}
+
+static std::string importBindingNameForLsp(const ImportStmt* imp) {
+    if (!imp) return {};
+    std::string bindingName = imp->hasAlias ? imp->alias : imp->moduleName;
+    if (!imp->hasAlias && bindingName.size() >= 4 && bindingName.compare(bindingName.size() - 4, 4, ".kn") == 0)
+        bindingName = bindingName.substr(0, bindingName.size() - 4);
+    return bindingName;
+}
+
+static std::string readTextFilePath(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return {};
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
 struct LspTransport {
     bool readMessage(std::string& outJson) {
         outJson.clear();
@@ -592,6 +705,18 @@ static std::vector<IndexedSymbol> buildSymbolIndex(const std::string& source) {
     return out;
 }
 
+static bool findTopLevelDefinitionSpan(const std::string& source, const std::string& name, SourceSpan& outSpan) {
+    std::vector<IndexedSymbol> all = buildSymbolIndex(source);
+    const IndexedSymbol* best = nullptr;
+    for (const auto& s : all) {
+        if (s.name != name || s.depth != 0) continue;
+        if (!best || s.decl.line < best->decl.line) best = &s;
+    }
+    if (!best) return false;
+    outSpan = best->decl;
+    return true;
+}
+
 static int lspSymbolKindFromIndexed(const std::string& kind) {
     if (kind == "function") return 12;  // Function
     if (kind == "class") return 5;    // Class
@@ -763,6 +888,21 @@ struct DocumentState {
     int version = 0;
 };
 
+static std::string loadKnTextForResolvedPath(const std::unordered_map<std::string, DocumentState>& docs,
+                                             const std::string& resolvedPath) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::path want = fs::weakly_canonical(fs::path(resolvedPath), ec);
+    if (ec) want = fs::path(resolvedPath);
+    const std::string wantGen = want.generic_string();
+    for (const auto& kv : docs) {
+        std::error_code ec2;
+        fs::path p = fs::weakly_canonical(fs::path(uriToPath(kv.first)), ec2);
+        if (!ec2 && p.generic_string() == wantGen) return kv.second.text;
+    }
+    return readTextFilePath(resolvedPath);
+}
+
 class KernLspServer {
 public:
     void run() {
@@ -901,7 +1041,7 @@ private:
         return JsonValue::array(std::move(items));
     }
 
-    /** Definition uses the same AST symbol index as diagnostics (indexStmt + visibleSymbolsFor), consistent with semantic.cpp warnings. */
+    /** Same-file first; then `import` / `from … import` targets on disk (open buffer if already in LSP). */
     JsonValue handleDefinition(const DocumentState& doc, int line, int column) {
         std::vector<Token> toks = safeTokenize(doc.text);
         const Token* id = findIdentifierAt(toks, line, column);
@@ -913,11 +1053,65 @@ private:
             if (!best) best = &s;
             else if (s.depth > best->depth || (s.depth == best->depth && s.decl.line >= best->decl.line)) best = &s;
         }
-        if (!best) return JsonValue::null();
-        return JsonValue::object({
-            {"uri", JsonValue::string(doc.uri)},
-            {"range", spanToLspRange(best->decl)}
-        });
+        if (best)
+            return JsonValue::object({
+                {"uri", JsonValue::string(doc.uri)},
+                {"range", spanToLspRange(best->decl)}
+            });
+
+        std::unique_ptr<Program> program;
+        try {
+            Lexer lexer(doc.text);
+            std::vector<Token> tokens = lexer.tokenize();
+            Parser parser(std::move(tokens));
+            program = parser.parse();
+        } catch (...) {
+            return JsonValue::null();
+        }
+        const std::string& idName = id->lexeme;
+        std::string importerPath = !doc.path.empty() ? doc.path : uriToPath(doc.uri);
+        if (importerPath.empty()) return JsonValue::null();
+
+        std::vector<std::string> inc;
+        if (const char* lib = std::getenv("KERN_LIB")) inc.emplace_back(lib);
+        const std::string root = lspDetectRepoRoot(importerPath);
+
+        for (const auto& st : program->statements) {
+            const auto* imp = dynamic_cast<const ImportStmt*>(st.get());
+            if (!imp) continue;
+
+            if (!imp->namedImports.empty()) {
+                bool wants = false;
+                for (const auto& n : imp->namedImports) {
+                    if (n == idName) {
+                        wants = true;
+                        break;
+                    }
+                }
+                if (!wants) continue;
+                const std::string modPath = lspResolveImportOnDisk(importerPath, imp->moduleName, root, inc);
+                if (modPath.empty()) continue;
+                const std::string modText = loadKnTextForResolvedPath(docs_, modPath);
+                if (modText.empty()) continue;
+                SourceSpan span;
+                if (!findTopLevelDefinitionSpan(modText, idName, span)) continue;
+                return JsonValue::object({
+                    {"uri", JsonValue::string(pathToFileUri(modPath))},
+                    {"range", spanToLspRange(span)}
+                });
+            }
+
+            if (importBindingNameForLsp(imp) == idName) {
+                const std::string modPath = lspResolveImportOnDisk(importerPath, imp->moduleName, root, inc);
+                if (modPath.empty()) continue;
+                SourceSpan entry = normalizeSourceSpan(1, 1, 1, 1);
+                return JsonValue::object({
+                    {"uri", JsonValue::string(pathToFileUri(modPath))},
+                    {"range", spanToLspRange(entry)}
+                });
+            }
+        }
+        return JsonValue::null();
     }
 
     JsonValue handleHover(const DocumentState& doc, int line, int column) {
