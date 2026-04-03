@@ -17,8 +17,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-powershell@v4
-
       - name: Cache FetchContent (Raylib under build/_deps)
         uses: actions/cache@v4
         with:
