@@ -1,0 +1,45 @@
+// Regression: VM stack frames carry resolved source path (activeSourcePath_ / ScriptCode::sourcePath).
+def str_contains(s, sub) {
+    let n = len(sub)
+    let pl = len(s)
+    if (n > pl) { return false }
+    let i = 0
+    while (i <= pl - n) {
+        if (slice(s, i, i + n) == sub) { return true }
+        i = i + 1
+    }
+    return false
+}
+
+let kBasename = "test_stack_trace_has_source_path.kn"
+
+fn leaf() {
+    let st = stack_trace_array()
+    assert_eq(len(st) >= 2, true, "expect at least outer + leaf frames")
+    let n = len(st)
+    let caller = st[n - 2]
+    let inner = st[n - 1]
+    assert_eq(has(caller, "name"), true, "caller has name")
+    assert_eq(has(inner, "name"), true, "inner has name")
+    assert_eq(caller["name"], "outer", "caller frame name")
+    assert_eq(inner["name"], "leaf", "innermost frame name")
+    assert_eq(has(caller, "file"), true, "caller has file")
+    assert_eq(has(inner, "file"), true, "leaf has file")
+    assert_eq(type(caller["file"]), "string", "caller file is string")
+    assert_eq(type(inner["file"]), "string", "leaf file is string")
+    assert_eq(type(caller["column"]), "int", "caller column present")
+    assert_eq(type(inner["column"]), "int", "leaf column present")
+    assert_eq(caller["column"] >= 1, true, "caller column 1-based when mapped")
+    assert_eq(inner["column"] >= 1, true, "leaf column 1-based when mapped")
+    assert_eq(len(caller["file"]) > 0, true, "caller file non-empty")
+    assert_eq(len(inner["file"]) > 0, true, "leaf file non-empty")
+    assert_eq(str_contains(caller["file"], kBasename), true, "caller path contains basename")
+    assert_eq(str_contains(inner["file"], kBasename), true, "leaf path contains basename")
+}
+
+fn outer() {
+    leaf()
+}
+
+outer()
+print("OK: test_stack_trace_has_source_path")

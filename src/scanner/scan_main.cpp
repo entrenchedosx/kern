@@ -4,6 +4,7 @@
 #include "import_resolution.hpp"
 #include "vm/builtins.hpp"
 #include "vm/vm.hpp"
+#include "vm/permissions.hpp"
 
 int main(int argc, char** argv) {
     const char* prog = argc >= 1 ? argv[0] : "kern-scan";
@@ -12,6 +13,7 @@ int main(int argc, char** argv) {
     kern::registerImportBuiltin(vm);
     kern::RuntimeGuardPolicy guards;
     guards.debugMode = true;
+    kern::registerAllStandardPermissions(guards);
     vm.setRuntimeGuards(guards);
     vm.setStepLimit(5'000'000);
     vm.setMaxCallDepth(2048);

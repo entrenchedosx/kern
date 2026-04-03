@@ -2,6 +2,8 @@
 
 This document is a **designer-level plan**: priorities, trade-offs, phased steps, and example sketches. It assumes familiarity with `docs/GETTING_STARTED.md` and `config/feature_flags.json`.
 
+For a **production-oriented ordering** of the same themes (stability → diagnostics → language surface → performance → stdlib/OS → tooling), see [PRODUCTION_VISION.md](PRODUCTION_VISION.md).
+
 ---
 
 ## 1. Where Kern stands today (baseline)

@@ -1,0 +1,39 @@
+// Connect, send one line, print echoed reply, exit.
+// Run after server: kern --unsafe examples/network/tcp_echo_client.kn [host] [port] [message]
+require("network.tcp")
+
+// cli_args: [0]=exe, [1]=--unsafe, [2]=script, [3]=host, [4]=port, [5]=message (optional)
+let host = "127.0.0.1"
+let port = 9876
+let msg = "hello from kern\n"
+let argv = cli_args()
+if len(argv) >= 5 {
+    host = argv[3]
+    port = parse_int(argv[4])
+}
+if len(argv) >= 6 {
+    msg = argv[5]
+}
+
+let c = tcp_connect(host, port)
+if c["ok"] == false {
+    print("tcp_connect failed:", c["error"])
+    exit_code(1)
+}
+let sid = c["id"]
+
+let snd = tcp_send(sid, msg)
+if snd["ok"] == false {
+    print("tcp_send failed:", snd["error"])
+    tcp_close(sid)
+    exit_code(1)
+}
+
+let r = tcp_recv(sid, 65536)
+if r["ok"] == false {
+    print("tcp_recv failed:", r["error"])
+    tcp_close(sid)
+    exit_code(1)
+}
+print("reply:", r["data"])
+tcp_close(sid)

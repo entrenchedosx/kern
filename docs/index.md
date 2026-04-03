@@ -12,6 +12,7 @@
 | Diagnostics & errors | [ERROR_CODES.md](ERROR_CODES.md), [TROUBLESHOOTING.md](TROUBLESHOOTING.md) |
 | Language & evolution | [LANGUAGE_SYNTAX.md](LANGUAGE_SYNTAX.md), [LANGUAGE_ROADMAP.md](LANGUAGE_ROADMAP.md) |
 | Production readiness plan | [ADOPTION_ROADMAP.md](ADOPTION_ROADMAP.md) |
+| **Engine internals** (compiler, VM, security) | [INTERNALS.md](INTERNALS.md) |
 
 ## Browsing locally
 

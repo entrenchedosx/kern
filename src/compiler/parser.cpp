@@ -992,8 +992,12 @@ ExprPtr Parser::coalesce() {
 ExprPtr Parser::pipeline() {
     ExprPtr left = coalesce();
     while (match(TokenType::PIPE)) {
+        const Token& pipeTok = previous();
         ExprPtr right = coalesce();
-        left = std::make_unique<PipelineExpr>(std::move(left), std::move(right));
+        auto pipe = std::make_unique<PipelineExpr>(std::move(left), std::move(right));
+        pipe->line = pipeTok.line;
+        pipe->column = pipeTok.column;
+        left = std::move(pipe);
     }
     return left;
 }
@@ -1021,7 +1025,11 @@ ExprPtr Parser::unary() {
     }
     if (isIdentifierToken(peek(), "await")) {
         advance();
-        return std::make_unique<AwaitExpr>(unary());
+        const Token& awaitTok = previous();
+        auto aw = std::make_unique<AwaitExpr>(unary());
+        aw->line = awaitTok.line;
+        aw->column = awaitTok.column;
+        return aw;
     }
     // fold repeated prefix ops so adversarial `!!!!…x` cannot blow the C++ stack.
     std::vector<TokenType> prefixOps;
@@ -1046,8 +1054,12 @@ ExprPtr Parser::postfix() {
     }
     for (;;) {
         if (match(TokenType::LPAREN)) {
+            const Token& openParen = previous();
             auto args = argumentList();
-            expr = std::make_unique<CallExpr>(std::move(expr), std::move(args));
+            auto call = std::make_unique<CallExpr>(std::move(expr), std::move(args));
+            call->line = openParen.line;
+            call->column = openParen.column;
+            expr = std::move(call);
         } else if (check(TokenType::QUESTION) && current_ + 1 < tokens_.size() && tokens_[current_ + 1].type == TokenType::LBRACKET) {
             advance();
             advance();

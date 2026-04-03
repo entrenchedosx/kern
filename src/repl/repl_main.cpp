@@ -8,6 +8,7 @@
 #include "compiler/codegen.hpp"
 #include "compiler/ast.hpp"
 #include "vm/vm.hpp"
+#include "vm/permissions.hpp"
 #include "vm/value.hpp"
 #include "vm/builtins.hpp"
 #include "vm/bytecode.hpp"
@@ -27,7 +28,7 @@ using namespace kern;
 
 static bool runSource(VM& vm, const std::string& source) {
     g_errorReporter.setSource(source);
-    g_errorReporter.setFilename("");  // rEPL
+    g_errorReporter.setFilename("<repl>");  // virtual path for diagnostics / stack traces
     try {
         Lexer lexer(source);
         std::vector<Token> tokens = lexer.tokenize();
@@ -60,6 +61,7 @@ static bool runSource(VM& vm, const std::string& source) {
         vm.setBytecode(code);
         vm.setStringConstants(gen.getConstants());
         vm.setValueConstants(gen.getValueConstants());
+        vm.setActiveSourcePath("<repl>");
         vm.run();
         if (vm.hasResult()) {
             ValuePtr r = vm.getResult();
@@ -86,7 +88,7 @@ static bool runSource(VM& vm, const std::string& source) {
     } catch (const VMError& e) {
         std::vector<StackFrame> stack;
         for (const auto& f : vm.getCallStackSlice()) {
-            stack.push_back({f.functionName, f.line, f.column});
+            stack.push_back({f.functionName, f.filePath, f.line, f.column});
         }
         std::string hint(vmRuntimeErrorHint(e.category, e.code));
         g_errorReporter.reportRuntimeError(vmErrorCategory(e.category), e.line, e.column, e.what(), stack, hint,
@@ -117,6 +119,7 @@ int main() {
     guards.enforcePointerBounds = true;
     guards.ffiEnabled = false;
     guards.sandboxEnabled = true;
+    registerAllStandardPermissions(guards);
     vm.setRuntimeGuards(guards);
     vm.setStepLimit(5'000'000);
     vm.setMaxCallDepth(2048);

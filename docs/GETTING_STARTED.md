@@ -13,7 +13,7 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release --target kern kern_repl kernc
 ```
 
-If you need graphics/game modules, build with `KERN_BUILD_GAME=ON`. For Windows portable drops (no installs), use the shareable build scripts (see below).
+If you need graphics/game modules (`import g2d`), build with `KERN_BUILD_GAME=ON` (the default). CMake will fetch Raylib via FetchContent when it is not installed system-wide. **Linux:** install X11/OpenGL/ALSA development packages first (same `apt install …` list as the `Install Raylib build dependencies` step in `.github/workflows/linux-kern.yml`). **macOS:** Xcode Command Line Tools are usually enough. For Windows portable drops (no installs), use the shareable build scripts (see below).
 
 ## Run
 

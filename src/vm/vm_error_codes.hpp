@@ -33,6 +33,9 @@ enum class VMErrorCode : int {
     INVALID_CALL_TARGET = 3006,
     INVALID_OPERATION = 3007,
     DIVISION_BY_ZERO = 3008,
+    PERMISSION_DENIED = 3009,
+    /** Abstract stack depth differs on merge at the same PC (control-flow inconsistency). */
+    BYTECODE_VERIFY_STACK = 3010,
 };
 
 } // namespace kern

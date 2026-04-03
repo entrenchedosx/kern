@@ -41,6 +41,8 @@ inline const std::unordered_map<std::string, std::string>& builtinStrictReturnTy
         {"ord", "int"},
         {"hex", "string"},
         {"bin", "string"},
+        {"append_file", "bool"},
+        {"require", "bool"},
     };
     return k;
 }

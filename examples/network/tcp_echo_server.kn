@@ -1,0 +1,53 @@
+// Blocking echo server: one client, echo bytes until EOF.
+// Run: kern --unsafe examples/network/tcp_echo_server.kn [port]
+// Default port 9876. Then in another terminal run tcp_echo_client.kn.
+require("network.tcp")
+
+// cli_args: [0]=exe, [1]=--unsafe, [2]=script, [3]=port (optional)
+let port = 9876
+let argv = cli_args()
+if len(argv) >= 4 {
+    port = parse_int(argv[3])
+}
+
+let L = tcp_listen("0.0.0.0", port, 8)
+if L["ok"] == false {
+    print("tcp_listen failed:", L["error"])
+    exit_code(1)
+}
+let lid = L["id"]
+print("listening on port", port)
+
+let C = tcp_accept(lid)
+if C["ok"] == false {
+    print("tcp_accept failed:", C["error"])
+    tcp_close(lid)
+    exit_code(1)
+}
+let cid = C["id"]
+
+while true {
+    let r = tcp_recv(cid, 65536)
+    if r["ok"] == false {
+        print("tcp_recv:", r["error"])
+        break
+    }
+    if r["would_block"] {
+        continue
+    }
+    if r["eof"] {
+        break
+    }
+    if len(r["data"]) == 0 {
+        continue
+    }
+    let s = tcp_send(cid, r["data"])
+    if s["ok"] == false {
+        print("tcp_send:", s["error"])
+        break
+    }
+}
+
+tcp_close(cid)
+tcp_close(lid)
+print("done")

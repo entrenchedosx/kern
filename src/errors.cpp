@@ -21,6 +21,19 @@ namespace kern {
 
 ErrorReporter g_errorReporter;
 
+// Implements: humanizePathForDisplay-001 (see errors.hpp).
+std::string humanizePathForDisplay(const std::string& path) {
+    // ----------------------------------------------------------------------------
+    // Display contract — authoritative spec: errors.hpp (humanizePathForDisplay).
+    // • First match wins (same precedence as the header).
+    // • Order is part of the public contract.
+    // • Do not reorder the following checks without updating errors.hpp.
+    // ----------------------------------------------------------------------------
+    if (path.empty()) return "<unknown>";
+    if (path == "<repl>") return "<repl> (interactive)";
+    return path;
+}
+
 static std::string escapeJson(const std::string& s) {
     std::string out;
     out.reserve(s.size() + 8);
@@ -176,7 +189,8 @@ void ErrorReporter::printDetailLines(std::ostream& out, const std::string& text)
 
 void ErrorReporter::print(const ReportedItem& item) const {
     std::ostream& out = std::cerr;
-    const std::string filePart = item.filename.empty() ? "<repl>" : item.filename;
+    const std::string filePartRaw = item.filename.empty() ? "<repl>" : item.filename;
+    const std::string filePart = humanizePathForDisplay(filePartRaw);
 
     if (item.stackTrace.empty()) {
         // compile-time / single location (C++/GCC + Python style) -----
@@ -205,8 +219,12 @@ void ErrorReporter::print(const ReportedItem& item) const {
         const size_t n = st.size();
         auto printFrame = [&](size_t i, bool withSnippet) {
             const auto& f = st[i];
+            const std::string frameRaw = !f.filePath.empty() ? f.filePath : filePartRaw;
+            const std::string frameFile = humanizePathForDisplay(frameRaw);
+            const bool snippetFromMainSource =
+                f.filePath.empty() || f.filePath == item.filename;
             out << colorDim("  File ");
-            out << "\"" << colorGreen(filePart) << "\"";
+            out << "\"" << colorGreen(frameFile) << "\"";
             out << colorDim(", line ") << colorCyan(std::to_string(f.line));
             out << colorDim(", in ") << (f.functionName.empty() ? "<module>" : f.functionName);
             out << "\n";
@@ -214,7 +232,7 @@ void ErrorReporter::print(const ReportedItem& item) const {
             if (!withSnippet) return;
 
             int col = f.column > 0 ? f.column : 1;
-            if (f.line > 0 && !sourceLines_.empty()) {
+            if (snippetFromMainSource && f.line > 0 && !sourceLines_.empty()) {
                 std::string frameSnip = getLineSnippet(f.line, col, 0, f.line, col);
                 if (!frameSnip.empty()) {
                     out << "\n" << frameSnip << "\n";
@@ -366,7 +384,7 @@ std::string ErrorReporter::toJson() const {
                     if (j) out << ",";
                     out << "{\"function\":\"" << escapeJson(sf.functionName) << "\","
                         << "\"line\":" << sf.line << ",\"column\":" << sf.column << ","
-                        << "\"filename\":\"" << escapeJson(it.filename) << "\"}";
+                        << "\"filename\":\"" << escapeJson(!sf.filePath.empty() ? sf.filePath : it.filename) << "\"}";
                 }
             } else {
                 size_t jout = 0;
@@ -375,7 +393,7 @@ std::string ErrorReporter::toJson() const {
                     const auto& sf = st[j];
                     out << "{\"function\":\"" << escapeJson(sf.functionName) << "\","
                         << "\"line\":" << sf.line << ",\"column\":" << sf.column << ","
-                        << "\"filename\":\"" << escapeJson(it.filename) << "\"}";
+                        << "\"filename\":\"" << escapeJson(!sf.filePath.empty() ? sf.filePath : it.filename) << "\"}";
                 }
                 out << ",{\"_truncated\":true,\"omitted\":" << (n - kTracebackHeadFrames - kTracebackTailFrames) << "}";
                 for (size_t j = n - kTracebackTailFrames; j < n; ++j) {
@@ -383,7 +401,7 @@ std::string ErrorReporter::toJson() const {
                     const auto& sf = st[j];
                     out << "{\"function\":\"" << escapeJson(sf.functionName) << "\","
                         << "\"line\":" << sf.line << ",\"column\":" << sf.column << ","
-                        << "\"filename\":\"" << escapeJson(it.filename) << "\"}";
+                        << "\"filename\":\"" << escapeJson(!sf.filePath.empty() ? sf.filePath : it.filename) << "\"}";
                 }
             }
             out << "]";

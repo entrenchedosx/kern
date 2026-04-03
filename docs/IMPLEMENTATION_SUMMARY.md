@@ -1,5 +1,7 @@
 # Kern upgrade — implementation summary
 
+For **architecture and production-oriented internals** (not tied to a single changelog), see [INTERNALS.md](INTERNALS.md) and the linked **Internals** docs in the MkDocs nav.
+
 ## 1. Selective import syntax (Python-style)
 
 **Introduced:**

@@ -11,6 +11,7 @@
 #endif
 
 #include <algorithm>
+#include <cmath>
 #include <cctype>
 #include <cstdio>
 #include <cstring>
@@ -26,6 +27,25 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
+
+#ifdef TRUE
+#undef TRUE
+#endif
+#ifdef FALSE
+#undef FALSE
+#endif
+#ifdef FLOAT
+#undef FLOAT
+#endif
+#ifdef AND
+#undef AND
+#endif
+#ifdef OR
+#undef OR
+#endif
+#ifdef NOT
+#undef NOT
+#endif
 
 namespace kern {
 
@@ -210,6 +230,7 @@ private:
         } catch (...) {
             throw std::runtime_error("Invalid JSON number");
         }
+        if (!std::isfinite(n)) n = 0;
         return JsonValue::number(n);
     }
 };
@@ -246,8 +267,10 @@ static std::string jsonStringify(const JsonValue& v) {
         case JsonValue::Type::Bool:
             return v.boolValue ? "true" : "false";
         case JsonValue::Type::Number: {
+            double n = v.numberValue;
+            if (!std::isfinite(n)) n = 0;
             std::ostringstream out;
-            out << v.numberValue;
+            out << n;
             return out.str();
         }
         case JsonValue::Type::String:
@@ -272,8 +295,9 @@ static std::string jsonStringify(const JsonValue& v) {
             out += "}";
             return out;
         }
+        default:
+            return "null";
     }
-    return "null";
 }
 
 static const JsonValue* objGet(const JsonValue& obj, const std::string& key) {
@@ -568,6 +592,24 @@ static std::vector<IndexedSymbol> buildSymbolIndex(const std::string& source) {
     return out;
 }
 
+static int lspSymbolKindFromIndexed(const std::string& kind) {
+    if (kind == "function") return 12;  // Function
+    if (kind == "class") return 5;    // Class
+    if (kind == "struct") return 23;  // Struct
+    return 13;                        // Variable (also parameter)
+}
+
+static JsonValue indexedSymbolToDocumentSymbol(const IndexedSymbol& s) {
+    std::map<std::string, JsonValue> fields;
+    fields["name"] = JsonValue::string(s.name);
+    fields["kind"] = JsonValue::number(static_cast<double>(lspSymbolKindFromIndexed(s.kind)));
+    fields["range"] = spanToLspRange(s.decl);
+    fields["selectionRange"] = spanToLspRange(s.decl);
+    if (!s.detail.empty()) fields["detail"] = JsonValue::string(s.detail);
+    fields["children"] = JsonValue::array({});
+    return JsonValue::object(std::move(fields));
+}
+
 static std::vector<std::string> kKeywords = {
     "let","var","const","def","class","struct","enum","extern","unsafe","return","if","elif","else",
     "for","while","repeat","in","match","case","try","catch","finally","throw","rethrow","break","continue","import"
@@ -632,6 +674,86 @@ static bool startsWithCaseInsensitive(const std::string& s, const std::string& p
             return false;
     }
     return true;
+}
+
+static bool semanticTokenSkippable(TokenType t) {
+    return t == TokenType::COMMENT_LINE || t == TokenType::COMMENT_BLOCK || t == TokenType::NEWLINE ||
+           t == TokenType::END_OF_FILE;
+}
+
+/** LSP legend indices: keyword, function, variable, string, number, operator */
+static unsigned semanticTokenTypeIndex(TokenType t) {
+    if (t == TokenType::IDENTIFIER) return 2;
+    if (t == TokenType::STRING) return 3;
+    if (t == TokenType::INTEGER || t == TokenType::FLOAT || t == TokenType::TRUE || t == TokenType::FALSE ||
+        t == TokenType::NULL_LIT)
+        return 4;
+    if (t == TokenType::PLUS || t == TokenType::MINUS || t == TokenType::STAR || t == TokenType::SLASH ||
+        t == TokenType::PERCENT || t == TokenType::STAR_STAR || t == TokenType::EQ || t == TokenType::NEQ ||
+        t == TokenType::LT || t == TokenType::GT || t == TokenType::LE || t == TokenType::GE || t == TokenType::AND ||
+        t == TokenType::OR || t == TokenType::NOT || t == TokenType::BIT_AND || t == TokenType::BIT_OR ||
+        t == TokenType::BIT_XOR || t == TokenType::SHL || t == TokenType::SHR || t == TokenType::ASSIGN ||
+        t == TokenType::PLUS_EQ || t == TokenType::MINUS_EQ || t == TokenType::STAR_EQ || t == TokenType::SLASH_EQ ||
+        t == TokenType::PERCENT_EQ || t == TokenType::LPAREN || t == TokenType::RPAREN || t == TokenType::LBRACE ||
+        t == TokenType::RBRACE || t == TokenType::LBRACKET || t == TokenType::RBRACKET || t == TokenType::COMMA ||
+        t == TokenType::DOT || t == TokenType::DOT_DOT || t == TokenType::COLON || t == TokenType::SEMICOLON ||
+        t == TokenType::ARROW || t == TokenType::PIPE || t == TokenType::ELLIPSIS || t == TokenType::QUESTION ||
+        t == TokenType::QUESTION_DOT || t == TokenType::COALESCE || t == TokenType::COALESCE_EQ || t == TokenType::AT)
+        return 5;
+    return 0;
+}
+
+static JsonValue buildSemanticTokensData(const std::string& source) {
+    std::vector<Token> toks;
+    try {
+        Lexer lexer(source);
+        toks = lexer.tokenize();
+    } catch (...) {
+        return JsonValue::object({{"data", JsonValue::array({})}});
+    }
+    std::vector<const Token*> ordered;
+    ordered.reserve(toks.size());
+    for (const auto& t : toks) {
+        if (semanticTokenSkippable(t.type)) continue;
+        ordered.push_back(&t);
+    }
+    std::sort(ordered.begin(), ordered.end(), [](const Token* a, const Token* b) {
+        if (a->line != b->line) return a->line < b->line;
+        return a->column < b->column;
+    });
+    std::vector<JsonValue> data;
+    int prevL0 = -1;
+    int prevStart = 0;
+    int prevLen = 0;
+    for (const Token* tp : ordered) {
+        const int l0 = tp->line - 1;
+        const int c0 = tp->column - 1;
+        const int len = static_cast<int>(tp->lexeme.size());
+        if (len <= 0) continue;
+        uint32_t deltaLine = 0;
+        uint32_t deltaStart = 0;
+        if (prevL0 < 0) {
+            deltaLine = static_cast<uint32_t>(std::max(0, l0));
+            deltaStart = static_cast<uint32_t>(std::max(0, c0));
+        } else if (l0 > prevL0) {
+            deltaLine = static_cast<uint32_t>(l0 - prevL0);
+            deltaStart = static_cast<uint32_t>(std::max(0, c0));
+        } else {
+            deltaLine = 0;
+            const int afterPrev = prevStart + prevLen;
+            deltaStart = static_cast<uint32_t>(std::max(0, c0 - afterPrev));
+        }
+        const unsigned tt = semanticTokenTypeIndex(tp->type);
+        data.push_back(JsonValue::number(static_cast<double>(deltaLine)));
+        data.push_back(JsonValue::number(static_cast<double>(deltaStart)));
+        data.push_back(JsonValue::number(static_cast<double>(len)));
+        data.push_back(JsonValue::number(static_cast<double>(tt)));
+        data.push_back(JsonValue::number(0.0));
+        prevL0 = l0;
+        prevStart = c0;
+        prevLen = len;
+    }
+    return JsonValue::object({{"data", JsonValue::array(std::move(data))}});
 }
 
 struct DocumentState {
@@ -779,6 +901,7 @@ private:
         return JsonValue::array(std::move(items));
     }
 
+    /** Definition uses the same AST symbol index as diagnostics (indexStmt + visibleSymbolsFor), consistent with semantic.cpp warnings. */
     JsonValue handleDefinition(const DocumentState& doc, int line, int column) {
         std::vector<Token> toks = safeTokenize(doc.text);
         const Token* id = findIdentifierAt(toks, line, column);
@@ -827,6 +950,42 @@ private:
         });
     }
 
+    JsonValue handleDocumentSymbol(const DocumentState& doc) {
+        std::vector<IndexedSymbol> all = buildSymbolIndex(doc.text);
+        std::vector<JsonValue> arr;
+        arr.reserve(all.size());
+        for (const auto& s : all) arr.push_back(indexedSymbolToDocumentSymbol(s));
+        return JsonValue::array(std::move(arr));
+    }
+
+    JsonValue handleWorkspaceSymbol(const std::string& query) {
+        std::string qlow = query;
+        std::transform(qlow.begin(), qlow.end(), qlow.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        std::vector<JsonValue> arr;
+        for (const auto& kv : docs_) {
+            const DocumentState& doc = kv.second;
+            std::vector<IndexedSymbol> all = buildSymbolIndex(doc.text);
+            for (const auto& s : all) {
+                if (!qlow.empty()) {
+                    std::string nlow = s.name;
+                    std::transform(nlow.begin(), nlow.end(), nlow.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    if (nlow.find(qlow) == std::string::npos) continue;
+                }
+                arr.push_back(JsonValue::object({
+                    {"name", JsonValue::string(s.name)},
+                    {"kind", JsonValue::number(static_cast<double>(lspSymbolKindFromIndexed(s.kind)))},
+                    {"location", JsonValue::object({
+                        {"uri", JsonValue::string(doc.uri)},
+                        {"range", spanToLspRange(s.decl)}
+                    })}
+                }));
+            }
+        }
+        return JsonValue::array(std::move(arr));
+    }
+
     void handleRequest(const JsonValue& req) {
         const JsonValue* id = objGet(req, "id");
         if (!id) return;
@@ -839,9 +998,25 @@ private:
                     {"textDocumentSync", JsonValue::number(1)},  // full
                     {"hoverProvider", JsonValue::boolean(true)},
                     {"definitionProvider", JsonValue::boolean(true)},
+                    {"semanticTokensProvider", JsonValue::object({
+                        {"legend", JsonValue::object({
+                            {"tokenTypes", JsonValue::array({
+                                JsonValue::string("keyword"),
+                                JsonValue::string("function"),
+                                JsonValue::string("variable"),
+                                JsonValue::string("string"),
+                                JsonValue::string("number"),
+                                JsonValue::string("operator")
+                            })},
+                            {"tokenModifiers", JsonValue::array({})}
+                        })},
+                        {"full", JsonValue::boolean(true)}
+                    })},
                     {"completionProvider", JsonValue::object({
                         {"resolveProvider", JsonValue::boolean(false)}
-                    })}
+                    })},
+                    {"documentSymbolProvider", JsonValue::boolean(true)},
+                    {"workspaceSymbolProvider", JsonValue::boolean(true)}
                 })},
                 {"serverInfo", JsonValue::object({
                     {"name", JsonValue::string("kern-lsp")},
@@ -890,6 +1065,33 @@ private:
             }
             SourceSpan pos = lspPosToSpan(params ? objGet(*params, "position") : nullptr);
             sendResponse(*id, handleHover(it->second, pos.line, pos.column));
+            return;
+        }
+        if (method == "textDocument/semanticTokens/full") {
+            const JsonValue* td = params ? objGet(*params, "textDocument") : nullptr;
+            std::string uri = asString(td ? objGet(*td, "uri") : nullptr);
+            auto it = docs_.find(uri);
+            if (it == docs_.end()) {
+                sendResponse(*id, JsonValue::object({{"data", JsonValue::array({})}}));
+                return;
+            }
+            sendResponse(*id, buildSemanticTokensData(it->second.text));
+            return;
+        }
+        if (method == "textDocument/documentSymbol") {
+            const JsonValue* td = params ? objGet(*params, "textDocument") : nullptr;
+            std::string uri = asString(td ? objGet(*td, "uri") : nullptr);
+            auto it = docs_.find(uri);
+            if (it == docs_.end()) {
+                sendResponse(*id, JsonValue::array({}));
+                return;
+            }
+            sendResponse(*id, handleDocumentSymbol(it->second));
+            return;
+        }
+        if (method == "workspace/symbol") {
+            std::string query = asString(params ? objGet(*params, "query") : nullptr);
+            sendResponse(*id, handleWorkspaceSymbol(query));
             return;
         }
 

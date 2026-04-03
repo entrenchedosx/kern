@@ -16,6 +16,19 @@
 
 namespace kern {
 
+/** Contract: humanizePathForDisplay-001
+ *
+ *  One-way display helper: never persist the return value into VM state, JSON, or traceback maps.
+ *  Canonical data stays raw (e.g. "<repl>", real paths) in JSON, stack_trace_array(), Error.traceback.
+ *
+ *  Precedence (evaluate in order; first match wins):
+ *   1. path.empty()  → "<unknown>"
+ *   2. path == "<repl>" → "<repl> (interactive)"
+ *   3. otherwise → path unchanged
+ *
+ *  Implementation (errors.cpp) must mirror this order; keep in sync when either side changes. */
+std::string humanizePathForDisplay(const std::string& path);
+
 // error categories -----
 enum class ErrorCategory {
     SyntaxError,
@@ -238,6 +251,7 @@ inline std::string importEmbeddedFailureDetail(const std::string& modulePath) {
 // stack frame (for runtime) -----
 struct StackFrame {
     std::string functionName;  // "main", "<lambda>", "foo", etc.
+    std::string filePath;      // source file; empty = unknown / stdin
     int line = 0;
     int column = 0;
 };

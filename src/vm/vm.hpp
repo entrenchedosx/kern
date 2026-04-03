@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <stack>
 #include <tuple>
 #include <functional>
@@ -24,14 +25,19 @@ namespace kern {
 struct RuntimeGuardPolicy {
     bool debugMode = true;
     bool allowUnsafe = false;
+    /** When true (default), sensitive OS builtins need unsafe {}, require(), or --allow. */
+    bool enforcePermissions = true;
     bool enforcePointerBounds = true;
     bool ffiEnabled = false;
     bool sandboxEnabled = true;
     std::vector<std::string> ffiLibraryAllowlist;
+    std::unordered_set<std::string> grantedPermissions;
 };
 
 struct VMStackFrame {
     std::string functionName;
+    /** Source file path for this frame (call site); empty if unknown (e.g. REPL). */
+    std::string filePath;
     int line = 0;
     int column = 0;
 };
@@ -64,6 +70,8 @@ public:
     void setBytecode(Bytecode code);
     void setStringConstants(std::vector<std::string> constants);
     void setValueConstants(std::vector<Value> constants);
+    /** Set the source path for bytecode currently loaded in the VM (main script); used in stack traces. Call after setBytecode/set*Constants, before run(). */
+    void setActiveSourcePath(std::string path) { activeSourcePath_ = std::move(path); }
     void run();
     using BuiltinFn = std::function<Value(VM*, std::vector<ValuePtr>)>;
     void registerBuiltin(size_t index, BuiltinFn fn);
@@ -109,7 +117,8 @@ public:
             callStack_.end());
     }
     /* * run another script's bytecode in this VM (for import). Saves/restores main script state.*/
-    void runSubScript(Bytecode code, std::vector<std::string> stringConstants, std::vector<Value> valueConstants);
+    void runSubScript(Bytecode code, std::vector<std::string> stringConstants, std::vector<Value> valueConstants,
+                      const std::string& sourcePath = "");
     /* * script-requested exit code (set by exit_code(n) builtin). -1 = not set.*/
     void setScriptExitCode(int c) { scriptExitCode_ = c; }
     int getScriptExitCode() const { return scriptExitCode_; }
@@ -118,7 +127,21 @@ public:
     void setVmTraceEnabled(bool on) { vmTraceEnabled_ = on; }
     bool isVmTraceEnabled() const { return vmTraceEnabled_; }
 
+    /** Current instruction index (0-based). Valid through code_.size() (end). */
+    size_t instructionPointer() const { return ip_; }
+    /** Jump execution; ip may be code_.size() to mark finished. */
+    void setInstructionPointer(size_t ip);
+    /** Execute exactly one instruction; returns true if more instructions remain. */
+    bool runNextInstruction();
+    /** Run until ip matches a breakpoint, end of script, or script exit. */
+    void runUntilBreakpoint();
+    void addBreakpoint(size_t pc);
+    void removeBreakpoint(size_t pc);
+    void clearBreakpoints();
+    bool isBreakpointAt(size_t pc) const { return breakpoints_.find(pc) != breakpoints_.end(); }
+
 private:
+    void verifyBytecodeOrThrow(const Bytecode& bc, size_t strPool, size_t valPool);
     Bytecode code_;
     std::vector<std::string> stringConstants_;
     std::vector<Value> valueConstants_;
@@ -137,7 +160,8 @@ private:
     std::shared_ptr<ScriptCode> currentScript_;  // set during runSubScript so BUILD_FUNC can attach it
     /* * entry (main) script snapshot for top-level functions when currentScript_ is null (not inside import).*/
     std::shared_ptr<ScriptCode> entryScriptCache_;
-    std::vector<std::tuple<Bytecode, std::vector<std::string>, std::vector<Value>>> codeFrameStack_;  // when calling into script function, push caller code
+    /** Saved caller bytecode + constants + caller source path when calling into another script's function. */
+    std::vector<std::tuple<Bytecode, std::vector<std::string>, std::vector<Value>, std::string>> codeFrameStack_;
     void runDeferredCalls();
     bool resumeGenerator(std::shared_ptr<GeneratorObject> gen, ValuePtr& out);
     void restoreExecutionState(
@@ -152,8 +176,9 @@ private:
         std::vector<VMStackFrame> callStack,
         std::vector<std::pair<ValuePtr, size_t>> iterStack,
         std::vector<size_t> tryStack,
-        std::vector<std::tuple<Bytecode, std::vector<std::string>, std::vector<Value>>> codeFrameStack,
-        std::shared_ptr<ScriptCode> currentScript);
+        std::vector<std::tuple<Bytecode, std::vector<std::string>, std::vector<Value>, std::string>> codeFrameStack,
+        std::shared_ptr<ScriptCode> currentScript,
+        std::string activeSourcePath);
     uint64_t cycleCount_ = 0;
     uint64_t stepLimit_ = 0;  // 0 = no limit
     size_t maxCallDepth_ = 1024;
@@ -170,6 +195,9 @@ private:
     bool vmTraceEnabled_ = false;
     RuntimeGuardPolicy runtimeGuards_{};
     int unsafeDepth_ = 0;
+    /** Path for instructions in `code_` (main, import body, or callee script after CALL). */
+    std::string activeSourcePath_;
+    std::unordered_set<size_t> breakpoints_;
 
     std::string getOperandStr(const Instruction& inst);
     size_t getOperandU64(const Instruction& inst);

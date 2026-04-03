@@ -7,6 +7,9 @@
 
 #include "value.hpp"
 #include "vm.hpp"
+#include "errors.hpp"
+#include "permissions.hpp"
+#include "kern_socket.hpp"
 #include <memory>
 #include <cmath>
 #include <ctime>
@@ -265,13 +268,31 @@ inline std::vector<std::string> getBuiltinNames() {
         "std_bytes_equal","std_bytes_get_u16_le","std_bytes_get_u32_le","std_bytes_set_u32_le","std_bytes_get_u8",
         "std_bytes_from_string","std_bytes_len",
         "std_col_array_index_of","std_col_array_last_index_of","std_col_swap","std_col_rotate_left","std_col_dict_merge_shallow",
-        "std_col_array_zip_pairs","std_col_array_unique","std_col_array_fill","std_col_map_invert","std_col_array_intersect"};
+        "std_col_array_zip_pairs","std_col_array_unique","std_col_array_fill","std_col_map_invert",        "std_col_array_intersect",
+        "append_file",
+        "require",
+        "tcp_connect",
+        "tcp_connect_start",
+        "tcp_connect_check",
+        "tcp_listen",
+        "tcp_accept",
+        "tcp_send",
+        "tcp_recv",
+        "tcp_close",
+        "udp_open",
+        "udp_bind",
+        "udp_send",
+        "udp_recv",
+        "udp_close",
+        "socket_set_nonblocking",
+        "socket_select_read",
+        "socket_select_write"};
     return names;
 }
 
 /* * predefined globals and alternate spellings that share a builtin index (not listed in getBuiltinNames order).*/
 inline std::vector<std::string> getBuiltinExtraGlobalNames() {
-    return {"PI", "E", "readFile", "writeFile", "file_exists", "list_dir"};
+    return {"PI", "E", "readFile", "writeFile", "appendFile", "file_exists", "list_dir"};
 }
 
 inline void insertAllBuiltinNamesForAnalysis(std::unordered_set<std::string>& out) {
@@ -740,13 +761,24 @@ inline std::string formatExceptionValue(const ValuePtr& e, int depth = 0) {
             auto& fm = std::get<std::unordered_map<std::string, ValuePtr>>(fr->data);
             std::string fn = "?";
             int64_t line = 0;
+            int64_t col = 0;
             auto itf = fm.find("name");
             if (itf != fm.end() && itf->second && itf->second->type == Value::Type::STRING)
                 fn = std::get<std::string>(itf->second->data);
             auto itl = fm.find("line");
             if (itl != fm.end() && itl->second && itl->second->type == Value::Type::INT)
                 line = std::get<int64_t>(itl->second->data);
-            out << "  File \"<kn>\", line " << line << ", in " << fn << "\n";
+            auto itc = fm.find("column");
+            if (itc != fm.end() && itc->second && itc->second->type == Value::Type::INT)
+                col = std::get<int64_t>(itc->second->data);
+            std::string rawFile;
+            auto itPath = fm.find("file");
+            if (itPath != fm.end() && itPath->second && itPath->second->type == Value::Type::STRING)
+                rawFile = std::get<std::string>(itPath->second->data);
+            const std::string dispFile = rawFile.empty() ? "<kn>" : humanizePathForDisplay(rawFile);
+            out << "  File \"" << dispFile << "\", line " << line;
+            if (col > 0) out << ", column " << col;
+            out << ", in " << fn << "\n";
         }
     }
     auto itc = m.find("cause");
@@ -886,7 +918,8 @@ inline void registerAllBuiltins(VM& vm) {
     });
     setGlobalFn("len", 12);
 
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "read_file");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::nil();
         std::string path = std::get<std::string>(args[0]->data);
         std::ifstream f(path);
@@ -897,7 +930,8 @@ inline void registerAllBuiltins(VM& vm) {
     });
     setGlobalFn("read_file", 13);
 
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemWrite, "write_file");
         if (args.size() < 2 || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromBool(false);
         std::string path = std::get<std::string>(args[0]->data);
         std::string content = args[1] && args[1]->type == Value::Type::STRING ? std::get<std::string>(args[1]->data) : (args[1] ? args[1]->toString() : "");
@@ -1142,14 +1176,16 @@ inline void registerAllBuiltins(VM& vm) {
     });
     setGlobalFn("log", 34);
 
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "fileExists");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromBool(false);
         return Value::fromBool(std::filesystem::exists(std::get<std::string>(args[0]->data)));
     });
     setGlobalFn("fileExists", 35);
     setGlobalFn("file_exists", 35);
 
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "listDir");
         std::string path = args.empty() || !args[0] || args[0]->type != Value::Type::STRING ? "." : std::get<std::string>(args[0]->data);
         std::vector<ValuePtr> out;
         try {
@@ -1500,7 +1536,8 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("max", 58);
 
     // file system
-    makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "listDirRecursive");
         std::string path = args.empty() || !args[0] || args[0]->type != Value::Type::STRING ? "." : std::get<std::string>(args[0]->data);
         std::vector<ValuePtr> out;
         try {
@@ -1511,7 +1548,8 @@ inline void registerAllBuiltins(VM& vm) {
         return Value::fromArray(std::move(out));
     });
     setGlobalFn("listDirRecursive", 59);
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemWrite, "copy_file");
         if (args.size() < 2 || !args[0] || !args[1] || args[0]->type != Value::Type::STRING || args[1]->type != Value::Type::STRING) return Value::fromBool(false);
         try {
             std::filesystem::copy(std::get<std::string>(args[0]->data), std::get<std::string>(args[1]->data), std::filesystem::copy_options::overwrite_existing);
@@ -1519,7 +1557,8 @@ inline void registerAllBuiltins(VM& vm) {
         } catch (...) { return Value::fromBool(false); }
     });
     setGlobalFn("copy_file", 60);
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemWrite, "delete_file");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromBool(false);
         try {
             return Value::fromBool(std::filesystem::remove(std::get<std::string>(args[0]->data)));
@@ -1629,7 +1668,8 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("log_error", 71);
 
     // more file system
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemWrite, "move_file");
         if (args.size() < 2 || !args[0] || !args[1] || args[0]->type != Value::Type::STRING || args[1]->type != Value::Type::STRING) return Value::fromBool(false);
         try {
             std::filesystem::rename(std::get<std::string>(args[0]->data), std::get<std::string>(args[1]->data));
@@ -1758,7 +1798,8 @@ inline void registerAllBuiltins(VM& vm) {
     });
     setGlobalFn("pad_right", 82);
 
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kEnvAccess, "env_get");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::nil();
         const std::string& key = std::get<std::string>(args[0]->data);
 #ifdef _WIN32
@@ -1790,14 +1831,16 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("any", 85);
 
     // directory & path type
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemWrite, "create_dir");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromBool(false);
         try {
             return Value::fromBool(std::filesystem::create_directories(std::get<std::string>(args[0]->data)));
         } catch (...) { return Value::fromBool(false); }
     });
     setGlobalFn("create_dir", 86);
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "is_file");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromBool(false);
         try {
             auto p = std::filesystem::status(std::get<std::string>(args[0]->data));
@@ -1805,7 +1848,8 @@ inline void registerAllBuiltins(VM& vm) {
         } catch (...) { return Value::fromBool(false); }
     });
     setGlobalFn("is_file", 87);
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "is_dir");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromBool(false);
         try {
             auto p = std::filesystem::status(std::get<std::string>(args[0]->data));
@@ -1937,7 +1981,11 @@ inline void registerAllBuiltins(VM& vm) {
         for (const auto& f : cs) {
             if (!first) out += "\n";
             first = false;
-            out += "  at " + f.functionName + " line " + std::to_string(f.line);
+            out += "  at " + f.functionName;
+            if (!f.filePath.empty())
+                out += " (" + humanizePathForDisplay(f.filePath) + ":" + std::to_string(f.line) + ")";
+            else
+                out += " line " + std::to_string(f.line);
         }
         return Value::fromString(out);
     });
@@ -3616,7 +3664,7 @@ inline void registerAllBuiltins(VM& vm) {
     });
     setGlobalFn("time_format", 252);
 
-    // stack_trace_array() – current call stack as array of {name, line} (innermost kMaxCallStackSnapshotFrames)
+    // stack_trace_array() – current call stack as array of {name, file, line, column} (innermost kMaxCallStackSnapshotFrames)
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
         std::vector<ValuePtr> arr;
         if (!vm) return Value::fromArray(std::move(arr));
@@ -3626,6 +3674,7 @@ inline void registerAllBuiltins(VM& vm) {
             std::unordered_map<std::string, ValuePtr> marker;
             marker["name"] = std::make_shared<Value>(Value::fromString(
                 "(" + std::to_string(depth - cs.size()) + " outer frame(s) omitted)"));
+            marker["file"] = std::make_shared<Value>(Value::fromString(""));
             marker["line"] = std::make_shared<Value>(Value::fromInt(0));
             marker["column"] = std::make_shared<Value>(Value::fromInt(0));
             arr.push_back(std::make_shared<Value>(Value::fromMap(std::move(marker))));
@@ -3633,6 +3682,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (const auto& f : cs) {
             std::unordered_map<std::string, ValuePtr> m;
             m["name"] = std::make_shared<Value>(Value::fromString(f.functionName));
+            m["file"] = std::make_shared<Value>(Value::fromString(f.filePath));
             m["line"] = std::make_shared<Value>(Value::fromInt(f.line));
             m["column"] = std::make_shared<Value>(Value::fromInt(f.column));
             arr.push_back(std::make_shared<Value>(Value::fromMap(std::move(m))));
@@ -3655,7 +3705,8 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("is_inf", 255);
 
     // env_all() – all environment variables as map
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr>) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
+        vmRequirePermission(vm, Perm::kEnvAccess, "env_all");
         std::unordered_map<std::string, ValuePtr> m;
 #ifdef _WIN32
         char* env = GetEnvironmentStringsA();
@@ -3694,7 +3745,8 @@ inline void registerAllBuiltins(VM& vm) {
     // oS / program-building builtins ---
 
     // cwd() – current working directory
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr>) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "cwd");
         try {
             return Value::fromString(std::filesystem::current_path().string());
         } catch (...) { return Value::fromString(""); }
@@ -3702,7 +3754,8 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("cwd", 258);
 
     // chdir(path) – change working directory; returns true on success
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemWrite, "chdir");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromBool(false);
         try {
             std::filesystem::current_path(std::get<std::string>(args[0]->data));
@@ -3712,7 +3765,8 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("chdir", 259);
 
     // hostname() – machine hostname
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr>) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "hostname");
         char buf[256];
 #ifdef _WIN32
         DWORD n = 256;
@@ -3726,14 +3780,16 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("hostname", 260);
 
     // cpu_count() – number of hardware threads (for parallelism)
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr>) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "cpu_count");
         unsigned n = std::thread::hardware_concurrency();
         return Value::fromInt(n > 0 ? static_cast<int64_t>(n) : 1);
     });
     setGlobalFn("cpu_count", 261);
 
     // temp_dir() – system temp directory path
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr>) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "temp_dir");
         try {
             return Value::fromString(std::filesystem::temp_directory_path().string());
         } catch (...) { return Value::fromString(""); }
@@ -3741,7 +3797,8 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("temp_dir", 262);
 
     // realpath(path) – resolve to absolute canonical path; nil on error
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "realpath");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::nil();
         try {
             std::filesystem::path p(std::get<std::string>(args[0]->data));
@@ -3752,7 +3809,8 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("realpath", 263);
 
     // getpid() – current process ID
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr>) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
+        vmRequirePermission(vm, Perm::kProcessControl, "getpid");
 #ifdef _WIN32
         return Value::fromInt(static_cast<int64_t>(GetCurrentProcessId()));
 #else
@@ -3770,7 +3828,8 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("monotonic_time", 265);
 
     // file_size(path) – size in bytes; nil if not a file or error
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "file_size");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::nil();
         try {
             auto sz = std::filesystem::file_size(std::get<std::string>(args[0]->data));
@@ -3780,7 +3839,8 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("file_size", 266);
 
     // env_set(name, value) – set environment variable for current process; value = nil to unset
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kEnvAccess, "env_set");
         if (args.size() < 1 || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromBool(false);
         std::string name = std::get<std::string>(args[0]->data);
         std::string val = args.size() >= 2 && args[1] ? args[1]->toString() : "";
@@ -3795,7 +3855,8 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("env_set", 267);
 
     // glob(pattern [, base_dir]) – list paths matching pattern (* and ?); base_dir defaults to cwd
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "glob");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromArray({});
         std::string pattern = std::get<std::string>(args[0]->data);
         std::string baseStr;
@@ -3915,7 +3976,8 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("sleep_ms", 277);
 
     // exec(cmd) – run shell command, return process exit code
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kSystemExec, "exec");
         if (args.empty() || !args[0]) return Value::fromInt(-1);
         std::string cmd = args[0]->toString();
         if (cmd.empty()) return Value::fromInt(-1);
@@ -3925,7 +3987,8 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("exec", 278);
 
     // exec_capture(cmd) – run shell command, return {code, out}
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kSystemExec, "exec_capture");
         std::unordered_map<std::string, ValuePtr> m;
         m["code"] = std::make_shared<Value>(Value::fromInt(-1));
         m["out"] = std::make_shared<Value>(Value::fromString(""));
@@ -3957,7 +4020,8 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("exec_capture", 279);
 
     // which(program) – resolve executable in PATH; returns absolute path or nil
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kSystemExec, "which");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::nil();
         std::string prog = std::get<std::string>(args[0]->data);
         if (prog.empty()) return Value::nil();
@@ -4072,16 +4136,22 @@ inline void registerAllBuiltins(VM& vm) {
             const RuntimeGuardPolicy& g = vm->getRuntimeGuards();
             m["debug_mode"] = std::make_shared<Value>(Value::fromBool(g.debugMode));
             m["allow_unsafe"] = std::make_shared<Value>(Value::fromBool(g.allowUnsafe));
+            m["enforce_permissions"] = std::make_shared<Value>(Value::fromBool(g.enforcePermissions));
             m["pointer_bounds"] = std::make_shared<Value>(Value::fromBool(g.enforcePointerBounds));
             m["ffi_enabled"] = std::make_shared<Value>(Value::fromBool(g.ffiEnabled));
             m["sandbox"] = std::make_shared<Value>(Value::fromBool(g.sandboxEnabled));
             m["unsafe_depth"] = std::make_shared<Value>(Value::fromInt(vm->unsafeDepth()));
+            std::vector<ValuePtr> perms;
+            for (const auto& s : g.grantedPermissions)
+                perms.push_back(std::make_shared<Value>(Value::fromString(s)));
+            m["permissions_granted"] = std::make_shared<Value>(Value::fromArray(std::move(perms)));
         }
         return Value::fromMap(std::move(m));
     });
     setGlobalFn("runtime_info", 285);
 
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "path_normalize");
         if (args.empty() || !args[0]) return Value::fromString("");
         std::filesystem::path p(args[0]->toString());
         try { return Value::fromString(p.lexically_normal().string()); }
@@ -4157,7 +4227,8 @@ inline void registerAllBuiltins(VM& vm) {
         return cmd;
     };
 
-    makeBuiltin(i++, [argsToCommand](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [argsToCommand](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kSystemExec, "exec_args");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::fromInt(-1);
         auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
         if (arr.empty()) return Value::fromInt(-1);
@@ -4167,7 +4238,8 @@ inline void registerAllBuiltins(VM& vm) {
     });
     setGlobalFn("exec_args", 290);
 
-    makeBuiltin(i++, [argsToCommand](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [argsToCommand](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kProcessControl, "spawn");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::fromInt(-1);
         auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
         if (arr.empty()) return Value::fromInt(-1);
@@ -4190,7 +4262,8 @@ inline void registerAllBuiltins(VM& vm) {
     });
     setGlobalFn("spawn", i - 1);
 
-    makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kProcessControl, "wait_process");
 #ifdef _WIN32
         if (args.empty()) return Value::fromMap({});
         int64_t hid = toInt(args[0]);
@@ -4212,6 +4285,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromMap(std::move(m));
 #else
+        (void)vm;
         (void)args;
         (void)toInt;
         std::unordered_map<std::string, ValuePtr> m;
@@ -4224,7 +4298,8 @@ inline void registerAllBuiltins(VM& vm) {
     });
     setGlobalFn("wait_process", i - 1);
 
-    makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kProcessControl, "kill_process");
 #ifdef _WIN32
         if (args.empty()) return Value::fromBool(false);
         int64_t hid = toInt(args[0]);
@@ -4235,6 +4310,7 @@ inline void registerAllBuiltins(VM& vm) {
         g_spawnHandles.erase(it);
         return Value::fromBool(ok != 0);
 #else
+        (void)vm;
         (void)args;
         (void)toInt;
         return Value::fromBool(false);
@@ -4286,7 +4362,8 @@ inline void registerAllBuiltins(VM& vm) {
     });
     setGlobalFn("url_decode", 295);
 
-    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kNetworkHttp, "http_get");
         if (args.empty() || !args[0]) return Value::fromString("");
         std::string url = args[0]->toString();
         if (url.empty()) return Value::fromString("");
@@ -4409,7 +4486,8 @@ inline void registerAllBuiltins(VM& vm) {
     });
     setGlobalFn("toml_parse", 297);
 
-    auto doHttpRequest = [](VM*, std::vector<ValuePtr> args) -> Value {
+    auto doHttpRequest = [](VM* vm, std::vector<ValuePtr> args, const char* opName) -> Value {
+        vmRequirePermission(vm, Perm::kNetworkHttp, opName ? opName : "http_request");
         if (args.size() < 2 || !args[0] || !args[1]) {
             std::unordered_map<std::string, ValuePtr> m;
             m["status"] = std::make_shared<Value>(Value::fromInt(0));
@@ -4493,7 +4571,9 @@ inline void registerAllBuiltins(VM& vm) {
         m["ok"] = std::make_shared<Value>(Value::fromBool(status >= 200 && status < 300));
         return Value::fromMap(std::move(m));
     };
-    makeBuiltin(i++, doHttpRequest);
+    makeBuiltin(i++, [doHttpRequest](VM* vm, std::vector<ValuePtr> args) {
+        return doHttpRequest(vm, std::move(args), "http_request");
+    });
     setGlobalFn("http_request", 298);
     makeBuiltin(i++, [doHttpRequest](VM* vm, std::vector<ValuePtr> args) {
         std::vector<ValuePtr> inner;
@@ -4507,7 +4587,7 @@ inline void registerAllBuiltins(VM& vm) {
             inner.push_back(std::make_shared<Value>(Value::fromMap(std::unordered_map<std::string, ValuePtr>{})));
             inner.push_back(args.size() >= 2 ? args[1] : std::make_shared<Value>(Value::nil()));
         }
-        return doHttpRequest(vm, inner);
+        return doHttpRequest(vm, std::move(inner), "http_post");
     });
     setGlobalFn("http_post", 299);
 
@@ -6284,6 +6364,11 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("__safe_invoke2", 351);
 
 #include "std_builtins_v1.inl"
+#include "std_builtins_socket.inl"
+    constexpr size_t kSocketBuiltinCount = 16;
+    setGlobalFn("append_file", i - kSocketBuiltinCount - 2);
+    setGlobalFn("appendFile", i - kSocketBuiltinCount - 2);
+    setGlobalFn("require", i - kSocketBuiltinCount - 1);
 }
 
 } // namespace kern

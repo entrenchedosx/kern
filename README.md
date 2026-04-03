@@ -1,7 +1,7 @@
 # Kern
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.6-blue.svg)](KERN_VERSION.txt)
+[![Version](https://img.shields.io/badge/version-1.0.7-blue.svg)](KERN_VERSION.txt)
 [![Discord](https://img.shields.io/badge/discord-Kern-5865F2?logo=discord&logoColor=white)](https://discord.gg/JBa4RfT2tE)
 
 **Kern** is a small, compiled scripting language: an explicit lexer → parser → bytecode pipeline and a bytecode **VM**, with a growing **standard library** (`lib/kern/`) and a **`kern`** CLI for running scripts, linting, and the REPL.
@@ -165,6 +165,7 @@ The canonical version string is the root **`KERN_VERSION.txt`** file (used by `k
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
 | [STRICT_TYPES.md](docs/STRICT_TYPES.md) | Optional `--strict-types` checks (Phase 2) |
 | [LANGUAGE_ROADMAP.md](docs/LANGUAGE_ROADMAP.md) | Language evolution phases and status |
+| [PRODUCTION_VISION.md](docs/PRODUCTION_VISION.md) | Phased plan for stability, diagnostics, stdlib, and tooling |
 | [MEMORY_MODEL.md](docs/MEMORY_MODEL.md) | Value lifetimes and FFI boundaries |
 | [ERROR_CODES.md](docs/ERROR_CODES.md) | Stable diagnostic codes |
 | [IMPLEMENTATION_SUMMARY.md](docs/IMPLEMENTATION_SUMMARY.md) | Recent toolchain upgrade summary |
@@ -183,9 +184,9 @@ See [docs/TESTING.md](docs/TESTING.md) for example sweeps, `kernc` tests, and st
 
 ## Releases & versioning
 
-- **Version:** `KERN_VERSION.txt` at repo root (e.g. `1.0.6`).
+- **Version:** `KERN_VERSION.txt` at repo root (e.g. `1.0.7`).
 - **Changelog:** [CHANGELOG.md](CHANGELOG.md) follows [Keep a Changelog](https://keepachangelog.com/).
-- **Tags:** release tags look like `v1.0.6` (see [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)).
+- **Tags:** release tags look like `v1.0.7` (see [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)).
 - **CI:** [`.github/workflows/windows-kern.yml`](.github/workflows/windows-kern.yml), [`.github/workflows/linux-kern.yml`](.github/workflows/linux-kern.yml), and [`.github/workflows/macos-kern.yml`](.github/workflows/macos-kern.yml) build and smoke-test on pushes and PRs.
 - **Releases:** Pushing a `v*` tag runs [`.github/workflows/release.yml`](.github/workflows/release.yml), which uploads **Windows** (zip, Raylib-enabled), **Linux** (`.tar.gz`, headless), and **macOS** (`.tar.gz`, headless) assets to the GitHub Release.
 

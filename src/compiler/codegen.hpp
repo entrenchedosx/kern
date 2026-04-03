@@ -32,6 +32,7 @@ public:
 private:
     Bytecode code_;
     int currentLine_ = 0;
+    int currentColumn_ = 0;
     std::vector<std::string> stringConstants_;
     std::vector<Value> valueConstants_;
     std::unordered_map<std::string, size_t> globals_;

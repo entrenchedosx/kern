@@ -1,0 +1,67 @@
+// Non-blocking listen + socket_select_read: wait for incoming connection (with timeout loop).
+// Run: kern --unsafe examples/network/tcp_select_accept.kn [port]
+// Then: kern --unsafe examples/network/tcp_echo_client.kn
+require("network.tcp")
+
+let port = 9876
+let argv = cli_args()
+if len(argv) >= 4 {
+    port = parse_int(argv[3])
+}
+
+let L = tcp_listen("0.0.0.0", port, 8)
+if L["ok"] == false {
+    print("tcp_listen failed:", L["error"])
+    exit_code(1)
+}
+let lid = L["id"]
+
+let nb = socket_set_nonblocking(lid, true)
+if nb["ok"] == false {
+    print("socket_set_nonblocking failed:", nb["error"])
+    tcp_close(lid)
+    exit_code(1)
+}
+
+print("select loop on port", port, "(connect with tcp_echo_client.kn)")
+
+let max_tries = 600
+let t = 0
+let cid = -1
+while t < max_tries {
+    let sel = socket_select_read(array(lid), 100)
+    if sel["ok"] == false {
+        print("select failed:", sel["error"])
+        break
+    }
+    if len(sel["ready"]) == 0 {
+        t = t + 1
+        continue
+    }
+    let A = tcp_accept(lid)
+    if A["ok"] == false {
+        print("accept failed:", A["error"])
+        break
+    }
+    if A["would_block"] {
+        t = t + 1
+        continue
+    }
+    cid = A["id"]
+    break
+}
+
+if cid < 0 {
+    print("timeout waiting for client")
+    tcp_close(lid)
+    exit_code(1)
+}
+
+let r = tcp_recv(cid, 65536)
+if r["ok"] {
+    print("got:", r["data"])
+    tcp_send(cid, r["data"])
+}
+tcp_close(cid)
+tcp_close(lid)
+print("done")

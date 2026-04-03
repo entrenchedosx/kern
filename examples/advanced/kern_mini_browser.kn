@@ -2,6 +2,7 @@
 // requires: kern built with game/Raylib. Set KERN_LIB to project lib/ for imports.
 // controls: type URL (https:// added if missing), Enter or Go, Backspace, -/= scroll, Esc closes (Raylib).
 
+require("network.http")
 kit = import("lib/kern/gamekit/module.kn")
 draw = kit.use_draw2d()
 ui = kit.use_ui()

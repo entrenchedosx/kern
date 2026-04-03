@@ -10,6 +10,7 @@
 #include "compiler/semantic.hpp"
 #include "compiler/ast.hpp"
 #include "vm/vm.hpp"
+#include "vm/permissions.hpp"
 #include "vm/value.hpp"
 #include "vm/builtins.hpp"
 #include "vm/bytecode.hpp"
@@ -41,6 +42,19 @@
 #endif
 
 using namespace kern;
+
+static void parseAllowCsv(const std::string& csv, RuntimeGuardPolicy& g) {
+    size_t i = 0;
+    while (i < csv.size()) {
+        while (i < csv.size() && (csv[i] == ' ' || csv[i] == '\t')) ++i;
+        size_t j = i;
+        while (j < csv.size() && csv[j] != ',') ++j;
+        std::string tok = csv.substr(i, j - i);
+        while (!tok.empty() && (tok.back() == ' ' || tok.back() == '\t')) tok.pop_back();
+        if (!tok.empty()) g.grantedPermissions.insert(std::move(tok));
+        i = j + 1;
+    }
+}
 
 static void dumpStmt(const Stmt* s, int indent) {
     if (!s) return;
@@ -74,6 +88,14 @@ static void dumpAst(Program* program) {
 }
 
 static void dumpBytecode(const Bytecode& code, const std::vector<std::string>& constants) {
+    for (size_t i = 0; i < code.size(); ++i) {
+        const auto& inst = code[i];
+        std::cout << (i + 1) << "\t" << opcodeName(inst.op) << formatBytecodeOperandSuffix(inst, constants)
+                  << "\t; L" << inst.line << " C" << inst.column << "\n";
+    }
+}
+
+static void dumpBytecodeNormalized(const Bytecode& code, const std::vector<std::string>& constants) {
     for (size_t i = 0; i < code.size(); ++i) {
         const auto& inst = code[i];
         std::cout << (i + 1) << "\t" << opcodeName(inst.op) << formatBytecodeOperandSuffix(inst, constants) << "\n";
@@ -198,6 +220,7 @@ static bool runSource(VM& vm, const std::string& sourceIn, const std::string& fi
         vm.setBytecode(code);
         vm.setStringConstants(gen.getConstants());
         vm.setValueConstants(gen.getValueConstants());
+        vm.setActiveSourcePath(filename);
         vm.run();
         return true;
     } catch (const LexerError& e) {
@@ -219,7 +242,7 @@ static bool runSource(VM& vm, const std::string& sourceIn, const std::string& fi
     } catch (const VMError& e) {
         std::vector<StackFrame> stack;
         for (const auto& f : vm.getCallStackSlice()) {
-            stack.push_back({f.functionName, f.line, f.column});
+            stack.push_back({f.functionName, f.filePath, f.line, f.column});
         }
         std::string hint(vmRuntimeErrorHint(e.category, e.code));
         g_errorReporter.reportRuntimeError(vmErrorCategory(e.category), e.line, e.column, e.what(), stack, hint,
@@ -312,6 +335,8 @@ static void printUsage(const char* prog) {
         << "  --fmt <file>          Format script (indent by braces).\n"
         << "  --ast <file>          Dump AST and exit.\n"
         << "  --bytecode <file>     Dump bytecode and exit.\n"
+        << "  --bytecode-normalized <file>  Dump bytecode without source locations (stable for golden tests).\n"
+        << "  --vm-error-codes-json Print machine-readable VM error catalog (E### ids) and exit.\n"
         << "  --scan [opts] [paths] Cross-layer scan: builtin registry, stdlib exports, compile + static analysis.\n"
         << "                        Same as standalone `kern-scan`. Use --registry-only, --json, --strict-types, --test.\n\n"
         << "  --watch <file>        Re-run script when file changes.\n\n"
@@ -319,6 +344,8 @@ static void printUsage(const char* prog) {
         << "  --trace               Enable VM instruction trace for the next script run or REPL (very noisy).\n"
         << "  --debug / --release   Toggle runtime guard profile (debug default).\n"
         << "  --allow-unsafe        Allow raw memory ops globally (without unsafe block).\n"
+        << "  --unsafe              Alias for --allow-unsafe (global unlock for permission-gated builtins).\n"
+        << "  --allow=a,b           Pre-grant permission ids (e.g. filesystem.read,network.http,system.exec).\n"
         << "  --ffi                 Enable ffi_call builtin.\n"
         << "  --ffi-allow <dll>     Add DLL allowlist entry for sandboxed ffi_call.\n"
         << "  --no-sandbox          Disable FFI allowlist sandbox checks.\n\n"
@@ -712,6 +739,9 @@ static int cmdTest(int argc, char** argv, int argBase, const char* prog) {
             continue;
         }
         VM vm;
+        RuntimeGuardPolicy testGuards;
+        registerAllStandardPermissions(testGuards);
+        vm.setRuntimeGuards(testGuards);
         registerAllBuiltins(vm);
         registerImportBuiltin(vm);
         g_errorReporter.resetCounts();
@@ -781,6 +811,11 @@ int main(int argc, char** argv) {
     runtimeGuards.enforcePointerBounds = true;
     runtimeGuards.ffiEnabled = false;
     runtimeGuards.sandboxEnabled = true;
+    {
+        const char* kEnf = std::getenv("KERN_ENFORCE_PERMISSIONS");
+        if (kEnf && (std::strcmp(kEnf, "0") == 0 || std::strcmp(kEnf, "false") == 0))
+            runtimeGuards.enforcePermissions = false;
+    }
     while (argBase < argc) {
         std::string flag = argv[argBase];
         if (flag == "--debug") {
@@ -793,8 +828,13 @@ int main(int argc, char** argv) {
             ++argBase;
             continue;
         }
-        if (flag == "--allow-unsafe") {
+        if (flag == "--allow-unsafe" || flag == "--unsafe") {
             runtimeGuards.allowUnsafe = true;
+            ++argBase;
+            continue;
+        }
+        if (flag.rfind("--allow=", 0) == 0) {
+            parseAllowCsv(flag.substr(8), runtimeGuards);
             ++argBase;
             continue;
         }
@@ -927,6 +967,10 @@ int main(int argc, char** argv) {
         }
         if (arg == "--help" || arg == "-h") {
             printUsage(prog);
+            return 0;
+        }
+        if (arg == "--vm-error-codes-json") {
+            std::cout << formatVmErrorCatalogJson();
             return 0;
         }
         if (arg == "test") {
@@ -1073,7 +1117,8 @@ int main(int argc, char** argv) {
         }
     }
 
-    if (argc > argBase + 1 && std::string(argv[argBase]) == "--bytecode") {
+    if (argc > argBase + 1 && (std::string(argv[argBase]) == "--bytecode" || std::string(argv[argBase]) == "--bytecode-normalized")) {
+        const bool normalized = std::string(argv[argBase]) == "--bytecode-normalized";
         ResolvedKnPath rs;
         std::string resolveErr;
         if (!resolveKnScriptPath(argv[argBase + 1], rs, resolveErr)) {
@@ -1104,7 +1149,10 @@ int main(int argc, char** argv) {
             std::unique_ptr<Program> program = parser.parse();
             CodeGenerator gen;
             Bytecode code = gen.generate(std::move(program));
-            dumpBytecode(code, gen.getConstants());
+            if (normalized)
+                dumpBytecodeNormalized(code, gen.getConstants());
+            else
+                dumpBytecode(code, gen.getConstants());
             return 0;
         } catch (const LexerError& e) {
             g_errorReporter.reportCompileError(ErrorCategory::SyntaxError, e.line, e.column, e.what(), lexerCompileErrorHint(),
@@ -1396,14 +1444,21 @@ int main(int argc, char** argv) {
             std::cout << it.errorCode << ": " << it.message << "\n";
             if (!it.stackTrace.empty()) {
                 for (const auto& fr : it.stackTrace) {
-                    std::cout << "  at " << fr.functionName << " (" << fr.line << ":" << fr.column << ")\n";
+                    std::cout << "  at " << fr.functionName;
+                    if (!fr.filePath.empty()) {
+                        std::cout << " " << humanizePathForDisplay(fr.filePath) << ":" << fr.line;
+                        if (fr.column > 0) std::cout << ":" << fr.column;
+                    } else {
+                        std::cout << " (" << fr.line << ":" << fr.column << ")";
+                    }
+                    std::cout << "\n";
                 }
             }
             continue;
         }
         history.push_back(line);
         g_errorReporter.resetCounts();
-        runSource(vm, line);
+        runSource(vm, line, "<repl>");
         g_errorReporter.printSummary();
     }
     return 0;

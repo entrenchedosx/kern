@@ -3,6 +3,7 @@
  */
 
 #include "codegen.hpp"
+#include "../vm/bytecode_peephole.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -90,18 +91,21 @@ size_t CodeGenerator::addValueConstant(Value v) {
 size_t CodeGenerator::emit(Opcode op) {
     code_.emplace_back(op);
     code_.back().line = currentLine_;
+    code_.back().column = currentColumn_;
     return code_.size() - 1;
 }
 
 size_t CodeGenerator::emit(Opcode op, int64_t arg) {
     code_.emplace_back(op, arg);
     code_.back().line = currentLine_;
+    code_.back().column = currentColumn_;
     return code_.size() - 1;
 }
 
 size_t CodeGenerator::emit(Opcode op, double arg) {
     code_.emplace_back(op, arg);
     code_.back().line = currentLine_;
+    code_.back().column = currentColumn_;
     return code_.size() - 1;
 }
 
@@ -112,12 +116,14 @@ size_t CodeGenerator::emit(Opcode op, const std::string& arg) {
 size_t CodeGenerator::emit(Opcode op, size_t arg) {
     code_.emplace_back(op, arg);
     code_.back().line = currentLine_;
+    code_.back().column = currentColumn_;
     return code_.size() - 1;
 }
 
 size_t CodeGenerator::emit(Opcode op, size_t a, size_t b) {
     code_.emplace_back(op, a, b);
     code_.back().line = currentLine_;
+    code_.back().column = currentColumn_;
     return code_.size() - 1;
 }
 
@@ -508,6 +514,7 @@ bool CodeGenerator::tryConstantFoldUnary(const UnaryExpr* x) {
 void CodeGenerator::emitExpr(const Expr* e) {
     if (!e) return;
     currentLine_ = e->line;
+    currentColumn_ = e->column;
     if (auto* x = dynamic_cast<const IntLiteral*>(e)) {
         emit(Opcode::CONST_I64, x->value);
         return;
@@ -580,6 +587,8 @@ void CodeGenerator::emitExpr(const Expr* e) {
         return;
     }
     if (auto* x = dynamic_cast<const AwaitExpr*>(e)) {
+        currentLine_ = x->line;
+        currentColumn_ = x->column;
         emit(Opcode::LOAD_GLOBAL, addConstant("__await_task"));
         emitExpr(x->target.get());
         emit(Opcode::CALL, static_cast<size_t>(1));
@@ -611,6 +620,8 @@ void CodeGenerator::emitExpr(const Expr* e) {
             emit(Opcode::LOAD_GLOBAL, addConstant("invoke"));
             emitExpr(x->callee.get());
             emit(Opcode::LOAD_GLOBAL, addConstant(acc));
+            currentLine_ = x->line;
+            currentColumn_ = x->column;
             emit(Opcode::CALL, static_cast<size_t>(2));
             return;
         }
@@ -642,6 +653,8 @@ void CodeGenerator::emitExpr(const Expr* e) {
             emit(Opcode::STORE_GLOBAL, addConstant("this"));
             emit(Opcode::GET_FIELD, addConstant(mem->member));
             for (const auto& a : x->args) emitExpr(a.expr.get());
+            currentLine_ = x->line;
+            currentColumn_ = x->column;
             emit(Opcode::CALL, static_cast<size_t>(x->args.size()));
         } else {
             emitExpr(x->callee.get());
@@ -650,9 +663,13 @@ void CodeGenerator::emitExpr(const Expr* e) {
                     if (arg) emitExpr(arg);
                     else emit(Opcode::CONST_NULL);
                 }
+                currentLine_ = x->line;
+                currentColumn_ = x->column;
                 emit(Opcode::CALL, static_cast<size_t>(ordered.size()));
             } else {
                 for (const auto& a : x->args) emitExpr(a.expr.get());
+                currentLine_ = x->line;
+                currentColumn_ = x->column;
                 emit(Opcode::CALL, static_cast<size_t>(x->args.size()));
             }
         }
@@ -780,6 +797,8 @@ void CodeGenerator::emitExpr(const Expr* e) {
         return;
     }
     if (auto* x = dynamic_cast<const CoalesceExpr*>(e)) {
+        currentLine_ = x->line;
+        currentColumn_ = x->column;
         emitExpr(x->left.get());
         emit(Opcode::DUP);
         emit(Opcode::CONST_NULL);
@@ -795,6 +814,8 @@ void CodeGenerator::emitExpr(const Expr* e) {
         // vM CALL pops args first (top of stack), then callee. So we need [arg, callee] = [left, right].
         emitExpr(x->right.get());   // callee (will be popped last)
         emitExpr(x->left.get());    // single argument (popped first)
+        currentLine_ = x->line;
+        currentColumn_ = x->column;
         emit(Opcode::CALL, static_cast<size_t>(1));
         return;
     }
@@ -1053,6 +1074,7 @@ void CodeGenerator::emitExpr(const Expr* e) {
 void CodeGenerator::emitStmt(const Stmt* s) {
     if (!s) return;
     currentLine_ = s->line;
+    currentColumn_ = s->column;
     if (auto* x = dynamic_cast<const ExprStmt*>(s)) {
         emitExpr(x->expr.get());
         emit(Opcode::POP);
@@ -1685,6 +1707,8 @@ void CodeGenerator::emitProgram(const Program* p) {
 void CodeGenerator::emitFunctionOntoStack(const FunctionDeclStmt* x) {
     std::vector<LambdaCodegenLayer> savedLambdaCtx;
     savedLambdaCtx.swap(lambdaCtxStack_);
+    currentLine_ = x->line;
+    currentColumn_ = x->column;
     size_t skipBody = emit(Opcode::JMP, size_t(0));
     size_t entry = code_.size();
     beginScope();
@@ -1729,8 +1753,7 @@ Bytecode CodeGenerator::generate(std::unique_ptr<Program> program) {
     code_.clear();
     emitProgram(program.get());
     emit(Opcode::HALT);
-    // peephole (NOP removal + jump remap) was removed: it caused stack underflow in smoke tests.
-    // reintroduce as a separate pass only after fixing BUILD_FUNC / jump remapping.
+    applyBytecodePeephole(code_);
     return std::move(code_);
 }
 

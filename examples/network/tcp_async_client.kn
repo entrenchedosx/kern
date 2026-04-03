@@ -1,0 +1,56 @@
+// Async connect: tcp_connect_start + socket_select_write + tcp_connect_check, then echo one line.
+// Run after server: kern --unsafe examples/network/tcp_async_client.kn [host] [port] [message]
+require("network.tcp")
+
+let host = "127.0.0.1"
+let port = 9876
+let msg = "hello async\n"
+let argv = cli_args()
+if len(argv) >= 5 {
+    host = argv[3]
+    port = parse_int(argv[4])
+}
+if len(argv) >= 6 {
+    msg = argv[5]
+}
+
+let c = tcp_connect_start(host, port)
+if c["ok"] == false {
+    print("tcp_connect_start failed:", c["error"])
+    exit_code(1)
+}
+let sid = c["id"]
+if c["instant_connected"] == false {
+    while true {
+        let w = socket_select_write(array(sid), 100)
+        if w["ok"] == false {
+            print("socket_select_write failed:", w["error"])
+            tcp_close(sid)
+            exit_code(1)
+        }
+        let chk = tcp_connect_check(sid)
+        if chk["ok"] == false {
+            print("tcp_connect_check failed:", chk["error"])
+            exit_code(1)
+        }
+        if chk["connected"] == true {
+            break
+        }
+    }
+}
+
+let snd = tcp_send(sid, msg)
+if snd["ok"] == false {
+    print("tcp_send failed:", snd["error"])
+    tcp_close(sid)
+    exit_code(1)
+}
+
+let r = tcp_recv(sid, 65536)
+if r["ok"] == false {
+    print("tcp_recv failed:", r["error"])
+    tcp_close(sid)
+    exit_code(1)
+}
+print("reply:", r["data"])
+tcp_close(sid)

@@ -13,6 +13,7 @@ const std::unordered_map<std::string, std::string>& stdlibBuiltinAliasTarget() {
     static const std::unordered_map<std::string, std::string> m = {
         {"readFile", "read_file"},
         {"writeFile", "write_file"},
+        {"appendFile", "append_file"},
         {"file_exists", "fileExists"},
         {"list_dir", "listDir"},
     };
@@ -107,7 +108,7 @@ ValuePtr createStdlibModule(VM& vm, const std::string& nameIn) {
             "set_step_limit", "set_max_call_depth", "set_callback_guard", "deterministic_mode", "runtime_info"
         }},
         { "io", {
-            "read_file", "write_file", "readFile", "writeFile", "readline", "base64_encode", "base64_decode", "csv_parse", "csv_stringify", "fileExists", "listDir", "file_size", "glob",
+            "read_file", "write_file", "append_file", "require", "readFile", "writeFile", "appendFile", "readline", "base64_encode", "base64_decode", "csv_parse", "csv_stringify", "fileExists", "listDir", "file_size", "glob",
             "listDirRecursive", "create_dir", "is_file", "is_dir", "copy_file", "delete_file", "move_file"
         }},
         // array: full combinator set
@@ -179,7 +180,7 @@ ValuePtr createStdlibModule(VM& vm, const std::string& nameIn) {
         // path and file system (path helpers + file I/O)
         { "path", {
             "basename", "dirname", "path_join", "cwd", "chdir", "realpath", "temp_dir",
-            "read_file", "write_file", "fileExists", "listDir", "listDirRecursive",
+            "read_file", "write_file", "append_file", "fileExists", "listDir", "listDirRecursive",
             "create_dir", "is_file", "is_dir", "copy_file", "delete_file", "move_file", "file_size", "glob",
             "path_normalize"
         }},
@@ -202,7 +203,7 @@ ValuePtr createStdlibModule(VM& vm, const std::string& nameIn) {
         }},
         // file system (alias for io)
         { "fs", {
-            "read_file", "write_file", "readFile", "writeFile", "fileExists", "listDir",
+            "read_file", "write_file", "append_file", "readFile", "writeFile", "appendFile", "fileExists", "listDir",
             "listDirRecursive", "create_dir", "is_file", "is_dir", "copy_file", "delete_file", "move_file"
         }},
         // python-inspired: re -> regex

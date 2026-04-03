@@ -9,11 +9,13 @@ $Root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 
 if ([string]::IsNullOrWhiteSpace($Exe)) {
     $candidates = @(
-        (Join-Path $Root "build\Release\kern.exe"),
-        (Join-Path $Root "build\Debug\kern.exe"),
-        (Join-Path $Root "shareable-ide\compiler\kern.exe"),
-        (Join-Path $Root "FINAL\bin\kern.exe"),
-        (Join-Path $Root "FINAL\Release\kern.exe")
+        ([System.IO.Path]::Combine($Root, "build", "Release", "kern.exe")),
+        ([System.IO.Path]::Combine($Root, "build", "Debug", "kern.exe")),
+        ([System.IO.Path]::Combine($Root, "build", "kern.exe")),
+        ([System.IO.Path]::Combine($Root, "build", "kern")),
+        ([System.IO.Path]::Combine($Root, "shareable-ide", "compiler", "kern.exe")),
+        ([System.IO.Path]::Combine($Root, "FINAL", "bin", "kern.exe")),
+        ([System.IO.Path]::Combine($Root, "FINAL", "Release", "kern.exe"))
     )
     foreach ($c in $candidates) {
         if (Test-Path $c) { $Exe = $c; break }

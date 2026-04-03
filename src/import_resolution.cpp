@@ -196,7 +196,7 @@ static bool compileAndRunImportedSource(VM* v, const std::string& displayPath, c
         std::unique_ptr<Program> program = parser.parse();
         CodeGenerator gen;
         Bytecode code = gen.generate(std::move(program));
-        v->runSubScript(code, gen.getConstants(), gen.getValueConstants());
+        v->runSubScript(code, gen.getConstants(), gen.getValueConstants(), displayPath);
         outModule = makeModuleFromGlobalDelta(*v, beforeGlobals);
         g_importState.moduleCache[resolvedKey] = outModule;
         g_importState.moduleCache[cacheKey] = outModule;
@@ -222,7 +222,7 @@ static bool compileAndRunImportedSource(VM* v, const std::string& displayPath, c
         ErrorReporterImportScope scope(g_errorReporter, displayPath, source);
         std::vector<StackFrame> stack;
         for (const auto& f : v->getCallStackSlice())
-            stack.push_back({f.functionName, f.line, f.column});
+            stack.push_back({f.functionName, f.filePath, f.line, f.column});
         std::string hint(vmRuntimeErrorHint(e.category, e.code));
         g_errorReporter.reportRuntimeError(vmErrorCategory(e.category), e.line, e.column, e.what(), stack, hint,
             vmErrorCodeString(e.category, e.code),

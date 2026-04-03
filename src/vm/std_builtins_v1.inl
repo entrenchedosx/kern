@@ -498,3 +498,24 @@
         }
         return Value::fromArray(std::move(out));
     });
+
+    // append bytes to file (create if missing); same string coercion as write_file
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemWrite, "append_file");
+        if (args.size() < 2 || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromBool(false);
+        std::string path = std::get<std::string>(args[0]->data);
+        std::string content = args[1] && args[1]->type == Value::Type::STRING ? std::get<std::string>(args[1]->data)
+                                                                              : (args[1] ? args[1]->toString() : "");
+        std::ofstream f(path, std::ios::out | std::ios::app);
+        if (!f) return Value::fromBool(false);
+        f << content;
+        return Value::fromBool(true);
+    });
+
+    // require("filesystem.write") — grant a permission for the rest of the VM run (no-op if enforcement off)
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        if (!vm || args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromBool(false);
+        std::string p = std::get<std::string>(args[0]->data);
+        vm->mutableRuntimeGuards().grantedPermissions.insert(std::move(p));
+        return Value::fromBool(true);
+    });

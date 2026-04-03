@@ -1,4 +1,4 @@
-# On version tag (v*): build Windows (Raylib), Linux/macOS (headless), attach archives to GitHub Release.
+# On version tag (v*): build Windows + Linux + macOS with Raylib (g2d/g3d); attach archives to GitHub Release.
 # workflow_dispatch: build + artifacts only (no release unless ref is a tag).
 name: Release
 
@@ -64,7 +64,7 @@ jobs:
 
       - name: Build
         shell: cmd
-        run: cmake --build build --config Release --target kern kernc kern-scan --parallel 4
+        run: cmake --build build --config Release --target kern kernc kern-scan kern_game kern_contract_humanize --parallel 4
 
       - name: Verify
         shell: cmd
@@ -73,6 +73,13 @@ jobs:
           build\Release\kern.exe --scan --registry-only
           build\Release\kern.exe tests\std_v1_builtins_smoke.kn
           build\Release\kern.exe examples\basic\01_hello_world.kn
+
+      # Headless runner: skip g2d/g3d .kn tests even when Raylib is linked (no GPU/display).
+      - name: Stable suite (contract, golden, coverage)
+        shell: pwsh
+        env:
+          KERN_COVERAGE_SKIP_GRAPHICS: "1"
+        run: pwsh -NoProfile -File ./tests/run_stable.ps1
 
       - name: Package zip
         id: zip
@@ -84,6 +91,7 @@ jobs:
           Copy-Item build/Release/kern.exe pkg/kern-${ver}-win64/
           Copy-Item build/Release/kernc.exe pkg/kern-${ver}-win64/
           Copy-Item build/Release/kern-scan.exe pkg/kern-${ver}-win64/
+          Copy-Item build/Release/kern_contract_humanize.exe pkg/kern-${ver}-win64/
           Copy-Item LICENSE pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
           Copy-Item README.md pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
           Copy-Item KERN_VERSION.txt pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
@@ -101,12 +109,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure & build (Release, headless)
+      - uses: actions/setup-powershell@v4
+
+      - name: Cache FetchContent (Raylib under build/_deps)
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: release-linux-fetchdeps-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Install Raylib build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libasound2-dev \
+            libx11-dev \
+            libxrandr-dev \
+            libxi-dev \
+            libxcursor-dev \
+            libxinerama-dev \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev
+
+      - name: Configure & build (Release, graphics)
         run: |
           cmake -B build -DCMAKE_BUILD_TYPE=Release \
-            -DKERN_BUILD_GAME=OFF \
+            -DKERN_BUILD_GAME=ON \
             -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF
-          cmake --build build --parallel 4 --target kern kernc kern-scan
+          cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_contract_humanize
 
       - name: Verify
         run: |
@@ -115,14 +145,20 @@ jobs:
           ./build/kern tests/std_v1_builtins_smoke.kn
           ./build/kern examples/basic/01_hello_world.kn
 
+      # Headless runner: skip g2d/g3d .kn coverage (same as Windows release).
+      - name: Stable suite (contract, golden, coverage)
+        env:
+          KERN_COVERAGE_SKIP_GRAPHICS: "1"
+        run: pwsh -NoProfile -File ./tests/run_stable.ps1
+
       - name: Package tarball
         id: tgz
         run: |
           ver=$(tr -d ' \t\r\n' < KERN_VERSION.txt)
           out="kern-linux-x64-v${ver}.tar.gz"
           mkdir -p "pkg/kern-${ver}-linux-x64"
-          chmod +x build/kern build/kernc build/kern-scan
-          cp build/kern build/kernc build/kern-scan "pkg/kern-${ver}-linux-x64/"
+          chmod +x build/kern build/kernc build/kern-scan build/kern_contract_humanize
+          cp build/kern build/kernc build/kern-scan build/kern_contract_humanize "pkg/kern-${ver}-linux-x64/"
           cp LICENSE README.md KERN_VERSION.txt "pkg/kern-${ver}-linux-x64/" 2>/dev/null || true
           tar -czvf "$out" -C pkg "kern-${ver}-linux-x64"
           echo "tgz_path=$out" >> "$GITHUB_OUTPUT"
@@ -132,17 +168,42 @@ jobs:
           name: kern-release-linux
           path: ${{ steps.tgz.outputs.tgz_path }}
 
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install MkDocs
+        run: pip install mkdocs
+
+      - name: Build docs (strict) + postprocess
+        run: |
+          mkdocs build --strict
+          python tools/postprocess_site.py
+
   macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure & build (Release, headless)
+      - uses: actions/setup-powershell@v4
+
+      - name: Cache FetchContent (Raylib under build/_deps)
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: release-macos-fetchdeps-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Configure & build (Release, graphics)
         run: |
           cmake -B build -DCMAKE_BUILD_TYPE=Release \
-            -DKERN_BUILD_GAME=OFF \
+            -DKERN_BUILD_GAME=ON \
             -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF
-          cmake --build build --parallel 4 --target kern kernc kern-scan
+          cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_contract_humanize
 
       - name: Verify
         run: |
@@ -151,14 +212,19 @@ jobs:
           ./build/kern tests/std_v1_builtins_smoke.kn
           ./build/kern examples/basic/01_hello_world.kn
 
+      - name: Stable suite (contract, golden, coverage)
+        env:
+          KERN_COVERAGE_SKIP_GRAPHICS: "1"
+        run: pwsh -NoProfile -File ./tests/run_stable.ps1
+
       - name: Package tarball
         id: tgz
         run: |
           ver=$(tr -d ' \t\r\n' < KERN_VERSION.txt)
           out="kern-macos-v${ver}.tar.gz"
           mkdir -p "pkg/kern-${ver}-macos"
-          chmod +x build/kern build/kernc build/kern-scan
-          cp build/kern build/kernc build/kern-scan "pkg/kern-${ver}-macos/"
+          chmod +x build/kern build/kernc build/kern-scan build/kern_contract_humanize
+          cp build/kern build/kernc build/kern-scan build/kern_contract_humanize "pkg/kern-${ver}-macos/"
           cp LICENSE README.md KERN_VERSION.txt "pkg/kern-${ver}-macos/" 2>/dev/null || true
           tar -czvf "$out" -C pkg "kern-${ver}-macos"
           echo "tgz_path=$out" >> "$GITHUB_OUTPUT"
@@ -169,7 +235,7 @@ jobs:
           path: ${{ steps.tgz.outputs.tgz_path }}
 
   publish:
-    needs: [windows, linux, macos]
+    needs: [windows, linux, macos, docs]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:

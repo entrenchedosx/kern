@@ -16,6 +16,8 @@ struct ScriptCode {
     Bytecode code;
     std::vector<std::string> stringConstants;
     std::vector<Value> valueConstants;
+    /** Resolved path for diagnostics (import path or main script path); may be empty. */
+    std::string sourcePath;
 };
 
 } // namespace kern

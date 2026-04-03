@@ -3,12 +3,16 @@
 
 site_name: Kern
 site_description: Kern language & toolchain documentation
+# Public site URL (GitHub Pages, etc.). Used by tools/generate_sitemap.py after `mkdocs build`.
+site_url: https://entrenchedosx.github.io/kern/
 repo_url: https://github.com/entrenchedosx/kern
 edit_uri: edit/main/docs/
 
 theme:
   name: readthedocs
   highlightjs: true
+  # Fixes invalid `id ="rtd-search-form"` from stock theme when rebuilding `site/`.
+  custom_dir: docs/overrides
 
 nav:
   - Home: index.md
@@ -20,8 +24,16 @@ nav:
   - Builtin reference: BUILTIN_REFERENCE.md
   - Error codes: ERROR_CODES.md
   - Trust model: TRUST_MODEL.md
+  - Networking & multiplayer: NETWORKING_MULTIPLAYER.md
   - Adoption roadmap: ADOPTION_ROADMAP.md
+  - Internals:
+      - Overview: INTERNALS.md
+      - Repository architecture: INTERNALS_ARCHITECTURE.md
+      - Compiler and bytecode: INTERNALS_COMPILER_AND_BYTECODE.md
+      - Virtual machine: INTERNALS_VM.md
+      - Modules and security: INTERNALS_MODULES_AND_SECURITY.md
   - More:
+      - Production vision: PRODUCTION_VISION.md
       - Language roadmap: LANGUAGE_ROADMAP.md
       - Memory model: MEMORY_MODEL.md
       - Strict types: STRICT_TYPES.md

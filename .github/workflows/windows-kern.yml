@@ -60,9 +60,9 @@ jobs:
             -DKERN_BUILD_GAME=ON ^
             -DKERN_PREFER_STATIC_RAYLIB=ON
 
-      - name: Build kern, kernc, kern-scan
+      - name: Build kern, kernc, kern-scan, kern_game, kern_contract_humanize
         shell: cmd
-        run: cmake --build build --config Release --target kern kernc kern-scan --parallel 4
+        run: cmake --build build --config Release --target kern kernc kern-scan kern_game kern_contract_humanize --parallel 4
 
       # GitHub windows-latest is headless (no OpenGL window). Skip coverage/g3d runs that init GLFW.
       - name: Smoke tests (.kn)
@@ -71,3 +71,7 @@ jobs:
           build\Release\kern.exe --scan --registry-only
           build\Release\kern.exe tests\std_v1_builtins_smoke.kn
           build\Release\kern.exe examples\basic\01_hello_world.kn
+
+      - name: Stable suite (contract, bytecode golden, coverage)
+        shell: pwsh
+        run: pwsh -NoProfile -File ./tests/run_stable.ps1

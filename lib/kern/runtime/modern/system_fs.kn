@@ -12,6 +12,11 @@ def write(policy, path, content) {
     return write_file(path, content)
 }
 
+def append(policy, path, content) {
+    caps.require(policy, "filesystem.write")
+    return append_file(path, content)
+}
+
 def exists(policy, path) {
     caps.require(policy, "filesystem.read")
     return fileExists(path)

@@ -1,4 +1,5 @@
 // quick check that http_get returns data (run: kern.exe examples/http_smoke.kn)
+require("network.http")
 let u = "https:" + "//example.com"
 let n = len(http_get(u))
 print("http_get bytes=" + str(n))

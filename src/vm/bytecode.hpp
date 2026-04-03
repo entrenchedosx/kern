@@ -185,6 +185,8 @@ inline const char* opcodeName(Opcode op) {
 struct Instruction {
     Opcode op;
     int line = 0;
+    /** Source column (1-based when set by codegen); 0 = unknown / legacy bytecode. */
+    int column = 0;
     std::variant<std::monostate, int64_t, double, std::string, size_t, std::pair<size_t, size_t>> operand;
 
     Instruction(Opcode o) : op(o) {}

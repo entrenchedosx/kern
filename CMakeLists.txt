@@ -15,6 +15,8 @@ enable_language(C)
 set(CMAKE_CXX_STANDARD 17)
 if(MSVC)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:10485760")
+  # Large translation units (e.g. main.cpp + builtins.hpp) exceed default COFF section limit without /bigobj.
+  add_compile_options(/bigobj)
 endif()
 
 # First-party targets: elevated diagnostics (third-party includes kept quiet on MSVC via /external:W0).
@@ -118,6 +120,9 @@ set(COMPILER_SOURCES
 set(VM_SOURCES
     src/vm/value.cpp
     src/vm/vm.cpp
+    src/vm/bytecode_verifier.cpp
+    src/vm/bytecode_peephole.cpp
+    src/vm/kern_socket.cpp
 )
 if(WIN32)
   list(APPEND VM_SOURCES src/vm/http_get_winhttp.cpp)
@@ -173,9 +178,13 @@ add_executable(kernc src/kernc_main.cpp ${KERN_WIN32_RESOURCES} ${COMPILER_SOURC
 target_include_directories(kernc PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(kernc PRIVATE KERN_VERSION="${KERN_VERSION}")
 
-add_executable(kern_lsp src/lsp/lsp_main.cpp ${KERN_WIN32_RESOURCES} ${COMPILER_SOURCES} ${ERROR_SOURCES})
+add_executable(kern_lsp src/lsp/lsp_main.cpp ${KERN_WIN32_RESOURCES} ${COMPILER_SOURCES} src/vm/bytecode_peephole.cpp ${ERROR_SOURCES})
 target_include_directories(kern_lsp PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(kern_lsp PRIVATE KERN_VERSION="${KERN_VERSION}")
+
+add_executable(kern_contract_humanize src/tests/humanize_path_contract_test.cpp ${ERROR_SOURCES})
+target_include_directories(kern_contract_humanize PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
+kern_apply_strict_warnings(kern_contract_humanize)
 
 kern_apply_strict_warnings(kern)
 kern_apply_strict_warnings(kern_repl)
@@ -188,10 +197,10 @@ target_compile_definitions(kern-scan PRIVATE KERN_VERSION="${KERN_VERSION}")
 kern_apply_strict_warnings(kern-scan)
 
 if(WIN32)
-  target_link_libraries(kernc PRIVATE psapi winhttp wininet)
-  target_link_libraries(kern_repl PRIVATE psapi winhttp wininet)
-  target_link_libraries(kern PRIVATE psapi winhttp wininet advapi32 shell32)
-  target_link_libraries(kern-scan PRIVATE psapi winhttp wininet)
+  target_link_libraries(kernc PRIVATE psapi winhttp wininet ws2_32)
+  target_link_libraries(kern_repl PRIVATE psapi winhttp wininet ws2_32)
+  target_link_libraries(kern PRIVATE psapi winhttp wininet advapi32 shell32 ws2_32)
+  target_link_libraries(kern-scan PRIVATE psapi winhttp wininet ws2_32)
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/kern_logo.ico")
     add_custom_command(
       TARGET kern
@@ -226,6 +235,7 @@ endif()
 # To get graphics: install Raylib then reconfigure (e.g. vcpkg install raylib, then
 #   cmake -B build -DCMAKE_TOOLCHAIN_FILE=[vcpkg]/scripts/buildsystems/vcpkg.cmake
 # or set RAYLIB_ROOT to raylib install dir).
+# Linux (FetchContent): install X11/OpenGL/ALSA dev packages — see .github/workflows/linux-kern.yml.
 if(KERN_BUILD_GAME)
   set(KERN_RAYLIB_TARGET "")
 
@@ -328,7 +338,10 @@ if(KERN_BUILD_GAME)
     add_executable(kern_game src/game/game_main.cpp ${KERN_WIN32_RESOURCES} src/game/game_builtins.cpp ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES})
     target_include_directories(kern_game PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
     target_compile_definitions(kern_game PRIVATE KERN_BUILD_GAME=1)
-    target_link_libraries(kern_game PRIVATE ${KERN_RAYLIB_TARGET} winhttp wininet)
+    target_link_libraries(kern_game PRIVATE ${KERN_RAYLIB_TARGET})
+    if(WIN32)
+      target_link_libraries(kern_game PRIVATE winhttp wininet ws2_32)
+    endif()
     kern_apply_strict_warnings(kern_game)
 
     # Some static raylib builds require explicitly linking system/libs.

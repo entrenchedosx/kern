@@ -1,0 +1,13 @@
+// Runtime permission model: require(), unsafe { }, CLI --allow / --unsafe (see docs after merge)
+let ri = runtime_info()
+assert_eq(ri["enforce_permissions"], true, "enforce on by default in harness")
+require("filesystem.read")
+require("filesystem.write")
+let p = path_join(temp_dir(), "kern_perm_smoke_" + str(random_int(99999999)) + ".txt")
+assert_eq(write_file(p, "ok"), true, "write after require")
+unsafe {
+    assert_eq(append_file(p, "!"), true, "append in unsafe")
+}
+assert_eq(read_file(p), "ok!", "read back")
+assert_eq(delete_file(p), true, "delete")
+print("OK: test_permissions_smoke")

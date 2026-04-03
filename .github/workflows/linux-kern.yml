@@ -1,4 +1,4 @@
-# Build Kern on Ubuntu without Raylib (headless CI). Validates cross-platform core toolchain.
+# Build Kern on Ubuntu with Raylib (g2d/g3d) — same language graphics as Windows; CI runners are headless.
 name: Linux Kern
 
 on:
@@ -17,14 +17,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure (Release, no game / no doc demo)
+      - uses: actions/setup-powershell@v4
+
+      - name: Cache FetchContent (Raylib under build/_deps)
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: linux-kern-fetchdeps-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Install Raylib build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libasound2-dev \
+            libx11-dev \
+            libxrandr-dev \
+            libxi-dev \
+            libxcursor-dev \
+            libxinerama-dev \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev
+
+      - name: Configure (Release, graphics + no doc demo)
         run: |
           cmake -B build -DCMAKE_BUILD_TYPE=Release \
-            -DKERN_BUILD_GAME=OFF \
+            -DKERN_BUILD_GAME=ON \
             -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF
 
       - name: Build
-        run: cmake --build build --parallel 4 --target kern kernc kern-scan
+        run: cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_contract_humanize
 
       - name: Smoke
         run: |
@@ -35,21 +57,49 @@ jobs:
           ./build/kern tests/std_v1_builtins_smoke.kn
           ./build/kern examples/basic/01_hello_world.kn
 
+      - name: Stable suite (contract, bytecode golden, coverage)
+        run: pwsh -NoProfile -File tests/run_stable.ps1
+
   # GCC/Clang only: enforce -Werror on Debug builds (see KERN_WERROR in CMakeLists.txt).
   debug-werror:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure (Debug, -Werror)
+      - uses: actions/setup-powershell@v4
+
+      - name: Cache FetchContent (Raylib under build-dbg/_deps)
+        uses: actions/cache@v4
+        with:
+          path: build-dbg/_deps
+          key: linux-kern-werror-fetchdeps-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Install Raylib build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libasound2-dev \
+            libx11-dev \
+            libxrandr-dev \
+            libxi-dev \
+            libxcursor-dev \
+            libxinerama-dev \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev
+
+      - name: Configure (Debug, -Werror, graphics)
         run: |
           cmake -B build-dbg -DCMAKE_BUILD_TYPE=Debug \
-            -DKERN_BUILD_GAME=OFF \
+            -DKERN_BUILD_GAME=ON \
             -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF \
             -DKERN_WERROR=ON
 
       - name: Build
-        run: cmake --build build-dbg --parallel 4 --target kern kernc kern-scan
+        run: cmake --build build-dbg --parallel 4 --target kern kernc kern-scan kern_game kern_contract_humanize
+
+      - name: Quick stable (contract + golden, Debug tree)
+        run: pwsh -NoProfile -File tests/run_stable.ps1 -BuildDir build-dbg -Quick
 
   docs:
     runs-on: ubuntu-latest
@@ -65,3 +115,6 @@ jobs:
 
       - name: Build docs (strict)
         run: mkdocs build --strict
+
+      - name: Post-process site (search markup + sitemap)
+        run: python tools/postprocess_site.py

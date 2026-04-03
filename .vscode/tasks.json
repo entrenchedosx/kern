@@ -57,6 +57,80 @@
       "args": ["--bytecode", "${file}"],
       "group": "none",
       "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "Kern: Stable suite",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/tests/run_stable.ps1"
+      ],
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${workspaceFolder}\\tests\\run_stable.ps1"
+        ]
+      },
+      "linux": {
+        "command": "pwsh",
+        "args": ["-NoProfile", "-File", "${workspaceFolder}/tests/run_stable.ps1"]
+      },
+      "osx": {
+        "command": "pwsh",
+        "args": ["-NoProfile", "-File", "${workspaceFolder}/tests/run_stable.ps1"]
+      },
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "Kern: Stable (quick)",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/tests/run_stable.ps1",
+        "-Quick"
+      ],
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${workspaceFolder}\\tests\\run_stable.ps1",
+          "-Quick"
+        ]
+      },
+      "linux": {
+        "command": "pwsh",
+        "args": ["-NoProfile", "-File", "${workspaceFolder}/tests/run_stable.ps1", "-Quick"]
+      },
+      "osx": {
+        "command": "pwsh",
+        "args": ["-NoProfile", "-File", "${workspaceFolder}/tests/run_stable.ps1", "-Quick"]
+      },
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "Kern: Docs build + postprocess",
+      "type": "shell",
+      "command": "mkdocs build --strict && python tools/postprocess_site.py",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "shared" }
     }
   ]
 }

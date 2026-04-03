@@ -4,6 +4,8 @@
 #include "vm_error_codes.hpp"
 #include <array>
 #include <cstddef>
+#include <sstream>
+#include <string>
 #include <string_view>
 
 namespace kern {
@@ -17,7 +19,7 @@ struct VMErrorMeta {
     const char* detail = "";
 };
 
-inline constexpr std::array<VMErrorMeta, 22> kVMErrorRegistryTable = {{
+inline constexpr std::array<VMErrorMeta, 24> kVMErrorRegistryTable = {{
         {VMErrorCode::BROWSERKIT_INIT_FAIL, 7, "BROWSERKIT_INIT_FAIL", "BROWSERKIT-INIT-FAIL",
             "BrowserKit could not initialize a required runtime or bridge dependency.",
             "BrowserKit initialization failed while preparing internal runtime state or required native bridge dependencies."},
@@ -84,9 +86,15 @@ inline constexpr std::array<VMErrorMeta, 22> kVMErrorRegistryTable = {{
         {VMErrorCode::DIVISION_BY_ZERO, 4, "DIVISION_BY_ZERO", "VM-DIV-ZERO",
             "Division or modulo by zero is not allowed.",
             "A DIV/MOD opcode attempted to use a zero denominator and was aborted deterministically."},
+        {VMErrorCode::PERMISSION_DENIED, 5, "PERMISSION_DENIED", "VM-PERMISSION-DENIED",
+            "Runtime permission required for this operation (filesystem, process, env, or shell).",
+            "The VM blocked a sensitive builtin because no matching permission was granted, the call was not inside unsafe { }, and global --unsafe was not set."},
+        {VMErrorCode::BYTECODE_VERIFY_STACK, 1, "BYTECODE_VERIFY_STACK", "VM-VERIFY-STACK",
+            "Bytecode preflight found inconsistent stack depth at the same instruction (invalid control flow).",
+            "The bytecode verifier simulated stack depth along control-flow edges and found conflicting merge depths for the same bytecode offset."},
 }};
 
-inline constexpr std::array<VMErrorCode, 22> kKnownVMErrorCodes = {{
+inline constexpr std::array<VMErrorCode, 24> kKnownVMErrorCodes = {{
     VMErrorCode::BROWSERKIT_INIT_FAIL,
     VMErrorCode::BROWSERKIT_RENDER_FAIL,
     VMErrorCode::BROWSERKIT_UNSUPPORTED,
@@ -109,15 +117,17 @@ inline constexpr std::array<VMErrorCode, 22> kKnownVMErrorCodes = {{
     VMErrorCode::INVALID_CALL_TARGET,
     VMErrorCode::INVALID_OPERATION,
     VMErrorCode::DIVISION_BY_ZERO,
+    VMErrorCode::PERMISSION_DENIED,
+    VMErrorCode::BYTECODE_VERIFY_STACK,
 }};
 
-inline constexpr const std::array<VMErrorMeta, 22>& vmErrorRegistryTable() {
+inline constexpr const std::array<VMErrorMeta, 24>& vmErrorRegistryTable() {
     return kVMErrorRegistryTable;
 }
 
 struct TokenMapEntry { std::string_view token; VMErrorCode code; };
 
-inline constexpr std::array<TokenMapEntry, 23> kVMErrorTokenMap = {{
+inline constexpr std::array<TokenMapEntry, 26> kVMErrorTokenMap = {{
     {"BROWSERKIT-INIT-FAIL", VMErrorCode::BROWSERKIT_INIT_FAIL},
     {"BROWSERKIT-RENDER-FAIL", VMErrorCode::BROWSERKIT_RENDER_FAIL},
     {"BROWSERKIT-UNSUPPORTED", VMErrorCode::BROWSERKIT_UNSUPPORTED},
@@ -141,6 +151,9 @@ inline constexpr std::array<TokenMapEntry, 23> kVMErrorTokenMap = {{
     {"VM-INVALID-CALL", VMErrorCode::INVALID_CALL_TARGET},
     {"VM-INVALID-OP", VMErrorCode::INVALID_OPERATION},
     {"VM-DIV-ZERO", VMErrorCode::DIVISION_BY_ZERO},
+    {"VM-PERMISSION-DENIED", VMErrorCode::PERMISSION_DENIED},
+    {"KERN-PERMISSION-DENIED", VMErrorCode::PERMISSION_DENIED},
+    {"VM-VERIFY-STACK", VMErrorCode::BYTECODE_VERIFY_STACK},
 }};
 
 constexpr bool vmErrorRegistryIsValid() {
@@ -213,6 +226,21 @@ inline int vmCategoryFromCode(VMErrorCode code, int fallback = 1) {
 inline std::string_view vmErrorStableName(VMErrorCode code) {
     const VMErrorMeta* meta = findVMErrorMeta(code);
     return meta ? std::string_view(meta->enumName) : std::string_view("NONE");
+}
+
+/** Machine-readable catalog: stable id "E{numeric}" matches VMErrorCode integer values. */
+inline std::string formatVmErrorCatalogJson() {
+    std::ostringstream os;
+    os << "[\n";
+    for (size_t i = 0; i < kVMErrorRegistryTable.size(); ++i) {
+        const VMErrorMeta& m = kVMErrorRegistryTable[i];
+        int n = static_cast<int>(m.code);
+        if (i) os << ",\n";
+        os << "  {\"id\":\"E" << n << "\",\"numeric\":" << n << ",\"enum\":\"" << m.enumName << "\",\"stableCode\":\"" << m.stableCode
+           << "\",\"category\":" << m.category << "}";
+    }
+    os << "\n]\n";
+    return os.str();
 }
 
 } // namespace kern

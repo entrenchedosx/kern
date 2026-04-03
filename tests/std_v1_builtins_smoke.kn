@@ -1,11 +1,13 @@
 // Smoke test for std.v1.* modules — run: kern tests/std_v1_builtins_smoke.kn
+require("filesystem.read")
+require("filesystem.write")
 
 let math = import("std.v1.math")
 // fmod may return float; compare as string for stability
 assert_eq(str(math["fmod"](5.0, 2.0)), "1", "std.v1.math fmod")
 
-let str = import("std.v1.string")
-assert_eq(str["index_of"]("hello", "l"), 2, "index_of")
+let strmod = import("std.v1.string")
+assert_eq(strmod["index_of"]("hello", "l"), 2, "index_of")
 
 let bytes = import("std.v1.bytes")
 let crc = bytes["crc32"](array(1, 2, 3, 4))
@@ -16,6 +18,11 @@ assert_eq(col["array_index_of"](array(1, 2, 3), 2), 1, "array_index_of")
 
 let fs = import("std.v1.fs")
 assert_eq(type(fs["read_text"]), "function", "fs re-export")
+let ap = path_join(temp_dir(), "kern_stdv1_append_" + str(random_int(99999999)) + ".txt")
+assert_eq(fs["write_text"](ap, "x"), true, "write_text")
+assert_eq(fs["append_text"](ap, "y"), true, "append_text")
+assert_eq(fs["read_text"](ap), "xy", "read after append")
+assert_eq(delete_file(ap), true, "cleanup append test")
 
 let std = import("std")
 // VM reports map values as type "dictionary"

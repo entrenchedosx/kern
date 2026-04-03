@@ -6,6 +6,7 @@
 #include "compiler/parser.hpp"
 #include "compiler/codegen.hpp"
 #include "vm/vm.hpp"
+#include "vm/permissions.hpp"
 #include "vm/value.hpp"
 #include "vm/builtins.hpp"
 #include "vm/bytecode.hpp"
@@ -55,6 +56,7 @@ static bool runSource(VM& vm, const std::string& source, const std::string& file
         vm.setBytecode(code);
         vm.setStringConstants(gen.getConstants());
         vm.setValueConstants(gen.getValueConstants());
+        vm.setActiveSourcePath(filename);
         vm.run();
         return true;
     } catch (const LexerError& e) {
@@ -69,7 +71,7 @@ static bool runSource(VM& vm, const std::string& source, const std::string& file
     } catch (const VMError& e) {
         std::vector<StackFrame> stack;
         for (const auto& f : vm.getCallStackSlice()) {
-            stack.push_back({f.functionName, f.line, f.column});
+            stack.push_back({f.functionName, f.filePath, f.line, f.column});
         }
         std::string hint(vmRuntimeErrorHint(e.category, e.code));
         g_errorReporter.reportRuntimeError(vmErrorCategory(e.category), e.line, e.column, e.what(), stack, hint,
@@ -99,6 +101,7 @@ int main(int argc, char** argv) {
     guards.enforcePointerBounds = true;
     guards.ffiEnabled = false;
     guards.sandboxEnabled = true;
+    registerAllStandardPermissions(guards);
     vm.setRuntimeGuards(guards);
     vm.setStepLimit(0);
     vm.setMaxCallDepth(8192);

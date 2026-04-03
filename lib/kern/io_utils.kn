@@ -1,5 +1,5 @@
 // kern I/O utilities — import("lib/kern/io_utils.kn")
-// read_lines, write_lines, append_file, read_json_file, write_json_file
+// read_lines, write_lines, append_to_file (wraps global append_file), read_json_file, write_json_file
 
 def read_lines(path) {
     let content = read_file(path)
@@ -11,10 +11,9 @@ def write_lines(path, lines_arr) {
     return write_file(path, content)
 }
 
-def append_file(path, content) {
-    let existing = ""
-    if (fileExists(path)) { existing = read_file(path) }
-    return write_file(path, existing + content)
+// Forwards to native append_file (no full-file read). Name avoids shadowing the global builtin.
+def append_to_file(path, content) {
+    return append_file(path, content)
 }
 
 def read_json_file(path) {

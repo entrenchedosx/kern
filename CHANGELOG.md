@@ -10,165 +10,201 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [1.0.6] - 2026-04-02
-
-### Fixed
-
-- **macOS build:** repo-root semver file renamed from **`VERSION`** to **`KERN_VERSION.txt`** so a default **case-insensitive** volume does not make `#include <version>` pick up the wrong file (C++20 standard header vs. version text).
-- **macOS `env_all()`:** use `_NSGetEnviron()` from `<crt_externs.h>` (Darwin does not expose `::environ` like glibc).
-- **CMake / macOS:** embed `version_info.rc` only on **Windows** so Apple Clang and other non-MSVC toolchains do not try to compile the PE resource file (unblocks Release workflow macOS/Linux packaging).
+## [1.0.7] - 2026-04-03
 
 ### Added
 
-- **CLI:** `kern docs` (documentation paths + MkDocs hint) and `kern build` (CMake build instructions).
-- **CI:** Linux and macOS workflows (headless CMake, smoke tests) alongside existing Windows jobs.
-- **CI:** Linux jobs for **Debug + `KERN_WERROR=ON`** (GCC/Clang) and **`mkdocs build --strict`**.
-- **Releases:** Tagged **`v*`** builds attach **Linux** and **macOS** tarballs in addition to the Windows zip (see `.github/workflows/release.yml`).
-- **Docs:** `docs/index.md`, `docs/ADOPTION_ROADMAP.md`, root `mkdocs.yml` for optional `mkdocs serve` (nav + validation tuned for strict builds).
-- **Community:** `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1).
-- **Build:** optional `KERN_WERROR` (GCC/Clang, Debug only); root `Dockerfile` for a minimal Ubuntu build image.
-- **Git:** ignore MkDocs output directory `site/`.
+#### TCP/UDP networking builtins (permission-gated)
 
-### Fixed
+- **Purpose:** First-class **TCP** and **UDP** socket access from `.kn` scripts for custom protocols, small servers, and multiplayer experiments — **not** a full netcode stack. All entry points are **builtins** registered alongside `std.v1.*` and guarded by **`network.tcp`** / **`network.udp`** (via `require("network.tcp")` or `kern --allow=network.tcp`, etc.).
+- **Core implementation files:** [`src/vm/kern_socket.hpp`](src/vm/kern_socket.hpp), [`src/vm/kern_socket.cpp`](src/vm/kern_socket.cpp) (Windows **Winsock** + **`ws2_32`**, Unix **BSD sockets**); [`src/vm/std_builtins_socket.inl`](src/vm/std_builtins_socket.inl); [`src/vm/permissions.hpp`](src/vm/permissions.hpp) (`Perm::kNetworkTcp`, `Perm::kNetworkUdp`).
+- **CMake / linkage:** [`CMakeLists.txt`](CMakeLists.txt) adds **`kern_socket.cpp`** to **`kern`**, **`kern_repl`**, **`kernc`**, **`kern-scan`**, **`kern_lsp`**, etc.; on **`_WIN32`**, links **`ws2_32`** with **`winhttp` / `wininet` / `psapi`** as needed.
+- **TCP surface:** **`tcp_connect`**, **`tcp_listen`**, **`tcp_accept`**, **`tcp_send`**, **`tcp_recv`**, **`tcp_close`**; **`tcp_connect_start`** / **`tcp_connect_check`** for non-blocking handshake (internal **`TcpConnecting`** state, stored **`sockaddr_storage`**, second **`connect()`** probe + **`select` write** + **`getsockopt(SO_ERROR)`**, including **`SO_ERROR` poll when `select` returns 0**); prefer **`"0.0.0.0"`** listen when clients use **`127.0.0.1`** on Windows (IPv4/IPv6 bind pitfalls).
+- **UDP surface:** **`udp_open`**, **`udp_bind`**, **`udp_send`**, **`udp_recv`**, **`udp_close`** with **`would_block`** where applicable.
+- **Polling:** **`socket_set_nonblocking`**, **`socket_select_read`**, **`socket_select_write`** ( **`FD_SETSIZE`** cap; **`timeout_ms`** **`-1`** = block, **`0`** = poll ).
+- **Registration:** [`src/vm/builtins.hpp`](src/vm/builtins.hpp) — **`kSocketBuiltinCount`**, **`getBuiltinNames()`** order, include **`std_builtins_socket.inl`** after **`std_builtins_v1.inl`**.
+- **Examples:** [`examples/network/`](examples/network/) — echo server/client, **`tcp_select_accept.kn`**, **`tcp_async_client.kn`**; [`examples/network/README.md`](examples/network/README.md) documents **`cli_args()`** layout.
 
-- **GCC `-Werror` (Linux CI):** disambiguate integer token literal overload; drop pessimizing `std::move` on `parameterList` return; silence assignment-target `dynamic_cast` bindings; fix misleading indentation in `mem_fill_pattern` / `uuid`; scope `std::tm bt` to Windows in `time_format`; scope `sigVals` to Windows in `ffi_call`; mark unused `wait_process` / `kill_process` args on non-Windows; assign `system()` result in REPL `clear` (glibc `warn_unused_result`).
-- **Linux link:** `env_all()` uses `::environ` (POSIX global), not `kern::environ`.
-- **Linux `-Wunused-function`:** gate `process_module`’s `toInt` helper behind `_WIN32`.
-- **Linux `kernc`:** include `<cstdint>` in `build_cache.hpp` for `uint64_t` (GCC is stricter than MSVC transitive includes).
+#### Bytecode pipeline
+
+- [`src/vm/bytecode_peephole.hpp`](src/vm/bytecode_peephole.hpp) / [`.cpp`](src/vm/bytecode_peephole.cpp) — safe peephole pass (NOP / label remap) wired through VM / codegen paths.
+- [`src/vm/bytecode_verifier.hpp`](src/vm/bytecode_verifier.hpp) / [`.cpp`](src/vm/bytecode_verifier.cpp) — bytecode structural verification before execution where enabled.
+
+#### LSP
+
+- [`src/lsp/lsp_main.cpp`](src/lsp/lsp_main.cpp) — **`textDocument/documentSymbol`** and **workspace symbol** support for outline and cross-file symbol search.
+
+#### Documentation
+
+- [`docs/INTERNALS.md`](docs/INTERNALS.md), [`INTERNALS_ARCHITECTURE.md`](docs/INTERNALS_ARCHITECTURE.md), [`INTERNALS_COMPILER_AND_BYTECODE.md`](docs/INTERNALS_COMPILER_AND_BYTECODE.md), [`INTERNALS_VM.md`](docs/INTERNALS_VM.md), [`INTERNALS_MODULES_AND_SECURITY.md`](docs/INTERNALS_MODULES_AND_SECURITY.md), [`NETWORKING_MULTIPLAYER.md`](docs/NETWORKING_MULTIPLAYER.md), [`PRODUCTION_VISION.md`](docs/PRODUCTION_VISION.md); [`mkdocs.yml`](mkdocs.yml) nav; [`docs/overrides/searchbox.html`](docs/overrides/searchbox.html) (search form **`id`** fix for strict HTML).
+
+#### Tests & tooling
+
+- Coverage: [`tests/coverage/socket_tcp_refused.kn`](tests/coverage/socket_tcp_refused.kn), [`test_permissions_smoke.kn`](tests/coverage/test_permissions_smoke.kn), [`test_append_file_builtin.kn`](tests/coverage/test_append_file_builtin.kn), [`test_stack_trace_has_source_path.kn`](tests/coverage/test_stack_trace_has_source_path.kn), bytecode golden artifacts; stable runners [`tests/run_stable.sh`](tests/run_stable.sh), [`.ps1`](tests/run_stable.ps1), [`.cmd`](tests/run_stable.cmd), repo [`stable.ps1`](stable.ps1) / [`stable.cmd`](stable.cmd); [`src/tests/humanize_path_contract_test.cpp`](src/tests/humanize_path_contract_test.cpp); [`.gitattributes`](.gitattributes).
+- Site: [`tools/generate_sitemap.py`](tools/generate_sitemap.py), [`normalize_site_search_forms.py`](tools/normalize_site_search_forms.py), [`postprocess_site.py`](tools/postprocess_site.py).
 
 ### Changed
 
-- **Version file:** root semver file is **`KERN_VERSION.txt`** instead of **`VERSION`** (see Fixed → macOS build). Update scripts and packaging that referenced the old filename.
+- VM / errors / compiler / CLI / modules / stdlib / examples / docs / tests / CI / [`.vscode/tasks.json`](.vscode/tasks.json) — see git history for this tag; highlights include [`src/vm/vm.cpp`](src/vm/vm.cpp), [`vm_error_registry.hpp`](src/vm/vm_error_registry.hpp), [`src/main.cpp`](src/main.cpp), [`src/lsp/lsp_main.cpp`](src/lsp/lsp_main.cpp), workflow YAML under [`.github/workflows/`](.github/workflows/).
+
+### Notes for script authors
+
+- Prefer **`socket_select_write`** with **positive** **`timeout_ms`** between **`tcp_connect_check`** polls to avoid tight loops that hit **VM step limits** on some hosts.
+- Networking requires explicit permissions; see [`docs/TRUST_MODEL.md`](docs/TRUST_MODEL.md) and [`docs/INTERNALS_MODULES_AND_SECURITY.md`](docs/INTERNALS_MODULES_AND_SECURITY.md).
+
+---
+
+## [1.0.6] - 2026-04-02
+
+### Summary
+
+Cross-platform **CI**, **macOS** **`#include <version>`** / case-insensitive **`VERSION`** fix, **GCC `-Werror`** on Linux, **`kern docs`** / **`kern build`**, **MkDocs** site skeleton, **Docker** Linux image, **Linux/macOS** release tarballs, and **code-of-conduct** doc.
+
+### Fixed (detailed)
+
+- **`VERSION` → `KERN_VERSION.txt`:** On **case-insensitive** APFS/HFS+, a root file **`VERSION`** can shadow **C++20 `<version>`**; semver moved to **[`KERN_VERSION.txt`](KERN_VERSION.txt)**; [`CMakeLists.txt`](CMakeLists.txt) reads it for **`KERN_VERSION`** and Windows **`version_info.rc`**.
+- **macOS `env_all()`:** **`_NSGetEnviron()`** from **`<crt_externs.h>`** (Darwin does not expose **`::environ`** like glibc).
+- **`version_info.rc`:** Compiled only on **Windows** so **Apple Clang** / Linux do not invoke the PE resource compiler.
+- **GCC `-Werror` (Linux CI):** Integer overload disambiguation; remove pessimizing **`std::move`** on **`parameterList`**; **`dynamic_cast`** assignment warnings; indentation in **`mem_fill_pattern`** / **`uuid`**; **`std::tm`** / **`sigVals`** scoped to Windows where needed; **`system()`** result in REPL **`clear`**; **`env_all`** uses **`::environ`**; gate **`process_module`** **`toInt`** on **`_WIN32`**; **`<cstdint>`** in **`build_cache.hpp`** for **`uint64_t`**.
+
+### Added (detailed)
+
+- **`kern docs`**, **`kern build`**; **Linux/macOS** workflows; **Linux** **`KERN_WERROR=ON`** + **`mkdocs build --strict`**; **releases** attach **Linux**/**macOS** tarballs; **[`docs/index.md`](docs/index.md)**, **ADOPTION_ROADMAP**, **`mkdocs.yml`**; **`CODE_OF_CONDUCT.md`**; **`Dockerfile`**; **`.gitignore`** **`site/`**.
+
+### Changed (detailed)
+
+- **Version file** name is **`KERN_VERSION.txt`** only; update any scripts that referenced **`VERSION`**.
 
 ---
 
 ## [1.0.5] - 2026-04-02
 
-### Added
+### Summary
 
-- **Modules:** Python-style **`from "module" import sym1, sym2`** (lexer `FROM` keyword); `extern def ... from "dll"` uses strict `from` token.
-- **Packages:** **`kern verify`** — exit 0 when `kern.lock` dependency names match `kern.json` (CI); fixture under `tests/coverage/kern_verify_fixture/`.
-- **Diagnostics:** JSON runtime **`stack`** frames include **`filename`**; **`kern --trace`** for VM instruction tracing; REPL **`last`** / **`.last`** for last diagnostic; **`docs/ERROR_CODES.md`**.
-- **Phase 2 typing:** **`kern --check --strict-types`** uses append-only **`src/compiler/typed_builtins.hpp`** for simple `let x: T = builtin(...)` checks; **`docs/STRICT_TYPES.md`**; tests **`tests/strict_types_phase2/`** and **`tests/coverage/test_strict_types_phase2_pass.kn`**; stdlib slice **`lib/kern/stdlib/strict_types_slice.kn`**.
-- **Docs:** **`docs/LANGUAGE_ROADMAP.md`**, **`docs/MEMORY_MODEL.md`**, **`docs/IMPLEMENTATION_SUMMARY.md`**, **`docs/TRUST_MODEL.md`**; roadmap §8 implementation status.
-- **Tests:** **`kern test`** supports **`--grep`**, **`--list`**, **`--fail-fast`**; smoke tests for selective imports, equation solver, strict types.
-- **`kern doctor`:** Reports memory model, error codes, implementation summary, and roadmap paths when present.
+**`from "m" import a, b`**, **`kern verify`**, JSON stack **`filename`**, **`kern --trace`**, REPL **`last`**, **`--strict-types`** + **`typed_builtins.hpp`**, **`kern test --grep/--list/--fail-fast`**, **`kern doctor`**, expanded docs.
 
-### Changed
+### Added (detailed)
 
-- **`CONTRIBUTING.md`:** Strict-types / `typed_builtins.hpp` append-only policy.
-- **`kern test`:** Skips `tests/strict_types_phase2/fail_mismatch.kn` (strict-check-only negative; still valid at runtime).
+- **Lexer** **`FROM`**; **`kern verify`** + **`tests/coverage/kern_verify_fixture/`**; **`docs/ERROR_CODES.md`**; **`docs/STRICT_TYPES.md`**, **`tests/strict_types_phase2/`**; **`lib/kern/stdlib/strict_types_slice.kn`**; roadmap/memory/trust/implementation docs; **`kern test`** filters.
+
+### Changed (detailed)
+
+- **`CONTRIBUTING.md`**; **`kern test`** skips strict-only negative **`fail_mismatch.kn`** in default runtime sweep.
 
 ---
 
 ## [1.0.4] - 2026-04-02
 
-### Fixed
+### Summary
 
-- **CI:** Windows **Release** and **Windows Kern** workflows no longer run `kern test tests/coverage` or g3d window smokes on GitHub-hosted runners (no OpenGL / GLFW window). Use a local machine for full graphics + coverage runs.
-- **CI:** Release workflow publishes the Windows zip to **GitHub Releases** via `softprops/action-gh-release` (tag push or manual dispatch).
+**CI** skips headless **g3d**/**coverage** full runs on Windows runners; **GitHub Releases** via **`softprops/action-gh-release`**.
 
-### Changed
+### Changed (detailed)
 
-- Version bump only (supersedes failed automated publish for `v1.0.3` on headless runners).
+- **Version bump** to repair failed **`v1.0.3`** publish on headless runners.
 
 ---
 
 ## [1.0.3] - 2026-04-02
 
-### Added
+### Summary
 
-- **VM / modules:** Versioned **`std.v1.*`** stdlib modules (`std.v1.math`, `std.v1.string`, `std.v1.bytes`, `std.v1.collections`, plus fs/process/time re-exports); append-only **`std_*`** native builtins ([`src/vm/std_builtins_v1.inl`](src/vm/std_builtins_v1.inl), [`src/stdlib_stdv1_exports.hpp`](src/stdlib_stdv1_exports.hpp)).
-- **CLI / tooling:** **`kern --scan`** and **`kern-scan`** — builtin registry + stdlib export validation + compile-time static analysis ([`docs/KERN_SCAN.md`](docs/KERN_SCAN.md)).
-- **Kern library:** Large **`lib/kern/stdlib/`** catalog (algorithms, collections, graph helpers, encoding, text, time, …).
-- **IDE sources:** **`Kern-IDE/`** desktop IDE layout (Python); VS Code extension under **`editors/vscode-kern/`**.
-- **Docs:** [README](README.md) refresh, [CONTRIBUTING](CONTRIBUTING.md), [LANGUAGE_SYNTAX](docs/LANGUAGE_SYNTAX.md), [BUILTIN_REFERENCE](docs/BUILTIN_REFERENCE.md), [RELEASE_CHECKLIST](docs/RELEASE_CHECKLIST.md), [STDLIB_STD_V1](docs/STDLIB_STD_V1.md).
-- **CI:** [`.github/workflows/release.yml`](.github/workflows/release.yml) — Windows build + zip artifact on **`v*`** tags; [windows-kern.yml](.github/workflows/windows-kern.yml) builds **`kern-scan`**, runs **`kern --scan --registry-only`** and smoke tests.
+**`std.v1.*`** + **`std_*`** builtins, **`kern --scan`**, **`lib/kern/stdlib/`**, **`Kern-IDE/`**, docs refresh, **Windows** release zip on **`v*`** tags.
 
-### Changed
+### Added (detailed)
 
-- **Layout:** Editor and toolchain boundaries documented; see [NESTED_KERN_TREE_REMOVED.md](docs/NESTED_KERN_TREE_REMOVED.md) for history.
+- **[`src/vm/std_builtins_v1.inl`](src/vm/std_builtins_v1.inl)**, **[`src/stdlib_stdv1_exports.hpp`](src/stdlib_stdv1_exports.hpp)**; **`kern-scan`**; **`lib/kern/stdlib/`** catalog; **IDE** sources; **CI** **`kern --scan --registry-only`**.
+
+### Changed (detailed)
+
+- **Layout:** see **[`docs/NESTED_KERN_TREE_REMOVED.md`](docs/NESTED_KERN_TREE_REMOVED.md)**.
 
 ---
 
 ## [1.0.2] - 2026-04-02
 
-### Added
+### Summary
 
-- **Compiler / VM:** lambda **closure captures** (`BUILD_CLOSURE`, `FunctionObject::captures`); `CALL` appends captures after parameters (fixes callbacks like `g3.run` with lambdas over outer locals).
-- **CLI:** `kern run <script>`; extensionless script path tries `<name>.kn`; UTF-8 BOM + shebang line strip for file runs; non-`.kn` scripts warned but allowed; `kern install` help text clarifies project lockfile vs system install.
-- **Install:** `install.sh`, `install.ps1`, root `Makefile` `install` target, CMake `install(TARGETS kern)`; Windows `.reg` and Linux MIME helpers under `tools/`.
-- **`kern::process` (Windows):** `first_readable_region` (VirtualQueryEx); `system_process_safe_read.kn` example; module field `_kern_process_api` for introspection.
+**Lambda closures** (**`BUILD_CLOSURE`**, **`FunctionObject::captures`**), **`kern run`**, BOM/shebang, **install** scripts, **`kern::process`** **VirtualQueryEx** example.
 
-### Fixed
+### Added (detailed)
 
-- **Examples / tooling:** `system_process_safe_read` documents VA 0 reads and avoids non-ASCII punctuation in messages (Windows console mojibake).
+- **VM** closure calling convention; **CLI** script discovery; **CMake** **`install`**; **`system_process_safe_read.kn`**.
+
+### Fixed (detailed)
+
+- **Example** console-safe messages.
 
 ---
 
 ## [1.0.1] - 2026-04-01
 
-### Changed
+### Summary
 
-- Documentation: simplified to a lean public set (`README.md`, `RELEASE.md`, `docs/GETTING_STARTED.md`, `docs/TESTING.md`, `docs/TROUBLESHOOTING.md`) and removed internal/extra markdown docs.
-- `run_all_tests.ps1` now scans `examples/` **recursively** (matches `basic/`, `graphics/`, etc.).
-- `docs/TESTING.md`: corrected path to `tests\kernc\run_kernc_tests.ps1`; documented `-Kernc` (alias `-Splc`); documented stress suite including **`-Aggressive`**.
-- `docs/STRESS_TESTS_PLAN.md`: replaced with a pointer to `tests/coverage/` and `tests/run_all_coverage_kn.ps1`.
-- `docs/TROUBLESHOOTING.md`: added VM reserved-opcode and example-runner notes.
+**Doc consolidation**, recursive **examples** test, **`kernc -o`** **HTTP** link on Windows, **bounded tracebacks** (256 frames), **stress** suite, **VM** tail-call vs **max depth**, **lexer** size/token limits, **non-recursive `??`**.
 
-### Fixed
+### Changed (detailed)
 
-- **Standalone EXE build (`kernc -o`) on Windows:** generated `CMakeLists.txt` now includes `http_get_winhttp.cpp` and links `winhttp`/`wininet`, matching the main `kern` target (fixes unresolved `kernHttpGetWinHttp` when building `kernc_standalone`).
-- **Diagnostics:** runtime tracebacks cap printed frames and redundant snippets for deep stacks; **`stack_trace` / `stack_trace_array`** and **`attachTracebackToError`** use bounded snapshots (**256** innermost frames). CLI documents that **`kern`** overrides default max call depth (see `main.cpp`).
+- **Docs** lean set; **`run_all_tests.ps1`** recursive **`examples/`**; **TESTING.md** paths; **STRESS** pointer to **`tests/coverage/`**; **TROUBLESHOOTING** VM notes.
 
-### Added
+### Fixed (detailed)
 
-- **Stress suite (`tests/stress/`):** adversarial `.kn` samples, `run_stress_suite.ps1` (uses `Start-Process` for reliable exit codes on Windows), UTF-8 BOM / UTF-16 BOM lexer checks, generated long `??` / unary inputs, oversized source rejection, and a **VM max call-depth** run that must exit non-zero; **`-Aggressive`** scales generators, verifies depth failure under **`--release`**, and runs the other stress scripts end-to-end.
-- **VM:** when `maxCallDepth_ > 0` (default 1024), **tail-call frame reuse is disabled** so recursion depth limits cannot be bypassed; `maxCallDepth_ == 0` means unlimited (and restores tail-call reuse). **`getCallStackSlice()`** for bounded reporting. **Lexer:** UTF-8 BOM strip + explicit **UTF-16 BOM** rejection via `source_encoding.hpp`.
-- **Diagnostics:** lexer/parser/file-open detail lines use ASCII `-` bullets so Windows consoles do not show mojibake (e.g. `ΓÇó`); shared limits in `diagnostics/traceback_limits.hpp`.
+- **`kernc -o`**: **`http_get_winhttp.cpp`**, **`winhttp`/`wininet`**; **traceback** bounds.
 
-### Security / robustness
+### Added (detailed)
 
-- **Lexer:** reject sources over **48 MiB** and token streams over **8M tokens** with a clear `LexerError`; skip a leading **UTF-8 BOM** so Windows-saved sources tokenize cleanly.
-- **Parser:** null-coalescing (`??`) parsed **left-associatively** without recursion (matches common semantics and avoids stack overflow on long chains); repeated unary `!`/`-`/`*` folded iteratively.
+- **`tests/stress/`**, **`run_stress_suite.ps1`**; **VM** **`maxCallDepth_`** / tail-call policy; **lexer** BOM handling; **ASCII** diagnostic bullets.
+
+### Security / robustness (detailed)
+
+- **Lexer** 48 MiB / 8M token caps; **parser** iterative **`??`**.
 
 ---
 
 ## [1.0.0] - 2025-03-07
 
-### Added
+### Summary
 
-- **Language**
-  - Multi-paradigm: imperative, functional, OOP, pattern matching, destructuring.
-  - Variables: `let`, `var`, `const`; optional type hints.
-  - Control flow: `if`/`elif`/`else`, `for` (range, for-in, C-style), `while`, `match`/`case`, `try`/`catch`/`finally`, `throw`, `defer`, `assert`.
-  - Functions: `def`, default and named args, multiple returns, lambdas, recursion.
-  - Collections: arrays (literal, `array()`, slice, push), maps (literal, keys/values/has).
-  - Ergonomics: optional chaining `?.`, null coalescing `??`, f-strings, ranges `1..10 step 2`.
-  - Classes: `class`, `init`, `this`, `Instance()`, inheritance with `extends`.
-- **Standard library**
-  - Hundreds of builtins: math, strings, collections (map/filter/reduce, sort, zip, chunk, …), file I/O, JSON, random, time, env, reflection, profiling.
-  - Modules: `import "math"`, `"string"`, `"json"`, `"sys"`, `"io"`, `"array"`, `"g2d"`, `"game"`, etc.
-  - System: `repr`, `kern_version`, `platform`, `os_name`, `arch`, `cli_args`, `env_get`.
-- **Graphics (optional, requires Raylib)**
-  - g2d module: window, clear, setColor, drawRect, fillRect, drawCircle, fillCircle, drawLine, drawPolygon, drawText, run(update, draw).
-  - game module: window, draw, input, sound, game loop.
-- **CLI**
-  - `kern script.kn` — run script.
-  - `kern` — REPL.
-  - `kern --version`, `kern -v` — print version.
-  - `kern --help`, `kern -h` — print usage.
-  - `kern --check <file>` — compile only (exit 0 if OK).
-  - `kern --fmt <file>` — format source.
-  - `kern --ast <file>`, `kern --bytecode <file>` — dump AST/bytecode.
-- **Errors**
-  - Line/column diagnostics, source snippets, hints, stack traces, categories (SyntaxError, RuntimeError, TypeError, etc.).
-- **IDE**
-  - Kern IDE (Electron + Monaco): edit, run, syntax highlighting; build with `npm run build:win` in kern-ide/.
-- **Docs**
-  - README, GETTING_STARTED, LANGUAGE_OVERVIEW, standard_library, TROUBLESHOOTING, kern_for_dummies.txt, RELEASE.md.
+Initial **Kern** release: **language** + **VM** + **builtins** + **`import`** modules (**`g2d`**, **`game`**, …) + **CLI** + **diagnostics** + optional **Raylib** + **Electron IDE** docs.
 
-### Build
+### Language (detailed)
 
-- CMake 3.14+; C++17. Optional Raylib for g2d/game (vcpkg or RAYLIB_ROOT).
-- Version from root `KERN_VERSION.txt`; reflected in `--version` and `kern_version()`.
+- **Paradigms:** imperative, functional, **OOP**, **pattern matching**, **destructuring**; **`let`/`var`/`const`**; control flow; **`def`**, lambdas; arrays/maps; **`?.`**, **`??`**, f-strings, ranges; **`class`**, **`extends`**.
+
+### Standard library (detailed)
+
+- **Builtins:** math, strings, collections, I/O, **JSON**, time, env, reflection; **`import`**, **`kern_version`**, **`cli_args`**, **`platform`**, etc.
+
+### Graphics (detailed)
+
+- **`g2d`**, **`game`** (**Raylib**), **`KERN_BUILD_GAME`**.
+
+### CLI (detailed)
+
+- **Run**, **REPL**, **`--version`**, **`--check`**, **`--fmt`**, **`--ast`**, **`--bytecode`**.
+
+### Errors (detailed)
+
+- Line/column, snippets, hints, traces, categories.
+
+### IDE (detailed)
+
+- **Electron + Monaco** (historical layout; see later tags for **`Kern-IDE/`**).
+
+### Docs (detailed)
+
+- **README**, **GETTING_STARTED**, **TROUBLESHOOTING**, **RELEASE.md**.
+
+### Build (detailed)
+
+- **CMake 3.14+**, **C++17**, optional **Raylib**; version from **`KERN_VERSION.txt`** (in post-1.0.0 trees; **`VERSION`** renamed in **1.0.6**).
+
+[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.7...HEAD
+[1.0.7]: https://github.com/entrenchedosx/kern/compare/v1.0.6...v1.0.7
+[1.0.6]: https://github.com/entrenchedosx/kern/compare/v1.0.5...v1.0.6
+[1.0.5]: https://github.com/entrenchedosx/kern/compare/v1.0.4...v1.0.5
+[1.0.4]: https://github.com/entrenchedosx/kern/compare/v1.0.3...v1.0.4
+[1.0.3]: https://github.com/entrenchedosx/kern/compare/v1.0.2...v1.0.3
+[1.0.2]: https://github.com/entrenchedosx/kern/compare/v1.0.1...v1.0.2
+[1.0.1]: https://github.com/entrenchedosx/kern/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/entrenchedosx/kern/releases/tag/v1.0.0

@@ -1,0 +1,6 @@
+{# Overrides stock readthedocs theme: fixes invalid id spacing; avoids action="//search.html" when base_url is "/". #}
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="{% if base_url == '/' %}search.html{% else %}{{ base_url }}/search.html{% endif %}" method="get">
+    <input type="text" name="q" placeholder="{% trans %}Search docs{% endtrans %}" aria-label="{% trans %}Search docs{% endtrans %}" title="{% trans %}Type search term here{% endtrans %}" />
+  </form>
+</div>

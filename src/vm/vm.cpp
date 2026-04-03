@@ -3,6 +3,7 @@
  */
 
 #include "vm.hpp"
+#include "bytecode_verifier.hpp"
 #include "vm_error_registry.hpp"
 #include <sstream>
 #include <string>
@@ -109,6 +110,54 @@ void VM::setBytecode(Bytecode code) {
     ip_ = 0;
     unsafeDepth_ = 0;
     entryScriptCache_.reset();
+    activeSourcePath_.clear();
+    breakpoints_.clear();
+}
+
+void VM::verifyBytecodeOrThrow(const Bytecode& bc, size_t strPool, size_t valPool) {
+    BytecodeVerifyResult vr;
+    if (!verifyBytecode(bc, strPool, valPool, vr)) {
+        const Instruction& at = !bc.empty() && vr.failPc < bc.size() ? bc[vr.failPc] : Instruction(Opcode::NOP);
+        throw VMError(vr.message.empty() ? "Bytecode verification failed" : vr.message, at.line, at.column, 1,
+                      static_cast<int>(vr.code));
+    }
+}
+
+void VM::setInstructionPointer(size_t ip) {
+    if (ip <= code_.size()) ip_ = ip;
+}
+
+void VM::addBreakpoint(size_t pc) { breakpoints_.insert(pc); }
+
+void VM::removeBreakpoint(size_t pc) { breakpoints_.erase(pc); }
+
+void VM::clearBreakpoints() { breakpoints_.clear(); }
+
+bool VM::runNextInstruction() {
+    if (code_.empty()) return false;
+    verifyBytecodeOrThrow(code_, stringConstants_.size(), valueConstants_.size());
+    if (ip_ >= code_.size()) return false;
+    runInstruction(code_[ip_]);
+    ip_++;
+    return ip_ < code_.size();
+}
+
+void VM::runUntilBreakpoint() {
+    if (code_.empty()) return;
+    verifyBytecodeOrThrow(code_, stringConstants_.size(), valueConstants_.size());
+    resetCycleCount();
+    stack_.reserve(512);
+    while (ip_ < code_.size()) {
+        if (breakpoints_.count(ip_)) return;
+        const Instruction& inst = code_[ip_];
+        runInstruction(inst);
+        if (vmTraceEnabled_ && cycleCount_ <= 500000u) {
+            std::cerr << "[vm] op=" << static_cast<int>(inst.op) << " line=" << inst.line << " col=" << inst.column
+                      << " sp=" << stack_.size() << "\n";
+        }
+        ip_++;
+        if (scriptExitCode_ >= 0) break;
+    }
 }
 
 void VM::setStringConstants(std::vector<std::string> constants) { stringConstants_ = std::move(constants); }
@@ -164,12 +213,12 @@ ValuePtr VM::getResult() {
 
 std::string VM::getOperandStr(const Instruction& inst) {
     if (!std::holds_alternative<size_t>(inst.operand)) {
-        throw VMError("Invalid bytecode operand: expected string constant index", inst.line, 0, 1,
+        throw VMError("Invalid bytecode operand: expected string constant index", inst.line, inst.column, 1,
                       static_cast<int>(VMErrorCode::INVALID_BYTECODE));
     }
     size_t idx = std::get<size_t>(inst.operand);
     if (idx >= stringConstants_.size()) {
-        throw VMError("Invalid bytecode operand: string constant index out of range", inst.line, 0, 1,
+        throw VMError("Invalid bytecode operand: string constant index out of range", inst.line, inst.column, 1,
                       static_cast<int>(VMErrorCode::INVALID_BYTECODE));
     }
     return stringConstants_[idx];
@@ -177,7 +226,7 @@ std::string VM::getOperandStr(const Instruction& inst) {
 
 size_t VM::getOperandU64(const Instruction& inst) {
     if (!std::holds_alternative<size_t>(inst.operand)) {
-        throw VMError("Invalid bytecode operand: expected unsigned operand", inst.line, 0, 1,
+        throw VMError("Invalid bytecode operand: expected unsigned operand", inst.line, inst.column, 1,
                       static_cast<int>(VMErrorCode::INVALID_BYTECODE));
     }
     return std::get<size_t>(inst.operand);
@@ -223,39 +272,39 @@ static void* toPtr(ValuePtr v) {
 void VM::runInstruction(const Instruction& inst) {
     ++cycleCount_;
     if (stepLimit_ != 0 && cycleCount_ > stepLimit_)
-        throw VMError("Step limit exceeded", inst.line, 0, 1, static_cast<int>(VMErrorCode::STEP_LIMIT_EXCEEDED));
+        throw VMError("Step limit exceeded", inst.line, inst.column, 1, static_cast<int>(VMErrorCode::STEP_LIMIT_EXCEEDED));
     auto requireNumeric = [&](const ValuePtr& v, const char* opName) {
         if (!v || (v->type != Value::Type::INT && v->type != Value::Type::FLOAT)) {
             throw VMError(std::string("Invalid operation: ") + opName + " expects numeric operands",
-                          inst.line, 0, 2, static_cast<int>(VMErrorCode::INVALID_OPERATION));
+                          inst.line, inst.column, 2, static_cast<int>(VMErrorCode::INVALID_OPERATION));
         }
     };
     auto requireInteger = [&](const ValuePtr& v, const char* opName) {
         if (!v || v->type != Value::Type::INT) {
             throw VMError(std::string("Invalid operation: ") + opName + " expects integer operands",
-                          inst.line, 0, 2, static_cast<int>(VMErrorCode::INVALID_OPERATION));
+                          inst.line, inst.column, 2, static_cast<int>(VMErrorCode::INVALID_OPERATION));
         }
     };
     switch (inst.op) {
         case Opcode::CONST_I64:
             if (!std::holds_alternative<int64_t>(inst.operand))
-                throw VMError("Invalid bytecode operand: CONST_I64 expects int64", inst.line, 0, 1,
+                throw VMError("Invalid bytecode operand: CONST_I64 expects int64", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::INVALID_BYTECODE));
             push(std::make_shared<Value>(Value::fromInt(std::get<int64_t>(inst.operand))));
             break;
         case Opcode::CONST_F64:
             if (!std::holds_alternative<double>(inst.operand))
-                throw VMError("Invalid bytecode operand: CONST_F64 expects float", inst.line, 0, 1,
+                throw VMError("Invalid bytecode operand: CONST_F64 expects float", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::INVALID_BYTECODE));
             push(std::make_shared<Value>(Value::fromFloat(std::get<double>(inst.operand))));
             break;
         case Opcode::CONST_STR: {
             if (!std::holds_alternative<size_t>(inst.operand))
-                throw VMError("Invalid bytecode operand: CONST_STR expects string constant index", inst.line, 0, 1,
+                throw VMError("Invalid bytecode operand: CONST_STR expects string constant index", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::INVALID_BYTECODE));
             size_t idx = std::get<size_t>(inst.operand);
             if (idx >= stringConstants_.size())
-                throw VMError("Invalid bytecode operand: CONST_STR index out of range", inst.line, 0, 1,
+                throw VMError("Invalid bytecode operand: CONST_STR index out of range", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::INVALID_BYTECODE));
             push(std::make_shared<Value>(Value::fromString(stringConstants_[idx])));
             break;
@@ -271,28 +320,28 @@ void VM::runInstruction(const Instruction& inst) {
             break;
         case Opcode::LOAD: {
             if (!std::holds_alternative<int64_t>(inst.operand))
-                throw VMError("Invalid bytecode operand: LOAD expects local slot index", inst.line, 0, 1,
+                throw VMError("Invalid bytecode operand: LOAD expects local slot index", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::INVALID_BYTECODE));
             int64_t rawSlot = std::get<int64_t>(inst.operand);
             if (rawSlot < 0)
-                throw VMError("Invalid bytecode operand: negative local slot in LOAD", inst.line, 0, 1,
+                throw VMError("Invalid bytecode operand: negative local slot in LOAD", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::INVALID_BYTECODE));
             size_t slot = static_cast<size_t>(rawSlot);
             if (slot < locals_.size()) {
                 push(locals_[slot]);
             } else {
-                throw VMError("Invalid bytecode operand: local slot out of range in LOAD", inst.line, 0, 1,
+                throw VMError("Invalid bytecode operand: local slot out of range in LOAD", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::INVALID_BYTECODE));
             }
             break;
         }
         case Opcode::STORE: {
             if (!std::holds_alternative<int64_t>(inst.operand))
-                throw VMError("Invalid bytecode operand: STORE expects local slot index", inst.line, 0, 1,
+                throw VMError("Invalid bytecode operand: STORE expects local slot index", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::INVALID_BYTECODE));
             int64_t rawSlot = std::get<int64_t>(inst.operand);
             if (rawSlot < 0)
-                throw VMError("Invalid bytecode operand: negative local slot in STORE", inst.line, 0, 1,
+                throw VMError("Invalid bytecode operand: negative local slot in STORE", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::INVALID_BYTECODE));
             size_t slot = static_cast<size_t>(rawSlot);
             while (locals_.size() <= slot) locals_.push_back(std::make_shared<Value>(Value::nil()));
@@ -325,13 +374,13 @@ void VM::runInstruction(const Instruction& inst) {
                 push(std::make_shared<Value>(Value::fromString(a->toString() + b->toString())));
             else if (a->type == Value::Type::PTR && b->type == Value::Type::INT) {
                 void* p = toPtr(a);
-                if (!p) throw VMError("Null pointer arithmetic", inst.line, 0, 2);
+                if (!p) throw VMError("Null pointer arithmetic", inst.line, inst.column, 2);
                 int64_t off = toInt(b);
                 push(std::make_shared<Value>(Value::fromPtr(static_cast<char*>(p) + off)));
             } else if (a->type == Value::Type::INT && b->type == Value::Type::PTR) {
                 int64_t off = toInt(a);
                 void* p = toPtr(b);
-                if (!p) throw VMError("Null pointer arithmetic", inst.line, 0, 2);
+                if (!p) throw VMError("Null pointer arithmetic", inst.line, inst.column, 2);
                 push(std::make_shared<Value>(Value::fromPtr(static_cast<char*>(p) + off)));
             } else if (a->type == Value::Type::FLOAT || b->type == Value::Type::FLOAT)
                 push(std::make_shared<Value>(Value::fromFloat(toDouble(a) + toDouble(b))));
@@ -339,27 +388,27 @@ void VM::runInstruction(const Instruction& inst) {
                 push(std::make_shared<Value>(Value::fromInt(toInt(a) + toInt(b))));
             else
                 throw VMError("Invalid operation: ADD expects numeric, string, or ptr+int operands",
-                              inst.line, 0, 2, static_cast<int>(VMErrorCode::INVALID_OPERATION));
+                              inst.line, inst.column, 2, static_cast<int>(VMErrorCode::INVALID_OPERATION));
             break;
         }
         case Opcode::SUB: {
             ValuePtr b = popStack(), a = popStack();
             if (a->type == Value::Type::PTR && b->type == Value::Type::INT) {
                 void* p = toPtr(a);
-                if (!p) throw VMError("Null pointer arithmetic", inst.line, 0, 2);
+                if (!p) throw VMError("Null pointer arithmetic", inst.line, inst.column, 2);
                 int64_t off = toInt(b);
                 push(std::make_shared<Value>(Value::fromPtr(static_cast<char*>(p) - off)));
             } else if (a->type == Value::Type::PTR && b->type == Value::Type::PTR) {
                 char* pa = static_cast<char*>(toPtr(a));
                 char* pb = static_cast<char*>(toPtr(b));
-                if (!pa || !pb) throw VMError("Null pointer arithmetic", inst.line, 0, 2);
+                if (!pa || !pb) throw VMError("Null pointer arithmetic", inst.line, inst.column, 2);
                 push(std::make_shared<Value>(Value::fromInt(static_cast<int64_t>(pa - pb))));
             } else if ((a->type == Value::Type::INT || a->type == Value::Type::FLOAT) &&
                        (b->type == Value::Type::INT || b->type == Value::Type::FLOAT))
                 push(std::make_shared<Value>(Value::fromFloat(toDouble(a) - toDouble(b))));
             else
                 throw VMError("Invalid operation: SUB expects numeric, ptr-int, or ptr-ptr operands",
-                              inst.line, 0, 2, static_cast<int>(VMErrorCode::INVALID_OPERATION));
+                              inst.line, inst.column, 2, static_cast<int>(VMErrorCode::INVALID_OPERATION));
             break;
         }
         case Opcode::MUL: {
@@ -375,7 +424,7 @@ void VM::runInstruction(const Instruction& inst) {
             requireNumeric(b, "DIV");
             double den = toDouble(b);
             if (den == 0)
-                throw VMError("Division by zero", inst.line, 0, 4, static_cast<int>(VMErrorCode::DIVISION_BY_ZERO));
+                throw VMError("Division by zero", inst.line, inst.column, 4, static_cast<int>(VMErrorCode::DIVISION_BY_ZERO));
             push(std::make_shared<Value>(Value::fromFloat(toDouble(a) / den)));
             break;
         }
@@ -385,7 +434,7 @@ void VM::runInstruction(const Instruction& inst) {
             requireInteger(b, "MOD");
             int64_t den = toInt(b);
             if (den == 0)
-                throw VMError("Division by zero", inst.line, 0, 4, static_cast<int>(VMErrorCode::DIVISION_BY_ZERO));
+                throw VMError("Division by zero", inst.line, inst.column, 4, static_cast<int>(VMErrorCode::DIVISION_BY_ZERO));
             push(std::make_shared<Value>(Value::fromInt(toInt(a) % den)));
             break;
         }
@@ -498,7 +547,7 @@ void VM::runInstruction(const Instruction& inst) {
         case Opcode::JMP: {
             size_t target = getOperandU64(inst);
             if (target == 0 || target > code_.size())
-                throw VMError("Invalid jump target", inst.line, 0, 1, static_cast<int>(VMErrorCode::INVALID_JUMP_TARGET));
+                throw VMError("Invalid jump target", inst.line, inst.column, 1, static_cast<int>(VMErrorCode::INVALID_JUMP_TARGET));
             ip_ = target - 1;
             break;
         }
@@ -507,7 +556,7 @@ void VM::runInstruction(const Instruction& inst) {
             if (!v->isTruthy()) {
                 size_t target = getOperandU64(inst);
                 if (target == 0 || target > code_.size())
-                    throw VMError("Invalid jump target", inst.line, 0, 1, static_cast<int>(VMErrorCode::INVALID_JUMP_TARGET));
+                    throw VMError("Invalid jump target", inst.line, inst.column, 1, static_cast<int>(VMErrorCode::INVALID_JUMP_TARGET));
                 ip_ = target - 1;
             }
             break;
@@ -517,7 +566,7 @@ void VM::runInstruction(const Instruction& inst) {
             if (v->isTruthy()) {
                 size_t target = getOperandU64(inst);
                 if (target == 0 || target > code_.size())
-                    throw VMError("Invalid jump target", inst.line, 0, 1, static_cast<int>(VMErrorCode::INVALID_JUMP_TARGET));
+                    throw VMError("Invalid jump target", inst.line, inst.column, 1, static_cast<int>(VMErrorCode::INVALID_JUMP_TARGET));
                 ip_ = target - 1;
             }
             break;
@@ -525,7 +574,7 @@ void VM::runInstruction(const Instruction& inst) {
         case Opcode::CALL: {
             size_t argc = getOperandU64(inst);
             if (stack_.size() < argc + 1)
-                throw VMError("Stack underflow in call (not enough arguments)", inst.line, 0, 5);
+                throw VMError("Stack underflow in call (not enough arguments)", inst.line, inst.column, 5);
             std::vector<ValuePtr> args;
             for (size_t i = 0; i < argc; ++i) args.push_back(popStack());
             std::reverse(args.begin(), args.end());
@@ -542,7 +591,7 @@ void VM::runInstruction(const Instruction& inst) {
                         if (it != builtins_.end()) {
                             push(std::make_shared<Value>(it->second(this, args)));
                         } else {
-                            throw VMError("Invalid builtin index", inst.line, 0, 1, static_cast<int>(VMErrorCode::INVALID_BYTECODE));
+                            throw VMError("Invalid builtin index", inst.line, inst.column, 1, static_cast<int>(VMErrorCode::INVALID_BYTECODE));
                         }
                     }
                 } else if (fn->isGenerator) {
@@ -558,7 +607,7 @@ void VM::runInstruction(const Instruction& inst) {
                     push(std::make_shared<Value>(Value::fromGenerator(std::move(go))));
                 } else {
                     if (maxCallDepth_ > 0 && callFrames_.size() >= maxCallDepth_) {
-                        throw VMError("Maximum call depth exceeded (" + std::to_string(maxCallDepth_) + ")", inst.line, 0, 1);
+                        throw VMError("Maximum call depth exceeded (" + std::to_string(maxCallDepth_) + ")", inst.line, inst.column, 1);
                     }
                     // tail-call check must use the caller's bytecode/ip_. Switching code_ for fn->script first
                     // would read the wrong instruction (cross-script calls: e.g. callback from module -> main).
@@ -566,12 +615,15 @@ void VM::runInstruction(const Instruction& inst) {
                         && !deferStack_.empty() && deferStack_.back().empty();
                     // When maxCallDepth_ is enforced, do not reuse frames: tail recursion would bypass the limit.
                     if (maxCallDepth_ > 0) tailCall = false;
+                    const std::string callerPath = activeSourcePath_;
                     // if function was defined in an imported script, switch to its bytecode for the call
                     if (fn->script) {
-                        codeFrameStack_.push_back(std::make_tuple(std::move(code_), std::move(stringConstants_), std::move(valueConstants_)));
+                        codeFrameStack_.push_back(
+                            std::make_tuple(std::move(code_), std::move(stringConstants_), std::move(valueConstants_), callerPath));
                         code_ = fn->script->code;
                         stringConstants_ = fn->script->stringConstants;
                         valueConstants_ = fn->script->valueConstants;
+                        activeSourcePath_ = fn->script->sourcePath;
                     }
                     // tail-call reuse is invalid without an outer frame (would callStack_.back() UB).
                     auto appendCaptures = [&] {
@@ -579,7 +631,7 @@ void VM::runInstruction(const Instruction& inst) {
                             locals_.push_back(ensureNonNull(c ? c : std::make_shared<Value>(Value::nil())));
                     };
                     if (tailCall && !callStack_.empty()) {
-                        callStack_.back() = {fn->name.empty() ? "<anonymous>" : fn->name, inst.line, 0};
+                        callStack_.back() = {fn->name.empty() ? "<anonymous>" : fn->name, callerPath, inst.line, inst.column};
                         locals_.clear();
                         for (size_t i = 0; i < args.size(); ++i)
                             locals_.push_back(ensureNonNull(ValuePtr(args[i])));
@@ -588,7 +640,7 @@ void VM::runInstruction(const Instruction& inst) {
                         ip_ = fn->entryPoint - 1;
                     } else {
                         deferStack_.push_back({});
-                        callStack_.push_back({fn->name.empty() ? "<anonymous>" : fn->name, inst.line, 0});
+                        callStack_.push_back({fn->name.empty() ? "<anonymous>" : fn->name, callerPath, inst.line, inst.column});
                         callFrames_.push_back(ip_);
                         frameLocals_.push_back(std::move(locals_));
                         locals_.clear();
@@ -601,7 +653,7 @@ void VM::runInstruction(const Instruction& inst) {
                     }
                 }
             } else {
-                throw VMError("Invalid call target: value is not callable", inst.line, 0, 2,
+                throw VMError("Invalid call target: value is not callable", inst.line, inst.column, 2,
                               static_cast<int>(VMErrorCode::INVALID_CALL_TARGET));
             }
             break;
@@ -609,10 +661,10 @@ void VM::runInstruction(const Instruction& inst) {
         case Opcode::DEFER: {
             size_t n = getOperandU64(inst);
             if (stack_.size() < n)
-                throw VMError("Stack underflow in defer", inst.line, 0, 1,
+                throw VMError("Stack underflow in defer", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::STACK_UNDERFLOW));
             if (deferStack_.empty())
-                throw VMError("Invalid defer stack state", inst.line, 0, 1,
+                throw VMError("Invalid defer stack state", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::INVALID_BYTECODE));
             std::vector<ValuePtr> args;
             for (size_t i = 0; i < n - 1; ++i) args.push_back(popStack());
@@ -628,7 +680,7 @@ void VM::runInstruction(const Instruction& inst) {
             }
             ValuePtr result = stack_.empty() ? std::make_shared<Value>(Value::nil()) : popStack();
             if (callFrames_.empty())
-                throw VMError("Return outside function", inst.line, 0, 1, static_cast<int>(VMErrorCode::RETURN_OUTSIDE_FUNCTION));
+                throw VMError("Return outside function", inst.line, inst.column, 1, static_cast<int>(VMErrorCode::RETURN_OUTSIDE_FUNCTION));
             if (!deferStack_.empty()) runDeferredCalls();
             if (!callStack_.empty()) callStack_.pop_back();
             ip_ = callFrames_.back();
@@ -642,13 +694,14 @@ void VM::runInstruction(const Instruction& inst) {
                 code_ = std::move(std::get<0>(t));
                 stringConstants_ = std::move(std::get<1>(t));
                 valueConstants_ = std::move(std::get<2>(t));
+                activeSourcePath_ = std::move(std::get<3>(t));
             }
             push(result);
             break;
         }
         case Opcode::BUILD_FUNC: {
             size_t entry = getOperandU64(inst);
-            if (entry >= code_.size()) throw VMError("Invalid function entry point", inst.line);
+            if (entry >= code_.size()) throw VMError("Invalid function entry point", inst.line, inst.column);
             auto fn = std::make_shared<FunctionObject>();
             fn->entryPoint = entry;
             fn->arity = 0;
@@ -660,6 +713,7 @@ void VM::runInstruction(const Instruction& inst) {
                     entryScriptCache_->code = code_;
                     entryScriptCache_->stringConstants = stringConstants_;
                     entryScriptCache_->valueConstants = valueConstants_;
+                    entryScriptCache_->sourcePath = activeSourcePath_;
                 }
                 fn->script = entryScriptCache_;
             }
@@ -668,14 +722,14 @@ void VM::runInstruction(const Instruction& inst) {
         }
         case Opcode::BUILD_CLOSURE: {
             if (!std::holds_alternative<std::pair<size_t, size_t>>(inst.operand))
-                throw VMError("Invalid bytecode operand: BUILD_CLOSURE expects pair(entry, captureCount)", inst.line, 0, 1,
+                throw VMError("Invalid bytecode operand: BUILD_CLOSURE expects pair(entry, captureCount)", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::INVALID_BYTECODE));
             auto p = std::get<std::pair<size_t, size_t>>(inst.operand);
             size_t entry = p.first;
             size_t captureCount = p.second;
-            if (entry >= code_.size()) throw VMError("Invalid function entry point", inst.line);
+            if (entry >= code_.size()) throw VMError("Invalid function entry point", inst.line, inst.column);
             if (stack_.size() < captureCount)
-                throw VMError("Stack underflow in BUILD_CLOSURE", inst.line, 0, 1,
+                throw VMError("Stack underflow in BUILD_CLOSURE", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::STACK_UNDERFLOW));
             std::vector<ValuePtr> caps;
             caps.reserve(captureCount);
@@ -693,6 +747,7 @@ void VM::runInstruction(const Instruction& inst) {
                     entryScriptCache_->code = code_;
                     entryScriptCache_->stringConstants = stringConstants_;
                     entryScriptCache_->valueConstants = valueConstants_;
+                    entryScriptCache_->sourcePath = activeSourcePath_;
                 }
                 fn->script = entryScriptCache_;
             }
@@ -742,7 +797,7 @@ void VM::runInstruction(const Instruction& inst) {
         case Opcode::YIELD: {
             ValuePtr val = stack_.empty() ? std::make_shared<Value>(Value::nil()) : popStack();
             if (!inGeneratorExecution_)
-                throw VMError("yield outside generator", inst.line, 0, 1);
+                throw VMError("yield outside generator", inst.line, inst.column, 1);
             pendingYield_ = true;
             pendingYieldValue_ = std::move(val);
             break;
@@ -755,9 +810,9 @@ void VM::runInstruction(const Instruction& inst) {
             size_t n = getOperandU64(inst);
             const size_t kMaxArraySize = 64 * 1024 * 1024;
             if (n > kMaxArraySize)
-                throw VMError("Array size too large", inst.line, 0, 1);
+                throw VMError("Array size too large", inst.line, inst.column, 1);
             if (stack_.size() < n)
-                throw VMError("Stack underflow building array (need " + std::to_string(n) + " values)", inst.line, 0, 1);
+                throw VMError("Stack underflow building array (need " + std::to_string(n) + " values)", inst.line, inst.column, 1);
             std::vector<ValuePtr> arr;
             arr.reserve(n);
             for (size_t i = 0; i < n; ++i) arr.push_back(popStack());
@@ -864,7 +919,7 @@ void VM::runInstruction(const Instruction& inst) {
                 const size_t kMaxArraySize = 64 * 1024 * 1024;
                 size_t i = static_cast<size_t>(raw);
                 if (i > kMaxArraySize)
-                    throw VMError("Array index out of range", inst.line, 0, 6);
+                    throw VMError("Array index out of range", inst.line, inst.column, 6);
                 while (arr.size() <= i) arr.push_back(std::make_shared<Value>(Value::nil()));
                 arr[i] = stored;
             } else if (obj && obj->type == Value::Type::MAP) {
@@ -885,7 +940,7 @@ void VM::runInstruction(const Instruction& inst) {
             auto it = builtins_.find(idx);
             if (it != builtins_.end()) push(std::make_shared<Value>(it->second(this, {})));
             else
-                throw VMError("Invalid builtin index in bytecode", inst.line, 0, 1,
+                throw VMError("Invalid builtin index in bytecode", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::INVALID_BYTECODE));
             break;
         }
@@ -912,7 +967,7 @@ void VM::runInstruction(const Instruction& inst) {
             size_t catchAddr = tryStack_.back();
             tryStack_.pop_back();
             if (catchAddr == 0 || catchAddr > code_.size())
-                throw VMError("Invalid catch target", inst.line, 0, 1, static_cast<int>(VMErrorCode::INVALID_JUMP_TARGET));
+                throw VMError("Invalid catch target", inst.line, inst.column, 1, static_cast<int>(VMErrorCode::INVALID_JUMP_TARGET));
             push(val);
             ip_ = catchAddr - 1;
             break;
@@ -930,13 +985,13 @@ void VM::runInstruction(const Instruction& inst) {
             size_t catchAddr = tryStack_.back();
             tryStack_.pop_back();
             if (catchAddr == 0 || catchAddr > code_.size())
-                throw VMError("Invalid catch target", inst.line, 0, 1, static_cast<int>(VMErrorCode::INVALID_JUMP_TARGET));
+                throw VMError("Invalid catch target", inst.line, inst.column, 1, static_cast<int>(VMErrorCode::INVALID_JUMP_TARGET));
             push(val);
             ip_ = catchAddr - 1;
             break;
         }
         case Opcode::SLICE: {
-            if (stack_.size() < 4) throw VMError("Stack underflow in slice", inst.line, 0, 6);
+            if (stack_.size() < 4) throw VMError("Stack underflow in slice", inst.line, inst.column, 6);
             ValuePtr stepVal = popStack(), endVal = popStack(), startVal = popStack(), obj = popStack();
             if (!obj || obj->type != Value::Type::ARRAY) { push(std::make_shared<Value>(Value::fromArray({}))); break; }
             auto& arr = std::get<std::vector<ValuePtr>>(obj->data);
@@ -1040,7 +1095,7 @@ void VM::runInstruction(const Instruction& inst) {
             // legacy form: treat like an unconditional jump to operand target.
             size_t target = getOperandU64(inst);
             if (target == 0 || target > code_.size())
-                throw VMError("Invalid jump target", inst.line, 0, 1, static_cast<int>(VMErrorCode::INVALID_JUMP_TARGET));
+                throw VMError("Invalid jump target", inst.line, inst.column, 1, static_cast<int>(VMErrorCode::INVALID_JUMP_TARGET));
             ip_ = target - 1;
             break;
         }
@@ -1048,16 +1103,16 @@ void VM::runInstruction(const Instruction& inst) {
         case Opcode::INVOKE_METHOD:
         case Opcode::LOAD_THIS:
             throw VMError(std::string("Opcode not implemented: ") + opcodeName(inst.op),
-                          inst.line, 0, 1, static_cast<int>(VMErrorCode::INVALID_BYTECODE));
+                          inst.line, inst.column, 1, static_cast<int>(VMErrorCode::INVALID_BYTECODE));
         case Opcode::ALLOC: {
             int64_t n = toInt(popStack());
             if (n <= 0) { push(std::make_shared<Value>(Value::fromPtr(nullptr))); break; }
             const size_t kMaxAlloc = 256 * 1024 * 1024;  // 256 miB
             size_t sz = static_cast<size_t>(n);
             if (sz > kMaxAlloc)
-                throw VMError("Allocation size too large", inst.line, 0, 1);
+                throw VMError("Allocation size too large", inst.line, inst.column, 1);
             void* p = std::malloc(sz);
-            if (!p) throw VMError("Allocation failed", inst.line, 0, 1);
+            if (!p) throw VMError("Allocation failed", inst.line, inst.column, 1);
             push(std::make_shared<Value>(Value::fromPtr(p)));
             break;
         }
@@ -1076,7 +1131,7 @@ void VM::runInstruction(const Instruction& inst) {
             void* src = std::get<void*>(vsrc->data);
             const size_t kMaxCopy = 256 * 1024 * 1024;  // keep memcpy bounded
             size_t n = static_cast<size_t>(std::max(int64_t(0), toInt(vn)));
-            if (n > kMaxCopy) throw VMError("mem_copy size too large", inst.line, 0, 3);
+            if (n > kMaxCopy) throw VMError("mem_copy size too large", inst.line, inst.column, 3);
             if (dest && src) std::memcpy(dest, src, n);
             break;
         }
@@ -1091,7 +1146,7 @@ void VM::runInstruction(const Instruction& inst) {
             break;
         default:
             throw VMError(std::string("Invalid opcode: ") + opcodeName(inst.op),
-                          inst.line, 0, 1, static_cast<int>(VMErrorCode::INVALID_BYTECODE));
+                          inst.line, inst.column, 1, static_cast<int>(VMErrorCode::INVALID_BYTECODE));
     }
 }
 
@@ -1107,8 +1162,9 @@ void VM::restoreExecutionState(
     std::vector<VMStackFrame> callStack,
     std::vector<std::pair<ValuePtr, size_t>> iterStack,
     std::vector<size_t> tryStack,
-    std::vector<std::tuple<Bytecode, std::vector<std::string>, std::vector<Value>>> codeFrameStack,
-    std::shared_ptr<ScriptCode> currentScript) {
+    std::vector<std::tuple<Bytecode, std::vector<std::string>, std::vector<Value>, std::string>> codeFrameStack,
+    std::shared_ptr<ScriptCode> currentScript,
+    std::string activeSourcePath) {
     code_ = std::move(code);
     stringConstants_ = std::move(stringConstants);
     valueConstants_ = std::move(valueConstants);
@@ -1122,6 +1178,7 @@ void VM::restoreExecutionState(
     tryStack_ = std::move(tryStack);
     codeFrameStack_ = std::move(codeFrameStack);
     currentScript_ = std::move(currentScript);
+    activeSourcePath_ = std::move(activeSourcePath);
     normalizeValuePtrVector(locals_);
     for (auto& fr : frameLocals_) normalizeValuePtrVector(fr);
     for (auto& deflist : deferStack_) {
@@ -1149,14 +1206,16 @@ bool VM::resumeGenerator(std::shared_ptr<GeneratorObject> gen, ValuePtr& out) {
     std::vector<VMStackFrame> savedCS = callStack_;
     std::vector<std::pair<ValuePtr, size_t>> savedIter = iterStack_;
     std::vector<size_t> savedTry = tryStack_;
-    std::vector<std::tuple<Bytecode, std::vector<std::string>, std::vector<Value>>> savedCFS = codeFrameStack_;
+    std::vector<std::tuple<Bytecode, std::vector<std::string>, std::vector<Value>, std::string>> savedCFS = codeFrameStack_;
     std::shared_ptr<ScriptCode> savedCurScript = currentScript_;
+    std::string savedActivePath = activeSourcePath_;
 
     if (gen->fn->script) {
         code_ = gen->fn->script->code;
         stringConstants_ = gen->fn->script->stringConstants;
         valueConstants_ = gen->fn->script->valueConstants;
         currentScript_ = gen->fn->script;
+        activeSourcePath_ = gen->fn->script->sourcePath;
     }
     ip_ = gen->ip;
     locals_ = gen->locals;
@@ -1184,7 +1243,8 @@ bool VM::resumeGenerator(std::shared_ptr<GeneratorObject> gen, ValuePtr& out) {
                 pendingYield_ = false;
                 restoreExecutionState(std::move(savedCode), std::move(savedStr), std::move(savedVal), savedIp,
                     std::move(savedLocals), std::move(savedCF), std::move(savedFL), std::move(savedDef),
-                    std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedCFS), std::move(savedCurScript));
+                    std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedCFS), std::move(savedCurScript),
+                    std::move(savedActivePath));
                 inGeneratorExecution_ = false;
                 activeGenerator_.reset();
                 return true;
@@ -1193,7 +1253,8 @@ bool VM::resumeGenerator(std::shared_ptr<GeneratorObject> gen, ValuePtr& out) {
                 gen->exhausted = true;
                 restoreExecutionState(std::move(savedCode), std::move(savedStr), std::move(savedVal), savedIp,
                     std::move(savedLocals), std::move(savedCF), std::move(savedFL), std::move(savedDef),
-                    std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedCFS), std::move(savedCurScript));
+                    std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedCFS), std::move(savedCurScript),
+                    std::move(savedActivePath));
                 inGeneratorExecution_ = false;
                 activeGenerator_.reset();
                 return false;
@@ -1203,14 +1264,16 @@ bool VM::resumeGenerator(std::shared_ptr<GeneratorObject> gen, ValuePtr& out) {
         gen->exhausted = true;
         restoreExecutionState(std::move(savedCode), std::move(savedStr), std::move(savedVal), savedIp,
             std::move(savedLocals), std::move(savedCF), std::move(savedFL), std::move(savedDef),
-            std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedCFS), std::move(savedCurScript));
+            std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedCFS), std::move(savedCurScript),
+            std::move(savedActivePath));
         inGeneratorExecution_ = false;
         activeGenerator_.reset();
         return false;
     } catch (...) {
         restoreExecutionState(std::move(savedCode), std::move(savedStr), std::move(savedVal), savedIp,
             std::move(savedLocals), std::move(savedCF), std::move(savedFL), std::move(savedDef),
-            std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedCFS), std::move(savedCurScript));
+            std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedCFS), std::move(savedCurScript),
+            std::move(savedActivePath));
         inGeneratorExecution_ = false;
         activeGenerator_.reset();
         throw;
@@ -1229,6 +1292,7 @@ void VM::attachTracebackToError(ValuePtr val) {
         std::unordered_map<std::string, ValuePtr> marker;
         marker["name"] = std::make_shared<Value>(Value::fromString(
             "(" + std::to_string(depth - slice.size()) + " outer frame(s) omitted)"));
+        marker["file"] = std::make_shared<Value>(Value::fromString(""));
         marker["line"] = std::make_shared<Value>(Value::fromInt(0));
         marker["column"] = std::make_shared<Value>(Value::fromInt(0));
         arr.push_back(std::make_shared<Value>(Value::fromMap(std::move(marker))));
@@ -1236,6 +1300,8 @@ void VM::attachTracebackToError(ValuePtr val) {
     for (const auto& f : slice) {
         std::unordered_map<std::string, ValuePtr> fm;
         fm["name"] = std::make_shared<Value>(Value::fromString(f.functionName));
+        // Raw path (e.g. "<repl>") for programmatic use; use humanizePathForDisplay in format_exception / stack_trace.
+        fm["file"] = std::make_shared<Value>(Value::fromString(f.filePath));
         fm["line"] = std::make_shared<Value>(Value::fromInt(f.line));
         fm["column"] = std::make_shared<Value>(Value::fromInt(f.column));
         arr.push_back(std::make_shared<Value>(Value::fromMap(std::move(fm))));
@@ -1267,8 +1333,10 @@ ValuePtr VM::callValue(ValuePtr callee, std::vector<ValuePtr> args) {
     std::vector<VMStackFrame> savedCallStackState = callStack_;
     std::vector<std::pair<ValuePtr, size_t>> savedIterState = iterStack_;
     std::vector<size_t> savedTryState = tryStack_;
-    std::vector<std::tuple<Bytecode, std::vector<std::string>, std::vector<Value>>> savedCodeFramesState = codeFrameStack_;
+    std::vector<std::tuple<Bytecode, std::vector<std::string>, std::vector<Value>, std::string>> savedCodeFramesState =
+        codeFrameStack_;
     std::shared_ptr<ScriptCode> savedCurScriptState = currentScript_;
+    std::string savedActivePathState = activeSourcePath_;
     ValuePtr savedLastThrownState = lastThrown_;
     int savedUnsafeDepthState = unsafeDepth_;
     size_t savedFrames = callFrames_.size();
@@ -1309,6 +1377,7 @@ ValuePtr VM::callValue(ValuePtr callee, std::vector<ValuePtr> args) {
                 code_ = std::move(std::get<0>(t));
                 stringConstants_ = std::move(std::get<1>(t));
                 valueConstants_ = std::move(std::get<2>(t));
+                activeSourcePath_ = std::move(std::get<3>(t));
             }
             push(std::make_shared<Value>(Value::nil()));
         }
@@ -1330,6 +1399,7 @@ ValuePtr VM::callValue(ValuePtr callee, std::vector<ValuePtr> args) {
         tryStack_ = std::move(savedTryState);
         codeFrameStack_ = std::move(savedCodeFramesState);
         currentScript_ = std::move(savedCurScriptState);
+        activeSourcePath_ = std::move(savedActivePathState);
         lastThrown_ = std::move(savedLastThrownState);
         unsafeDepth_ = savedUnsafeDepthState;
         ip_ = savedIp;
@@ -1384,13 +1454,14 @@ void VM::runDeferredCalls() {
 
 void VM::run() {
     if (code_.empty()) return;
+    verifyBytecodeOrThrow(code_, stringConstants_.size(), valueConstants_.size());
     resetCycleCount();
     stack_.reserve(512);
     while (ip_ < code_.size()) {
         const Instruction& inst = code_[ip_];
         runInstruction(inst);
         if (vmTraceEnabled_ && cycleCount_ <= 500000u) {
-            std::cerr << "[vm] op=" << static_cast<int>(inst.op) << " line=" << inst.line
+            std::cerr << "[vm] op=" << static_cast<int>(inst.op) << " line=" << inst.line << " col=" << inst.column
                       << " sp=" << stack_.size() << "\n";
         }
         ip_++;
@@ -1398,11 +1469,18 @@ void VM::run() {
     }
 }
 
-void VM::runSubScript(Bytecode code, std::vector<std::string> stringConstants, std::vector<Value> valueConstants) {
+void VM::runSubScript(Bytecode code, std::vector<std::string> stringConstants, std::vector<Value> valueConstants,
+                      const std::string& sourcePath) {
     auto savedScript = currentScript_;
+    std::string savedActive = activeSourcePath_;
     int savedExitCode = scriptExitCode_;
     scriptExitCode_ = -1;  // imported scripts must not terminate parent script
-    currentScript_ = std::make_shared<ScriptCode>(ScriptCode{std::move(code), std::move(stringConstants), std::move(valueConstants)});
+    currentScript_ = std::make_shared<ScriptCode>();
+    currentScript_->code = std::move(code);
+    currentScript_->stringConstants = std::move(stringConstants);
+    currentScript_->valueConstants = std::move(valueConstants);
+    currentScript_->sourcePath = sourcePath;
+    verifyBytecodeOrThrow(currentScript_->code, currentScript_->stringConstants.size(), currentScript_->valueConstants.size());
     Bytecode savedCode = std::move(code_);
     std::vector<std::string> savedStr = std::move(stringConstants_);
     std::vector<Value> savedVal = std::move(valueConstants_);
@@ -1410,6 +1488,7 @@ void VM::runSubScript(Bytecode code, std::vector<std::string> stringConstants, s
     code_ = currentScript_->code;
     stringConstants_ = currentScript_->stringConstants;
     valueConstants_ = currentScript_->valueConstants;
+    activeSourcePath_ = sourcePath;
     ip_ = 0;
     while (ip_ < code_.size()) {
         const Instruction& inst = code_[ip_];
@@ -1421,6 +1500,7 @@ void VM::runSubScript(Bytecode code, std::vector<std::string> stringConstants, s
     stringConstants_ = std::move(savedStr);
     valueConstants_ = std::move(savedVal);
     ip_ = savedIp;
+    activeSourcePath_ = std::move(savedActive);
     currentScript_ = savedScript;
     scriptExitCode_ = savedExitCode;
 }
