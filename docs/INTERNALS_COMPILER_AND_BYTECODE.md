@@ -34,9 +34,11 @@ Treat **on-disk bytecode blobs** as tied to a **specific `kern` build**. Upgrade
 
 - [`src/ir/`](../src/ir/) holds typed IR builders and passes (constant folding, DCE, etc.) used when feature flags enable those pipelines.
 - [`src/backend/cpp_backend.cpp`](../src/backend/cpp_backend.cpp) is an alternate emission path for specific workflows—not the default `kern` execution path.
+- [`src/compile/compile_pipeline.hpp`](../src/compile/compile_pipeline.hpp) — modular driver (`kern::compile`) for **standalone `.exe`** builds; design and trade-offs in [STANDALONE_COMPILE_ARCHITECTURE.md](STANDALONE_COMPILE_ARCHITECTURE.md).
 
 ## See also
 
+- [STANDALONE_COMPILE_ARCHITECTURE.md](STANDALONE_COMPILE_ARCHITECTURE.md) — embedded VM backend, incremental cache, future bytecode/LLVM hooks
 - [INTERNALS_VM.md](INTERNALS_VM.md) — how bytecode executes
 - [ERROR_CODES.md](ERROR_CODES.md) — diagnostic codes
 - [KERN_SCAN.md](KERN_SCAN.md) — static validation of exports and builtins

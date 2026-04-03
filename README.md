@@ -161,6 +161,7 @@ The canonical version string is the root **`KERN_VERSION.txt`** file (used by `k
 | [LANGUAGE_SYNTAX.md](docs/LANGUAGE_SYNTAX.md) | Short syntax overview + pointers to examples |
 | [BUILTIN_REFERENCE.md](docs/BUILTIN_REFERENCE.md) | Where builtins are defined and how to look them up |
 | [RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) | Maintainer pre-release checklist |
+| [STANDALONE_COMPILE_ARCHITECTURE.md](docs/STANDALONE_COMPILE_ARCHITECTURE.md) | `.kn` → standalone `.exe` pipeline, `kern::compile` API |
 | [RELEASE.md](RELEASE.md) | User install + maintainer packaging |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
 | [STRICT_TYPES.md](docs/STRICT_TYPES.md) | Optional `--strict-types` checks (Phase 2) |

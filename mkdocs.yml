@@ -30,6 +30,7 @@ nav:
       - Overview: INTERNALS.md
       - Repository architecture: INTERNALS_ARCHITECTURE.md
       - Compiler and bytecode: INTERNALS_COMPILER_AND_BYTECODE.md
+      - Standalone EXE compile: STANDALONE_COMPILE_ARCHITECTURE.md
       - Virtual machine: INTERNALS_VM.md
       - Modules and security: INTERNALS_MODULES_AND_SECURITY.md
   - More:
