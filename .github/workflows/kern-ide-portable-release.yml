@@ -48,13 +48,18 @@ jobs:
           name: kern-ide-portable-windows
           path: Kern-IDE/kern-ide-windows-x64-portable-v*.zip
 
+      # Do not use secrets.* in step `if:` — GitHub rejects it (invalid workflow). Gate on input only; skip in-script if PAT unset.
       - name: Upload release asset on kern-IDE repo
-        if: ${{ github.event.inputs.upload_to_kern_ide == 'true' && secrets.KERN_IDE_RELEASE_PAT != '' }}
+        if: github.event.inputs.upload_to_kern_ide == true
         working-directory: ${{ github.workspace }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.KERN_IDE_RELEASE_PAT }}
         run: |
+          if ([string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
+            Write-Host "::warning::KERN_IDE_RELEASE_PAT secret not set; skipping release upload (artifact still available)."
+            exit 0
+          }
           $zip = Get-ChildItem -Path Kern-IDE -Filter "kern-ide-windows-x64-portable-v*.zip" | Select-Object -First 1
           if (-not $zip) { throw "zip not found" }
-          gh release upload "${{ inputs.release_tag }}" $zip.FullName --repo entrenchedosx/kern-IDE --clobber
+          gh release upload "${{ github.event.inputs.release_tag }}" $zip.FullName --repo entrenchedosx/kern-IDE --clobber
