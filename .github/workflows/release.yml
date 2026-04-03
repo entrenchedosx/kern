@@ -89,7 +89,8 @@ jobs:
           $out = "kern-windows-x64-v$ver.zip"
           New-Item -ItemType Directory -Path pkg/kern-${ver}-win64 | Out-Null
           Copy-Item build/Release/kern.exe pkg/kern-${ver}-win64/
-          Copy-Item build/Release/kernc.exe pkg/kern-${ver}-win64/
+          # Windows: real compiler is kern-impl.exe; kernc.exe in build/ is a dev launcher (cmake + exec). Ship impl as kernc.exe for portable use.
+          Copy-Item build/Release/kern-impl.exe pkg/kern-${ver}-win64/kernc.exe
           Copy-Item build/Release/kern-scan.exe pkg/kern-${ver}-win64/
           Copy-Item build/Release/kern_contract_humanize.exe pkg/kern-${ver}-win64/
           Copy-Item LICENSE pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
