@@ -5,6 +5,7 @@
 #include "vm.hpp"
 #include "bytecode_verifier.hpp"
 #include "vm_error_registry.hpp"
+#include "platform/env_compat.hpp"
 #include <sstream>
 #include <string>
 #include <cmath>
@@ -100,7 +101,7 @@ VM::VM() : ip_(0) {
     } else
         vmTraceEnabled_ = false;
 #else
-    const char* tr = std::getenv("KERN_VM_TRACE");
+    const char* tr = kernGetEnv("KERN_VM_TRACE");
     vmTraceEnabled_ = tr && tr[0] != '\0' && tr[0] != '0';
 #endif
 }

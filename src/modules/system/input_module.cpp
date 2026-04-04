@@ -3,6 +3,7 @@
 #include "system/runtime_services.hpp"
 #include "vm/vm.hpp"
 #include "vm/value.hpp"
+#include "platform/env_compat.hpp"
 
 #include <cstdlib>
 #include <memory>
@@ -41,7 +42,7 @@ static bool simulationAllowed() {
     if (value) std::free(value);
     return env == "1";
 #else
-    const char* env = std::getenv("KERN_ALLOW_INPUT_SIM");
+    const char* env = kernGetEnv("KERN_ALLOW_INPUT_SIM");
     return env && std::string(env) == "1";
 #endif
 }

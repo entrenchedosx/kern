@@ -4,6 +4,7 @@
 
 #include "errors.hpp"
 #include "diagnostics/traceback_limits.hpp"
+#include "platform/env_compat.hpp"
 #include <iostream>
 #include <sstream>
 #include <algorithm>
@@ -68,14 +69,7 @@ static bool stderrIsTty() {
 }
 
 ErrorReporter::ErrorReporter() {
-#if defined(_WIN32) && defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable : 4996)
-#endif
-    const char* noColor = std::getenv("NO_COLOR");
-#if defined(_WIN32) && defined(_MSC_VER)
-#pragma warning(pop)
-#endif
+    const char* noColor = kernGetEnv("NO_COLOR");
     useColors_ = (noColor == nullptr || noColor[0] == '\0') && stderrIsTty();
 }
 

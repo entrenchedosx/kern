@@ -5,6 +5,7 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 #endif
 #include "import_resolution.hpp"
+#include "platform/env_compat.hpp"
 #include "compiler/lexer.hpp"
 #include "compiler/parser.hpp"
 #include "compiler/codegen.hpp"
@@ -135,7 +136,7 @@ static std::string resolveImportPath(const std::string& importPath, std::string*
     std::error_code ec;
     fs::path cwd = fs::current_path(ec);
     if (!ec) roots.push_back(cwd);
-    const char* lib = std::getenv("KERN_LIB");
+    const char* lib = kernGetEnv("KERN_LIB");
     if (lib && lib[0]) {
         roots.emplace_back(lib);
     } else {
@@ -336,7 +337,7 @@ static Value runImportBuiltin(VM* v, std::vector<ValuePtr> args) {
         path += ".kn";
 
     // embedded module path resolution (used by standalone bundled executables).
-    if (std::getenv("KERNC_TRACE_IMPORTS")) {
+    if (kernGetEnv("KERNC_TRACE_IMPORTS")) {
         std::cerr << "[kern-embed] import request=" << path << " provider=" << (g_embeddedProvider ? "set" : "null") << std::endl;
     }
     if (g_embeddedProvider) {
@@ -430,13 +431,13 @@ void registerImportBuiltin(VM& vm) {
 
 void setEmbeddedModuleProvider(EmbeddedModuleProvider provider) {
     g_embeddedProvider = std::move(provider);
-    if (std::getenv("KERNC_TRACE_IMPORTS")) {
+    if (kernGetEnv("KERNC_TRACE_IMPORTS")) {
         std::cerr << "[kern-embed] provider installed" << std::endl;
     }
 }
 
 void clearEmbeddedModuleProvider() {
-    if (std::getenv("KERNC_TRACE_IMPORTS")) {
+    if (kernGetEnv("KERNC_TRACE_IMPORTS")) {
         std::cerr << "[kern-embed] provider cleared" << std::endl;
     }
     g_embeddedProvider = nullptr;
