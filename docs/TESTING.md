@@ -50,6 +50,13 @@ If the current working directory has **`kern.json`**, **`kern test`** and **`ker
 - Grouped grants supported by CLI and `require(...)` include:
   - `fs.readonly`, `fs.readwrite`, `net.client`, `proc.control`, `env.manage`
 
+## System-access wave 30 smoke
+
+- Source/API surface + unsafe-execution smoke:
+  - `.\build\Release\kern.exe tests\coverage\test_system_access_30_surface.kn`
+- Static check:
+  - `.\build\Release\kern.exe --check tests\coverage\test_system_access_30_surface.kn`
+
 ## Useful options
 
 - `-TimeoutSeconds 60` to increase per-test timeout

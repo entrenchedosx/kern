@@ -106,8 +106,16 @@ static void emitRiskyApiWarnings(const std::string& source) {
          "Prefer exec_args/run wrappers to avoid shell-injection risks.", "SCAN-RISK-EXEC"},
         {"spawn(", "Process spawn detected.",
          "Validate command source and require process control permission intentionally.", "SCAN-RISK-SPAWN"},
+        {"process_spawn_v2(", "Structured process spawn detected.",
+         "Validate argv/options inputs and timeout/cleanup behavior for production workloads.", "SCAN-RISK-SPAWN-V2"},
+        {"fs_fd_open(", "Low-level file descriptor API detected.",
+         "Ensure descriptor lifecycle (close/release) is explicit to avoid leaks.", "SCAN-RISK-FD"},
         {"tcp_connect(", "Raw TCP API detected.",
          "Confirm net.client/network.tcp permission intent and timeout handling.", "SCAN-RISK-TCP"},
+        {"net_tls_connect(", "TLS socket API detected.",
+         "Validate certificate/hostname behavior before production use.", "SCAN-RISK-TLS"},
+        {"net_ws_connect(", "WebSocket API detected.",
+         "Ensure protocol-level validation and backpressure handling.", "SCAN-RISK-WS"},
     };
     for (const auto& r : kRisky) {
         size_t pos = source.find(r.needle);

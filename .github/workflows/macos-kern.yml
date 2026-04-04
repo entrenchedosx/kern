@@ -40,6 +40,7 @@ jobs:
           ./build/kern --scan --registry-only
           ./build/kern graph --json tests/compile_pipeline_fixture/main.kn
           ./build/kern --allow=filesystem.read tests/coverage/test_g3d_api_surface_vnext_source.kn
+          ./build/kern tests/coverage/test_system_access_30_surface.kn
           ./build/kern tests/std_v1_builtins_smoke.kn
           ./build/kern examples/basic/01_hello_world.kn
 

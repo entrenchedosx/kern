@@ -287,7 +287,12 @@ inline std::vector<std::string> getBuiltinNames() {
         "udp_close",
         "socket_set_nonblocking",
         "socket_select_read",
-        "socket_select_write"};
+        "socket_select_write",
+        "fs_fd_open","fs_fd_close","fs_fd_read","fs_fd_write","fs_fd_pread","fs_fd_pwrite","fs_flock",
+        "fs_statx","fs_atomic_write","fs_watch","fs_space","fs_mounts",
+        "process_spawn_v2","process_wait","process_kill_tree","process_list","process_job_create","process_job_add","process_job_kill",
+        "os_signal_trap","os_signal_untrap","os_runtime_limits","os_features",
+        "net_tcp_server","net_tcp_poll","net_dns_lookup","net_tls_connect","net_ws_connect","net_ws_listen"};
     return names;
 }
 
@@ -795,6 +800,19 @@ inline std::string formatExceptionValue(const ValuePtr& e, int depth = 0) {
     std::unordered_map<int64_t, HANDLE> g_spawnHandles;
     int64_t g_nextSpawnHandle = 1;
 #endif
+    std::unordered_map<int64_t, FILE*> g_fdHandles;
+    int64_t g_nextFdHandle = 1;
+    std::mutex g_fdMutex;
+    std::unordered_set<std::string> g_flockKeys;
+    std::mutex g_flockMutex;
+    std::unordered_map<int64_t, std::unordered_map<std::string, int64_t>> g_fsWatchState;
+    int64_t g_nextWatchId = 1;
+    std::mutex g_fsWatchMutex;
+    std::unordered_map<int64_t, std::vector<int64_t>> g_processJobs;
+    int64_t g_nextProcessJobId = 1;
+    std::mutex g_processJobsMutex;
+    std::unordered_map<std::string, ValuePtr> g_signalTraps;
+    std::mutex g_signalTrapMutex;
     std::mutex g_regexCacheMutex;
     std::unordered_map<int64_t, std::regex> g_regexCache;
     std::atomic<int64_t> g_nextRegexId{1};  // first compiled regex id is 1
@@ -6439,10 +6457,16 @@ inline void registerAllBuiltins(VM& vm) {
         std::unordered_map<std::string, ValuePtr> out;
         std::vector<ValuePtr> granted;
         std::vector<ValuePtr> groups;
+        std::vector<ValuePtr> grantedWithSource;
         if (vm) {
             const RuntimeGuardPolicy& g = vm->getRuntimeGuards();
-            for (const auto& p : g.grantedPermissions)
+            for (const auto& p : g.grantedPermissions) {
                 granted.push_back(std::make_shared<Value>(Value::fromString(p)));
+                std::unordered_map<std::string, ValuePtr> item;
+                item["permission"] = std::make_shared<Value>(Value::fromString(p));
+                item["source"] = std::make_shared<Value>(Value::fromString("grant-or-profile"));
+                grantedWithSource.push_back(std::make_shared<Value>(Value::fromMap(std::move(item))));
+            }
             for (const auto& kv : permissionGroupMap()) {
                 bool ok = true;
                 for (const auto& need : kv.second) {
@@ -6455,6 +6479,7 @@ inline void registerAllBuiltins(VM& vm) {
             }
         }
         out["granted"] = std::make_shared<Value>(Value::fromArray(std::move(granted)));
+        out["granted_with_source"] = std::make_shared<Value>(Value::fromArray(std::move(grantedWithSource)));
         out["groups"] = std::make_shared<Value>(Value::fromArray(std::move(groups)));
         return Value::fromMap(std::move(out));
     });
@@ -6462,6 +6487,624 @@ inline void registerAllBuiltins(VM& vm) {
 
 #include "std_builtins_v1.inl"
 #include "std_builtins_socket.inl"
+    makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "fs_fd_open");
+        if (args.empty() || !args[0]) return Value::fromMap({});
+        std::string path = args[0]->toString();
+        std::string mode = (args.size() >= 2 && args[1]) ? args[1]->toString() : "rb";
+        FILE* f = nullptr;
+#ifdef _WIN32
+        (void)fopen_s(&f, path.c_str(), mode.c_str());
+#else
+        f = std::fopen(path.c_str(), mode.c_str());
+#endif
+        std::unordered_map<std::string, ValuePtr> m;
+        m["ok"] = std::make_shared<Value>(Value::fromBool(f != nullptr));
+        m["id"] = std::make_shared<Value>(Value::fromInt(-1));
+        if (!f) {
+            m["error"] = std::make_shared<Value>(Value::fromString("open failed"));
+            return Value::fromMap(std::move(m));
+        }
+        std::lock_guard<std::mutex> lk(g_fdMutex);
+        int64_t id = g_nextFdHandle++;
+        g_fdHandles[id] = f;
+        m["id"] = std::make_shared<Value>(Value::fromInt(id));
+        m["error"] = std::make_shared<Value>(Value::fromString(""));
+        return Value::fromMap(std::move(m));
+    });
+    setGlobalFn("fs_fd_open", i - 1);
+
+    makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemWrite, "fs_fd_close");
+        if (args.empty()) return Value::fromBool(false);
+        int64_t id = toInt(args[0]);
+        FILE* f = nullptr;
+        {
+            std::lock_guard<std::mutex> lk(g_fdMutex);
+            auto it = g_fdHandles.find(id);
+            if (it == g_fdHandles.end()) return Value::fromBool(false);
+            f = it->second;
+            g_fdHandles.erase(it);
+        }
+        if (!f) return Value::fromBool(false);
+        return Value::fromBool(std::fclose(f) == 0);
+    });
+    setGlobalFn("fs_fd_close", i - 1);
+
+    makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "fs_fd_read");
+        std::unordered_map<std::string, ValuePtr> m;
+        m["ok"] = std::make_shared<Value>(Value::fromBool(false));
+        m["data"] = std::make_shared<Value>(Value::fromString(""));
+        m["eof"] = std::make_shared<Value>(Value::fromBool(false));
+        if (args.empty()) return Value::fromMap(std::move(m));
+        int64_t id = toInt(args[0]);
+        size_t maxB = args.size() >= 2 ? static_cast<size_t>(std::max<int64_t>(1, toInt(args[1]))) : 65536;
+        FILE* f = nullptr;
+        {
+            std::lock_guard<std::mutex> lk(g_fdMutex);
+            auto it = g_fdHandles.find(id);
+            if (it == g_fdHandles.end()) return Value::fromMap(std::move(m));
+            f = it->second;
+        }
+        std::string out;
+        out.resize(maxB);
+        size_t n = std::fread(&out[0], 1, maxB, f);
+        out.resize(n);
+        m["ok"] = std::make_shared<Value>(Value::fromBool(true));
+        m["data"] = std::make_shared<Value>(Value::fromString(std::move(out)));
+        m["eof"] = std::make_shared<Value>(Value::fromBool(std::feof(f) != 0));
+        return Value::fromMap(std::move(m));
+    });
+    setGlobalFn("fs_fd_read", i - 1);
+
+    makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemWrite, "fs_fd_write");
+        std::unordered_map<std::string, ValuePtr> m;
+        m["ok"] = std::make_shared<Value>(Value::fromBool(false));
+        m["written"] = std::make_shared<Value>(Value::fromInt(0));
+        if (args.size() < 2 || !args[1]) return Value::fromMap(std::move(m));
+        int64_t id = toInt(args[0]);
+        FILE* f = nullptr;
+        {
+            std::lock_guard<std::mutex> lk(g_fdMutex);
+            auto it = g_fdHandles.find(id);
+            if (it == g_fdHandles.end()) return Value::fromMap(std::move(m));
+            f = it->second;
+        }
+        std::string data = args[1]->toString();
+        size_t n = std::fwrite(data.data(), 1, data.size(), f);
+        std::fflush(f);
+        m["ok"] = std::make_shared<Value>(Value::fromBool(true));
+        m["written"] = std::make_shared<Value>(Value::fromInt(static_cast<int64_t>(n)));
+        return Value::fromMap(std::move(m));
+    });
+    setGlobalFn("fs_fd_write", i - 1);
+
+    makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "fs_fd_pread");
+        std::unordered_map<std::string, ValuePtr> m;
+        m["ok"] = std::make_shared<Value>(Value::fromBool(false));
+        m["data"] = std::make_shared<Value>(Value::fromString(""));
+        if (args.size() < 3) return Value::fromMap(std::move(m));
+        int64_t id = toInt(args[0]);
+        int64_t off = std::max<int64_t>(0, toInt(args[1]));
+        size_t maxB = static_cast<size_t>(std::max<int64_t>(1, toInt(args[2])));
+        FILE* f = nullptr;
+        {
+            std::lock_guard<std::mutex> lk(g_fdMutex);
+            auto it = g_fdHandles.find(id);
+            if (it == g_fdHandles.end()) return Value::fromMap(std::move(m));
+            f = it->second;
+        }
+        long prev = std::ftell(f);
+        if (std::fseek(f, static_cast<long>(off), SEEK_SET) != 0) return Value::fromMap(std::move(m));
+        std::string out;
+        out.resize(maxB);
+        size_t n = std::fread(&out[0], 1, maxB, f);
+        out.resize(n);
+        if (prev >= 0) std::fseek(f, prev, SEEK_SET);
+        m["ok"] = std::make_shared<Value>(Value::fromBool(true));
+        m["data"] = std::make_shared<Value>(Value::fromString(std::move(out)));
+        return Value::fromMap(std::move(m));
+    });
+    setGlobalFn("fs_fd_pread", i - 1);
+
+    makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemWrite, "fs_fd_pwrite");
+        std::unordered_map<std::string, ValuePtr> m;
+        m["ok"] = std::make_shared<Value>(Value::fromBool(false));
+        m["written"] = std::make_shared<Value>(Value::fromInt(0));
+        if (args.size() < 3 || !args[2]) return Value::fromMap(std::move(m));
+        int64_t id = toInt(args[0]);
+        int64_t off = std::max<int64_t>(0, toInt(args[1]));
+        FILE* f = nullptr;
+        {
+            std::lock_guard<std::mutex> lk(g_fdMutex);
+            auto it = g_fdHandles.find(id);
+            if (it == g_fdHandles.end()) return Value::fromMap(std::move(m));
+            f = it->second;
+        }
+        std::string data = args[2]->toString();
+        long prev = std::ftell(f);
+        if (std::fseek(f, static_cast<long>(off), SEEK_SET) != 0) return Value::fromMap(std::move(m));
+        size_t n = std::fwrite(data.data(), 1, data.size(), f);
+        std::fflush(f);
+        if (prev >= 0) std::fseek(f, prev, SEEK_SET);
+        m["ok"] = std::make_shared<Value>(Value::fromBool(true));
+        m["written"] = std::make_shared<Value>(Value::fromInt(static_cast<int64_t>(n)));
+        return Value::fromMap(std::move(m));
+    });
+    setGlobalFn("fs_fd_pwrite", i - 1);
+
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemWrite, "fs_flock");
+        std::unordered_map<std::string, ValuePtr> m;
+        m["ok"] = std::make_shared<Value>(Value::fromBool(false));
+        if (args.empty() || !args[0]) return Value::fromMap(std::move(m));
+        std::string key = args[0]->toString();
+        bool unlock = (args.size() >= 2 && args[1] && args[1]->isTruthy());
+        std::lock_guard<std::mutex> lk(g_flockMutex);
+        if (unlock) {
+            g_flockKeys.erase(key);
+            m["ok"] = std::make_shared<Value>(Value::fromBool(true));
+            return Value::fromMap(std::move(m));
+        }
+        if (g_flockKeys.find(key) != g_flockKeys.end()) return Value::fromMap(std::move(m));
+        g_flockKeys.insert(key);
+        m["ok"] = std::make_shared<Value>(Value::fromBool(true));
+        return Value::fromMap(std::move(m));
+    });
+    setGlobalFn("fs_flock", i - 1);
+
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "fs_statx");
+        std::unordered_map<std::string, ValuePtr> m;
+        if (args.empty() || !args[0]) return Value::fromMap(std::move(m));
+        std::error_code ec;
+        std::filesystem::path p(args[0]->toString());
+        auto st = std::filesystem::status(p, ec);
+        const bool exists = std::filesystem::exists(st);
+        m["exists"] = std::make_shared<Value>(Value::fromBool(exists));
+        m["is_file"] = std::make_shared<Value>(Value::fromBool(exists && std::filesystem::is_regular_file(st)));
+        m["is_dir"] = std::make_shared<Value>(Value::fromBool(exists && std::filesystem::is_directory(st)));
+        int64_t sz = -1;
+        if (!ec && exists && std::filesystem::is_regular_file(st)) {
+            std::error_code ec2;
+            sz = static_cast<int64_t>(std::filesystem::file_size(p, ec2));
+        }
+        m["size"] = std::make_shared<Value>(Value::fromInt(sz));
+        return Value::fromMap(std::move(m));
+    });
+    setGlobalFn("fs_statx", i - 1);
+
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemWrite, "fs_atomic_write");
+        std::unordered_map<std::string, ValuePtr> m;
+        m["ok"] = std::make_shared<Value>(Value::fromBool(false));
+        if (args.size() < 2 || !args[0]) return Value::fromMap(std::move(m));
+        std::filesystem::path target(args[0]->toString());
+        std::string data = args[1] ? args[1]->toString() : "";
+        std::filesystem::path tmp = target;
+        tmp += ".kern_tmp";
+        try {
+            std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+            out << data;
+            out.close();
+            std::error_code ec;
+            std::filesystem::rename(tmp, target, ec);
+            if (ec) {
+                std::filesystem::remove(target, ec);
+                ec.clear();
+                std::filesystem::rename(tmp, target, ec);
+                if (ec) return Value::fromMap(std::move(m));
+            }
+            m["ok"] = std::make_shared<Value>(Value::fromBool(true));
+        } catch (...) {}
+        return Value::fromMap(std::move(m));
+    });
+    setGlobalFn("fs_atomic_write", i - 1);
+
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "fs_watch");
+        std::unordered_map<std::string, ValuePtr> out;
+        std::string mode = (args.size() >= 1 && args[0]) ? args[0]->toString() : "create";
+        if (mode == "create") {
+            std::string root = (args.size() >= 2 && args[1]) ? args[1]->toString() : ".";
+            std::unordered_map<std::string, int64_t> snap;
+            std::error_code ec;
+            for (auto it = std::filesystem::recursive_directory_iterator(root, ec); !ec && it != std::filesystem::recursive_directory_iterator(); it.increment(ec)) {
+                if (ec) break;
+                if (!it->is_regular_file()) continue;
+                auto t = it->last_write_time(ec);
+                if (ec) continue;
+                auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t.time_since_epoch()).count();
+                snap[it->path().string()] = static_cast<int64_t>(ms);
+            }
+            std::lock_guard<std::mutex> lk(g_fsWatchMutex);
+            int64_t id = g_nextWatchId++;
+            g_fsWatchState[id] = std::move(snap);
+            out["ok"] = std::make_shared<Value>(Value::fromBool(true));
+            out["id"] = std::make_shared<Value>(Value::fromInt(id));
+            return Value::fromMap(std::move(out));
+        }
+        if (mode == "close") {
+            int64_t id = (args.size() >= 2 && args[1]) ? (args[1]->type == Value::Type::INT ? std::get<int64_t>(args[1]->data) : 0) : 0;
+            std::lock_guard<std::mutex> lk(g_fsWatchMutex);
+            g_fsWatchState.erase(id);
+            out["ok"] = std::make_shared<Value>(Value::fromBool(true));
+            return Value::fromMap(std::move(out));
+        }
+        int64_t id = (args.size() >= 2 && args[1]) ? (args[1]->type == Value::Type::INT ? std::get<int64_t>(args[1]->data) : 0) : 0;
+        std::string root = (args.size() >= 3 && args[2]) ? args[2]->toString() : ".";
+        std::unordered_map<std::string, int64_t> cur;
+        std::error_code ec;
+        for (auto it = std::filesystem::recursive_directory_iterator(root, ec); !ec && it != std::filesystem::recursive_directory_iterator(); it.increment(ec)) {
+            if (ec) break;
+            if (!it->is_regular_file()) continue;
+            auto t = it->last_write_time(ec);
+            if (ec) continue;
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t.time_since_epoch()).count();
+            cur[it->path().string()] = static_cast<int64_t>(ms);
+        }
+        std::vector<ValuePtr> changed;
+        {
+            std::lock_guard<std::mutex> lk(g_fsWatchMutex);
+            auto wit = g_fsWatchState.find(id);
+            if (wit == g_fsWatchState.end()) return Value::fromMap(std::move(out));
+            for (const auto& kv : cur) {
+                auto pit = wit->second.find(kv.first);
+                if (pit == wit->second.end() || pit->second != kv.second)
+                    changed.push_back(std::make_shared<Value>(Value::fromString(kv.first)));
+            }
+            wit->second = std::move(cur);
+        }
+        out["ok"] = std::make_shared<Value>(Value::fromBool(true));
+        out["changed"] = std::make_shared<Value>(Value::fromArray(std::move(changed)));
+        return Value::fromMap(std::move(out));
+    });
+    setGlobalFn("fs_watch", i - 1);
+
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "fs_space");
+        std::string path = (args.empty() || !args[0]) ? "." : args[0]->toString();
+        std::unordered_map<std::string, ValuePtr> m;
+        std::error_code ec;
+        auto s = std::filesystem::space(path, ec);
+        m["ok"] = std::make_shared<Value>(Value::fromBool(!ec));
+        m["capacity"] = std::make_shared<Value>(Value::fromInt(ec ? -1 : static_cast<int64_t>(s.capacity)));
+        m["free"] = std::make_shared<Value>(Value::fromInt(ec ? -1 : static_cast<int64_t>(s.free)));
+        m["available"] = std::make_shared<Value>(Value::fromInt(ec ? -1 : static_cast<int64_t>(s.available)));
+        return Value::fromMap(std::move(m));
+    });
+    setGlobalFn("fs_space", i - 1);
+
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
+        vmRequirePermission(vm, Perm::kFilesystemRead, "fs_mounts");
+        std::vector<ValuePtr> arr;
+#ifdef _WIN32
+        for (char d = 'A'; d <= 'Z'; ++d) {
+            std::string root;
+            root += d;
+            root += ":\\";
+            if (std::filesystem::exists(root))
+                arr.push_back(std::make_shared<Value>(Value::fromString(root)));
+        }
+#else
+        arr.push_back(std::make_shared<Value>(Value::fromString("/")));
+#endif
+        return Value::fromArray(std::move(arr));
+    });
+    setGlobalFn("fs_mounts", i - 1);
+
+    makeBuiltin(i++, [toInt, argsToCommand](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kProcessControl, "process_spawn_v2");
+        std::unordered_map<std::string, ValuePtr> m;
+        m["ok"] = std::make_shared<Value>(Value::fromBool(false));
+        m["id"] = std::make_shared<Value>(Value::fromInt(-1));
+        if (args.empty() || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::fromMap(std::move(m));
+        auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
+        if (arr.empty()) return Value::fromMap(std::move(m));
+        std::string cmd = argsToCommand(arr);
+#ifdef _WIN32
+        STARTUPINFOA si{};
+        si.cb = sizeof(si);
+        PROCESS_INFORMATION pi{};
+        std::vector<char> buf(cmd.begin(), cmd.end());
+        buf.push_back('\0');
+        BOOL ok = CreateProcessA(nullptr, buf.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
+        if (!ok) return Value::fromMap(std::move(m));
+        CloseHandle(pi.hThread);
+        int64_t hid = g_nextSpawnHandle++;
+        g_spawnHandles[hid] = pi.hProcess;
+        m["ok"] = std::make_shared<Value>(Value::fromBool(true));
+        m["id"] = std::make_shared<Value>(Value::fromInt(hid));
+        return Value::fromMap(std::move(m));
+#else
+        int rc = std::system(cmd.c_str());
+        m["ok"] = std::make_shared<Value>(Value::fromBool(rc >= 0));
+        m["id"] = std::make_shared<Value>(Value::fromInt(rc));
+        return Value::fromMap(std::move(m));
+#endif
+    });
+    setGlobalFn("process_spawn_v2", i - 1);
+
+    makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kProcessControl, "process_wait");
+        if (args.empty()) return Value::fromMap({});
+#ifdef _WIN32
+        int64_t hid = toInt(args[0]);
+        auto it = g_spawnHandles.find(hid);
+        if (it == g_spawnHandles.end() || !it->second) return Value::fromMap({});
+        int64_t timeoutMs = args.size() >= 2 ? std::max<int64_t>(0, toInt(args[1])) : -1;
+        DWORD wr = WaitForSingleObject(it->second, timeoutMs < 0 ? INFINITE : static_cast<DWORD>(timeoutMs));
+        std::unordered_map<std::string, ValuePtr> m;
+        m["ok"] = std::make_shared<Value>(Value::fromBool(wr == WAIT_OBJECT_0));
+        m["exited"] = std::make_shared<Value>(Value::fromBool(wr == WAIT_OBJECT_0));
+        m["timed_out"] = std::make_shared<Value>(Value::fromBool(wr == WAIT_TIMEOUT));
+        DWORD code = 0;
+        if (wr == WAIT_OBJECT_0 && GetExitCodeProcess(it->second, &code)) {
+            m["code"] = std::make_shared<Value>(Value::fromInt(static_cast<int64_t>(code)));
+            CloseHandle(it->second);
+            g_spawnHandles.erase(it);
+        } else {
+            m["code"] = std::make_shared<Value>(Value::fromInt(-1));
+        }
+        return Value::fromMap(std::move(m));
+#else
+        std::unordered_map<std::string, ValuePtr> m;
+        m["ok"] = std::make_shared<Value>(Value::fromBool(false));
+        m["exited"] = std::make_shared<Value>(Value::fromBool(false));
+        m["timed_out"] = std::make_shared<Value>(Value::fromBool(false));
+        m["code"] = std::make_shared<Value>(Value::fromInt(-1));
+        return Value::fromMap(std::move(m));
+#endif
+    });
+    setGlobalFn("process_wait", i - 1);
+
+    makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kProcessControl, "process_kill_tree");
+        if (args.empty()) return Value::fromBool(false);
+#ifdef _WIN32
+        int64_t hid = toInt(args[0]);
+        auto it = g_spawnHandles.find(hid);
+        if (it == g_spawnHandles.end() || !it->second) return Value::fromBool(false);
+        BOOL ok = TerminateProcess(it->second, 1);
+        CloseHandle(it->second);
+        g_spawnHandles.erase(it);
+        return Value::fromBool(ok != 0);
+#else
+        return Value::fromBool(false);
+#endif
+    });
+    setGlobalFn("process_kill_tree", i - 1);
+
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
+        vmRequirePermission(vm, Perm::kProcessControl, "process_list");
+        std::vector<ValuePtr> arr;
+        std::unordered_map<std::string, ValuePtr> self;
+        self["pid"] = std::make_shared<Value>(Value::fromInt(
+#ifdef _WIN32
+            static_cast<int64_t>(GetCurrentProcessId())
+#else
+            static_cast<int64_t>(::getpid())
+#endif
+        ));
+        self["name"] = std::make_shared<Value>(Value::fromString("kern"));
+        self["self"] = std::make_shared<Value>(Value::fromBool(true));
+        arr.push_back(std::make_shared<Value>(Value::fromMap(std::move(self))));
+        (void)vm;
+        return Value::fromArray(std::move(arr));
+    });
+    setGlobalFn("process_list", i - 1);
+
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
+        vmRequirePermission(vm, Perm::kProcessControl, "process_job_create");
+        std::lock_guard<std::mutex> lk(g_processJobsMutex);
+        int64_t id = g_nextProcessJobId++;
+        g_processJobs[id] = {};
+        return Value::fromInt(id);
+    });
+    setGlobalFn("process_job_create", i - 1);
+
+    makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kProcessControl, "process_job_add");
+        if (args.size() < 2) return Value::fromBool(false);
+        int64_t jobId = toInt(args[0]);
+        int64_t pid = toInt(args[1]);
+        std::lock_guard<std::mutex> lk(g_processJobsMutex);
+        auto it = g_processJobs.find(jobId);
+        if (it == g_processJobs.end()) return Value::fromBool(false);
+        it->second.push_back(pid);
+        return Value::fromBool(true);
+    });
+    setGlobalFn("process_job_add", i - 1);
+
+    makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kProcessControl, "process_job_kill");
+        if (args.empty()) return Value::fromBool(false);
+        int64_t jobId = toInt(args[0]);
+        std::vector<int64_t> pids;
+        {
+            std::lock_guard<std::mutex> lk(g_processJobsMutex);
+            auto it = g_processJobs.find(jobId);
+            if (it == g_processJobs.end()) return Value::fromBool(false);
+            pids = it->second;
+            g_processJobs.erase(it);
+        }
+#ifdef _WIN32
+        for (int64_t hid : pids) {
+            auto it = g_spawnHandles.find(hid);
+            if (it != g_spawnHandles.end() && it->second) {
+                (void)TerminateProcess(it->second, 1);
+                CloseHandle(it->second);
+                g_spawnHandles.erase(it);
+            }
+        }
+#endif
+        return Value::fromBool(true);
+    });
+    setGlobalFn("process_job_kill", i - 1);
+
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kProcessControl, "os_signal_trap");
+        if (args.size() < 2 || !args[0]) return Value::fromBool(false);
+        std::string sig = args[0]->toString();
+        std::lock_guard<std::mutex> lk(g_signalTrapMutex);
+        g_signalTraps[sig] = args[1] ? args[1] : std::make_shared<Value>(Value::nil());
+        return Value::fromBool(true);
+    });
+    setGlobalFn("os_signal_trap", i - 1);
+
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kProcessControl, "os_signal_untrap");
+        if (args.empty() || !args[0]) return Value::fromBool(false);
+        std::string sig = args[0]->toString();
+        std::lock_guard<std::mutex> lk(g_signalTrapMutex);
+        g_signalTraps.erase(sig);
+        return Value::fromBool(true);
+    });
+    setGlobalFn("os_signal_untrap", i - 1);
+
+    makeBuiltin(i++, [](VM*, std::vector<ValuePtr>) {
+        std::unordered_map<std::string, ValuePtr> m;
+        m["cpu_count"] = std::make_shared<Value>(Value::fromInt(static_cast<int64_t>(std::thread::hardware_concurrency())));
+        m["max_open_files"] = std::make_shared<Value>(Value::fromInt(-1));
+        m["max_processes"] = std::make_shared<Value>(Value::fromInt(-1));
+        return Value::fromMap(std::move(m));
+    });
+    setGlobalFn("os_runtime_limits", i - 1);
+
+    makeBuiltin(i++, [](VM*, std::vector<ValuePtr>) {
+        std::unordered_map<std::string, ValuePtr> m;
+        m["fs_fd"] = std::make_shared<Value>(Value::fromBool(true));
+        m["fs_watch_poll"] = std::make_shared<Value>(Value::fromBool(true));
+        m["process_jobs"] = std::make_shared<Value>(Value::fromBool(true));
+        m["tcp_udp"] = std::make_shared<Value>(Value::fromBool(true));
+        m["tls"] = std::make_shared<Value>(Value::fromBool(false));
+        m["websocket"] = std::make_shared<Value>(Value::fromBool(false));
+        return Value::fromMap(std::move(m));
+    });
+    setGlobalFn("os_features", i - 1);
+
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kNetworkTcp, "net_tcp_server");
+        if (args.size() < 2 || !args[0] || !args[1]) return Value::fromMap({});
+        int64_t backlog = (args.size() >= 3 && args[2]) ? std::max<int64_t>(1, (args[2]->type == Value::Type::INT ? std::get<int64_t>(args[2]->data) : 16)) : 16;
+        std::string err;
+        int64_t id = -1;
+        if (!kernTcpListen(args[0]->toString(), static_cast<int>(args[1]->type == Value::Type::INT ? std::get<int64_t>(args[1]->data) : 0), static_cast<int>(backlog), id, err)) {
+            std::unordered_map<std::string, ValuePtr> m;
+            m["ok"] = std::make_shared<Value>(Value::fromBool(false));
+            m["error"] = std::make_shared<Value>(Value::fromString(err));
+            return Value::fromMap(std::move(m));
+        }
+        std::unordered_map<std::string, ValuePtr> m;
+        m["ok"] = std::make_shared<Value>(Value::fromBool(true));
+        m["id"] = std::make_shared<Value>(Value::fromInt(id));
+        return Value::fromMap(std::move(m));
+    });
+    setGlobalFn("net_tcp_server", i - 1);
+
+    makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
+        if (!vmPermissionAllowed(vm, Perm::kNetworkTcp) && !vmPermissionAllowed(vm, Perm::kNetworkUdp))
+            vmRequirePermission(vm, Perm::kNetworkTcp, "net_tcp_poll");
+        if (args.empty() || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::fromMap({});
+        auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
+        std::vector<int64_t> ids;
+        for (const auto& v : arr) ids.push_back(toInt(v));
+        int timeoutMs = args.size() >= 2 ? static_cast<int>(toInt(args[1])) : 0;
+        bool writeMode = args.size() >= 3 && args[2] && args[2]->isTruthy();
+        std::vector<int64_t> ready;
+        std::string err;
+        bool ok = writeMode ? kernSocketSelectWrite(ids, timeoutMs, ready, err) : kernSocketSelectRead(ids, timeoutMs, ready, err);
+        std::unordered_map<std::string, ValuePtr> m;
+        m["ok"] = std::make_shared<Value>(Value::fromBool(ok));
+        m["error"] = std::make_shared<Value>(Value::fromString(ok ? "" : err));
+        std::vector<ValuePtr> out;
+        for (int64_t x : ready) out.push_back(std::make_shared<Value>(Value::fromInt(x)));
+        m["ready"] = std::make_shared<Value>(Value::fromArray(std::move(out)));
+        return Value::fromMap(std::move(m));
+    });
+    setGlobalFn("net_tcp_poll", i - 1);
+
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kNetworkTcp, "net_dns_lookup");
+        std::unordered_map<std::string, ValuePtr> m;
+        std::vector<ValuePtr> addrs;
+        if (args.empty() || !args[0]) {
+            m["ok"] = std::make_shared<Value>(Value::fromBool(false));
+            m["addresses"] = std::make_shared<Value>(Value::fromArray(std::move(addrs)));
+            return Value::fromMap(std::move(m));
+        }
+        std::string host = args[0]->toString();
+        if (host == "localhost") {
+            addrs.push_back(std::make_shared<Value>(Value::fromString("127.0.0.1")));
+            addrs.push_back(std::make_shared<Value>(Value::fromString("::1")));
+        } else if (!host.empty()) {
+            addrs.push_back(std::make_shared<Value>(Value::fromString(host)));
+        }
+        m["ok"] = std::make_shared<Value>(Value::fromBool(!addrs.empty()));
+        m["addresses"] = std::make_shared<Value>(Value::fromArray(std::move(addrs)));
+        return Value::fromMap(std::move(m));
+    });
+    setGlobalFn("net_dns_lookup", i - 1);
+
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kNetworkTcp, "net_tls_connect");
+        std::unordered_map<std::string, ValuePtr> m;
+        m["ok"] = std::make_shared<Value>(Value::fromBool(false));
+        m["secure"] = std::make_shared<Value>(Value::fromBool(false));
+        m["id"] = std::make_shared<Value>(Value::fromInt(-1));
+        if (args.size() < 2 || !args[0] || !args[1]) return Value::fromMap(std::move(m));
+        int64_t id = -1;
+        std::string err;
+        if (kernTcpConnect(args[0]->toString(), static_cast<int>(args[1]->type == Value::Type::INT ? std::get<int64_t>(args[1]->data) : 0), id, err)) {
+            m["ok"] = std::make_shared<Value>(Value::fromBool(true));
+            m["id"] = std::make_shared<Value>(Value::fromInt(id));
+        } else {
+            m["error"] = std::make_shared<Value>(Value::fromString(err));
+        }
+        return Value::fromMap(std::move(m));
+    });
+    setGlobalFn("net_tls_connect", i - 1);
+
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kNetworkTcp, "net_ws_connect");
+        std::unordered_map<std::string, ValuePtr> m;
+        m["ok"] = std::make_shared<Value>(Value::fromBool(false));
+        m["id"] = std::make_shared<Value>(Value::fromInt(-1));
+        if (args.size() < 2 || !args[0] || !args[1]) return Value::fromMap(std::move(m));
+        int64_t id = -1;
+        std::string err;
+        if (kernTcpConnect(args[0]->toString(), static_cast<int>(args[1]->type == Value::Type::INT ? std::get<int64_t>(args[1]->data) : 0), id, err)) {
+            m["ok"] = std::make_shared<Value>(Value::fromBool(true));
+            m["id"] = std::make_shared<Value>(Value::fromInt(id));
+        } else {
+            m["error"] = std::make_shared<Value>(Value::fromString(err));
+        }
+        return Value::fromMap(std::move(m));
+    });
+    setGlobalFn("net_ws_connect", i - 1);
+
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        vmRequirePermission(vm, Perm::kNetworkTcp, "net_ws_listen");
+        std::unordered_map<std::string, ValuePtr> m;
+        m["ok"] = std::make_shared<Value>(Value::fromBool(false));
+        m["id"] = std::make_shared<Value>(Value::fromInt(-1));
+        if (args.size() < 2 || !args[0] || !args[1]) return Value::fromMap(std::move(m));
+        int64_t id = -1;
+        std::string err;
+        if (kernTcpListen(args[0]->toString(), static_cast<int>(args[1]->type == Value::Type::INT ? std::get<int64_t>(args[1]->data) : 0), 16, id, err)) {
+            m["ok"] = std::make_shared<Value>(Value::fromBool(true));
+            m["id"] = std::make_shared<Value>(Value::fromInt(id));
+        } else {
+            m["error"] = std::make_shared<Value>(Value::fromString(err));
+        }
+        return Value::fromMap(std::move(m));
+    });
+    setGlobalFn("net_ws_listen", i - 1);
+
     constexpr size_t kSocketBuiltinCount = 16;
     setGlobalFn("append_file", i - kSocketBuiltinCount - 2);
     setGlobalFn("appendFile", i - kSocketBuiltinCount - 2);
