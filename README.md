@@ -14,6 +14,8 @@ Use Kern when you want:
 
 This repository is the **language and toolchain** (compiler, VM, stdlib, tests, docs). **Editors** (desktop IDE, VS Code extension) live under **[`Kern-IDE/`](Kern-IDE/)** and are published separately.
 
+Kern is a **solo-built project by a 15-year-old developer**. That does not mean it is a toy: the repository includes a full compiler/VM pipeline, cross-platform CI, native module surfaces, and production-oriented tooling. Every major part of the language/toolchain here is authored and maintained independently.
+
 **Discord:** [discord.gg/JBa4RfT2tE](https://discord.gg/JBa4RfT2tE) — official server for help and discussion.
 
 ---
@@ -222,6 +224,8 @@ If Kern is useful to you, optional tips are welcome. Contributions directly supp
 | **Bitcoin** | `bc1qpzg22xmhzkchkwc96wxm9ge5x4a8kat7gxs6u7` |
 | **Ethereum** | `0xE2F8Ac9D4e636115a47f0c12B42292a2A9E37f8F` |
 | **Solana** | `9ivTpFL42Y7qJ8W66J1uycZyQXubHiyaWTv3o5Mj2gab` |
+
+Donations are needed to accelerate development velocity and ship updates faster.
 
 ---
 
