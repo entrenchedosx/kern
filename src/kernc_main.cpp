@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <algorithm>
+#include "platform/env_compat.hpp"
 
 #ifdef _MSC_VER
 static std::string kerncGetEnvStr(const char* name) {
@@ -25,7 +26,7 @@ static std::string kerncGetEnvStr(const char* name) {
 }
 #else
 static std::string kerncGetEnvStr(const char* name) {
-    if (const char* v = std::getenv(name)) return std::string(v);
+    if (const char* v = kern::kernGetEnv(name)) return std::string(v);
     return {};
 }
 #endif
@@ -207,12 +208,36 @@ static void printUsage(const char* prog) {
         << "  --ffi             Enable ffi_call in runtime builds\n"
         << "  --ffi-allow <dll> Allow a DLL in runtime sandbox allowlist\n"
         << "  --no-sandbox      Disable runtime sandbox allowlist checks\n"
+        << "  capability_profile (kernconfig): secure | dev | ci\n"
         << "  --pkg-init        Create kernpackage.json if missing\n"
         << "  --pkg-lock        Generate kern.lock.json from manifest\n"
         << "  --pkg-validate    Validate package manifest + lockfile\n"
         << "  --version, -V     Print version and exit\n"
         << "\nEnvironment:\n"
         << "  KERN_REPO_ROOT     Override Kern source tree for standalone link (default: detected from kern executable)\n";
+}
+
+static bool applyBuildCapabilityProfile(const std::string& name, SplConfig& cfg, std::string& err) {
+    if (name.empty() || name == "secure") {
+        cfg.allowUnsafe = false;
+        cfg.ffiEnabled = false;
+        cfg.sandboxEnabled = true;
+        return true;
+    }
+    if (name == "dev") {
+        cfg.allowUnsafe = false;
+        cfg.ffiEnabled = true;
+        cfg.sandboxEnabled = true;
+        return true;
+    }
+    if (name == "ci") {
+        cfg.allowUnsafe = false;
+        cfg.ffiEnabled = false;
+        cfg.sandboxEnabled = true;
+        return true;
+    }
+    err = "unknown capability_profile in kernconfig: " + name;
+    return false;
 }
 
 static bool parseArgs(int argc, char** argv, CliOptions& o, std::string& error) {
@@ -536,6 +561,11 @@ int main(int argc, char** argv) {
     cfg.ffiEnabled = cfg.ffiEnabled || cli.ffiEnabled;
     if (!cli.sandboxEnabled) cfg.sandboxEnabled = false;
     for (const auto& lib : cli.ffiAllowLibraries) cfg.ffiAllowLibraries.push_back(lib);
+    if (!cfg.capabilityProfile.empty()) {
+        if (!applyBuildCapabilityProfile(cfg.capabilityProfile, cfg, error)) {
+            return emitError(error, cli.json);
+        }
+    }
     if (cfg.target == "kernel") {
         fs::path outGuess(cfg.output);
         if (outGuess.extension() == ".exe" || cfg.output.empty()) cfg.output = "dist/kernel.bin";

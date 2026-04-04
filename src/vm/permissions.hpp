@@ -10,6 +10,8 @@
 #include "errors.hpp"
 #include <sstream>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace kern {
 
@@ -26,6 +28,44 @@ inline constexpr const char* kNetworkTcp = "network.tcp";
 /** Reserved for future UDP socket APIs. */
 inline constexpr const char* kNetworkUdp = "network.udp";
 } // namespace Perm
+
+inline const std::unordered_map<std::string, std::vector<std::string>>& permissionGroupMap() {
+    static const std::unordered_map<std::string, std::vector<std::string>> groups = {
+        {"fs.readonly", {Perm::kFilesystemRead}},
+        {"fs.readwrite", {Perm::kFilesystemRead, Perm::kFilesystemWrite}},
+        {"net.client", {Perm::kNetworkHttp, Perm::kNetworkTcp, Perm::kNetworkUdp}},
+        {"proc.control", {Perm::kProcessControl, Perm::kSystemExec}},
+        {"env.manage", {Perm::kEnvAccess}},
+        {"system.full", {Perm::kFilesystemRead, Perm::kFilesystemWrite, Perm::kSystemExec, Perm::kProcessControl,
+                         Perm::kEnvAccess, Perm::kNetworkHttp, Perm::kNetworkTcp, Perm::kNetworkUdp}},
+    };
+    return groups;
+}
+
+inline std::vector<std::string> resolvePermissionToken(const std::string& token) {
+    auto it = permissionGroupMap().find(token);
+    if (it != permissionGroupMap().end()) return it->second;
+    return {token};
+}
+
+inline const std::unordered_map<std::string, std::vector<std::string>>& capabilityProfiles() {
+    static const std::unordered_map<std::string, std::vector<std::string>> profiles = {
+        {"secure", {}},
+        {"dev", {"fs.readwrite", "net.client", "proc.control", "env.manage"}},
+        {"ci", {"fs.readwrite", "net.client", "proc.control"}},
+    };
+    return profiles;
+}
+
+inline bool applyCapabilityProfile(const std::string& profile, RuntimeGuardPolicy& g) {
+    auto it = capabilityProfiles().find(profile);
+    if (it == capabilityProfiles().end()) return false;
+    for (const auto& tok : it->second) {
+        for (const auto& p : resolvePermissionToken(tok))
+            g.grantedPermissions.insert(p);
+    }
+    return true;
+}
 
 inline bool vmPermissionAllowed(VM* vm, const char* permissionId) {
     if (!vm || !permissionId) return false;

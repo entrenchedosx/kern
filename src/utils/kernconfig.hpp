@@ -37,6 +37,7 @@ struct SplConfig {
     bool ffiEnabled = false;
     bool sandboxEnabled = true;
     std::vector<std::string> ffiAllowLibraries;
+    std::string capabilityProfile;
 };
 
 bool loadSplConfig(const std::string& path, SplConfig& out, std::string& error);

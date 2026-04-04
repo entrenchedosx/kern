@@ -516,6 +516,7 @@
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         if (!vm || args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromBool(false);
         std::string p = std::get<std::string>(args[0]->data);
-        vm->mutableRuntimeGuards().grantedPermissions.insert(std::move(p));
+        for (const auto& resolved : resolvePermissionToken(p))
+            vm->mutableRuntimeGuards().grantedPermissions.insert(resolved);
         return Value::fromBool(true);
     });

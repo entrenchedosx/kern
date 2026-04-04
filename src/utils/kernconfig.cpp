@@ -90,6 +90,7 @@ bool loadSplConfig(const std::string& path, SplConfig& out, std::string& error) 
     extractStringArray(text, "enabled_features", out.enabledFeatures);
     extractStringArray(text, "disabled_features", out.disabledFeatures);
     extractStringArray(text, "ffi_allow_libraries", out.ffiAllowLibraries);
+    extractString(text, "capability_profile", out.capabilityProfile);
     extractBool(text, "console", out.console);
     extractBool(text, "release", out.release);
     extractBool(text, "debug_runtime", out.debugRuntime);

@@ -51,7 +51,8 @@ ValuePtr createStdlibModule(VM& vm, const std::string& nameIn) {
     }
     if (name == "std.v1") {
         std::unordered_map<std::string, ValuePtr> out;
-        const char* subs[] = {"math", "string", "bytes", "collections", "fs", "process", "time"};
+        const char* subs[] = {"math", "string", "bytes", "collections", "fs", "process", "net", "os", "signal", "memory",
+                              "task", "sync", "time"};
         for (const char* s : subs) {
             std::string full = std::string("std.v1.") + s;
             out[s] = createStdlibModule(vm, full);
@@ -188,7 +189,7 @@ ValuePtr createStdlibModule(VM& vm, const std::string& nameIn) {
         { "errors", {
             "Error", "panic", "error_message", "error_name", "error_cause",
             "ValueError", "TypeError", "RuntimeError", "OSError", "KeyError", "is_error_type",
-            "stack_trace", "stack_trace_array", "format_exception", "error_traceback"
+            "stack_trace", "stack_trace_array", "format_exception", "error_traceback", "error_structured"
         }},
         // iteration and sequences
         { "iter", {
@@ -236,7 +237,7 @@ ValuePtr createStdlibModule(VM& vm, const std::string& nameIn) {
         { "run", { "cli_args", "exit_code" }},
         // advanced interop and native boundaries
         { "interop", {
-            "ffi_allow_library", "ffi_call",
+            "ffi_allow_library", "ffi_call", "ffi_call_typed",
             "ptr_address", "ptr_from_address", "ptr_offset", "ptr_add", "ptr_sub", "ptr_diff", "ptr_eq",
             "type", "runtime_info"
         }},

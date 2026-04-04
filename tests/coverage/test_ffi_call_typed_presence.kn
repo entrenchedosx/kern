@@ -1,0 +1,4 @@
+// ffi_call_typed additive API presence smoke
+let interop = import("interop")
+if type(interop["ffi_call_typed"]) != "function" { panic("interop.ffi_call_typed missing") }
+print("test_ffi_call_typed_presence: ok")

@@ -9,6 +9,7 @@
 #include "errors.hpp"
 #include "vm/builtins.hpp"
 #include "vm/bytecode.hpp"
+#include "platform/env_compat.hpp"
 #ifdef KERN_BUILD_GAME
 #include "game/game_builtins.hpp"
 #endif
@@ -27,7 +28,7 @@ namespace kern {
 namespace {
 
 static void setEnvVarIfEmpty(const char* key, const std::string& value) {
-    const char* existing = std::getenv(key);
+    const char* existing = kernGetEnv(key);
     if (existing && existing[0]) return;
     if (value.empty()) return;
 #ifdef _WIN32
@@ -82,6 +83,41 @@ static void normalizeKernSourceText(std::string& s, const std::string& filenameF
     stripShebangLineForFile(s, filenameForRun);
 }
 
+static int lineForOffset(const std::string& source, size_t off) {
+    int line = 1;
+    for (size_t i = 0; i < off && i < source.size(); ++i)
+        if (source[i] == '\n') ++line;
+    return line;
+}
+
+static void emitRiskyApiWarnings(const std::string& source) {
+    struct Risk {
+        const char* needle;
+        const char* message;
+        const char* hint;
+        const char* code;
+    };
+    static const Risk kRisky[] = {
+        {"ffi_call(", "Potentially unsafe FFI call detected.",
+         "Prefer ffi_call_typed descriptor mode and ensure unsafe context + allowlist.", "SCAN-RISK-FFI"},
+        {"ffi_call_typed(", "Typed FFI call detected.",
+         "Ensure library allowlist and minimal argument surface for production.", "SCAN-RISK-FFI-TYPED"},
+        {"exec(", "Shell execution detected.",
+         "Prefer exec_args/run wrappers to avoid shell-injection risks.", "SCAN-RISK-EXEC"},
+        {"spawn(", "Process spawn detected.",
+         "Validate command source and require process control permission intentionally.", "SCAN-RISK-SPAWN"},
+        {"tcp_connect(", "Raw TCP API detected.",
+         "Confirm net.client/network.tcp permission intent and timeout handling.", "SCAN-RISK-TCP"},
+    };
+    for (const auto& r : kRisky) {
+        size_t pos = source.find(r.needle);
+        while (pos != std::string::npos) {
+            g_errorReporter.reportWarning(lineForOffset(source, pos), 1, r.message, r.hint, r.code, "");
+            pos = source.find(r.needle, pos + 1);
+        }
+    }
+}
+
 static std::string readTextFile(const std::string& path) {
     std::ifstream f(path, std::ios::binary);
     if (!f) return "";
@@ -133,6 +169,7 @@ static bool scanOneFile(const std::string& path, bool strictTypes) {
     normalizeKernSourceText(source, path);
     g_errorReporter.setSource(source);
     g_errorReporter.setFilename(path);
+    emitRiskyApiWarnings(source);
 
     try {
         Lexer lexer(source);

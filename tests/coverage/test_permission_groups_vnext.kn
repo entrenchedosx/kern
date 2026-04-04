@@ -1,0 +1,15 @@
+// Grouped permission expansion smoke
+require("net.client")
+require("fs.readonly")
+
+let p = permissions_active()
+let groups = p["groups"]
+if type(groups) != "array" { panic("permissions_active.groups should be array") }
+
+let sawNetClient = false
+for g in groups {
+    if g == "net.client" { sawNetClient = true }
+}
+if !sawNetClient { panic("net.client group was not expanded/recorded") }
+
+print("test_permission_groups_vnext: ok")

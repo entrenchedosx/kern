@@ -3,6 +3,7 @@
 #include "compiler/codegen.hpp"
 #include "compiler/semantic.hpp"
 #include "compiler/ast.hpp"
+#include "platform/env_compat.hpp"
 #include "errors.hpp"
 #include "vm/builtins.hpp"
 #include "diagnostics/source_span.hpp"
@@ -749,6 +750,34 @@ static std::unordered_set<std::string> builtinNameSet() {
     return names;
 }
 
+static std::string builtinPermissionHint(const std::string& name) {
+    static const std::unordered_map<std::string, std::string> hints = {
+        {"read_file", "permission: filesystem.read"},
+        {"write_file", "permission: filesystem.write"},
+        {"append_file", "permission: filesystem.write"},
+        {"delete_file", "permission: filesystem.write"},
+        {"copy_file", "permission: filesystem.write"},
+        {"move_file", "permission: filesystem.write"},
+        {"exec", "permission: system.exec"},
+        {"exec_args", "permission: system.exec"},
+        {"exec_capture", "permission: system.exec"},
+        {"spawn", "permission: process.control"},
+        {"wait_process", "permission: process.control"},
+        {"kill_process", "permission: process.control"},
+        {"http_get", "permission: network.http"},
+        {"http_post", "permission: network.http"},
+        {"http_request", "permission: network.http"},
+        {"tcp_connect", "permission: network.tcp"},
+        {"tcp_listen", "permission: network.tcp"},
+        {"udp_open", "permission: network.udp"},
+        {"ffi_call", "unsafe + ffi enabled"},
+        {"ffi_call_typed", "unsafe + ffi enabled"},
+        {"alloc", "unsafe context"},
+        {"free", "unsafe context"}};
+    auto it = hints.find(name);
+    return it == hints.end() ? std::string() : it->second;
+}
+
 static std::vector<Token> safeTokenize(const std::string& source) {
     try {
         Lexer lx(source);
@@ -1089,7 +1118,7 @@ private:
         if (importerPath.empty()) return JsonValue::null();
 
         std::vector<std::string> inc;
-        if (const char* lib = std::getenv("KERN_LIB")) inc.emplace_back(lib);
+        if (const char* lib = kernGetEnv("KERN_LIB")) inc.emplace_back(lib);
         const std::string root = lspDetectRepoRoot(importerPath);
 
         for (const auto& st : program->statements) {
@@ -1162,7 +1191,11 @@ private:
             text = best->name + " — " + (best->detail.empty() ? best->kind : best->detail);
         } else {
             std::unordered_set<std::string> builtins = builtinNameSet();
-            if (builtins.find(id->lexeme) != builtins.end()) text = id->lexeme + " — builtin";
+            if (builtins.find(id->lexeme) != builtins.end()) {
+                text = id->lexeme + " — builtin";
+                std::string hint = builtinPermissionHint(id->lexeme);
+                if (!hint.empty()) text += "\n" + hint;
+            }
             else text = id->lexeme;
         }
 

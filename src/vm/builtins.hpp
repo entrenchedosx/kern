@@ -10,6 +10,7 @@
 #include "errors.hpp"
 #include "permissions.hpp"
 #include "kern_socket.hpp"
+#include "platform/env_compat.hpp"
 #include <memory>
 #include <cmath>
 #include <ctime>
@@ -243,20 +244,20 @@ inline std::vector<std::string> getBuiltinNames() {
         "cwd","chdir","hostname","cpu_count","temp_dir","realpath","getpid","monotonic_time","file_size","env_set","glob",
         "is_string","is_array","is_map","is_number","is_function","round_to","insert_at","remove_at",
         "sleep_ms","exec","exec_capture","which",
-        "set_step_limit","set_max_call_depth","set_callback_guard","deterministic_mode","runtime_info",
+        "set_step_limit","set_max_call_depth","set_callback_guard","deterministic_mode","runtime_info","permissions_active",
         "path_normalize","retry_call","sha1","sha256",
         "exec_args","spawn","wait_process","kill_process",
         "url_encode","url_decode","http_get","toml_parse",
         "http_request","http_post","regex_split","regex_find_all","url_parse","parse_query","html_escape","http_parse_response","toml_stringify",
         "regex_compile","regex_match_pattern","regex_replace_pattern",
-        "format_exception","error_traceback",
+        "format_exception","error_traceback","error_structured",
         "invoke","extend_array","with_cleanup","__apply_decorator","__spawn_task","__await_task","__runtime_apply_decorators","__safe_invoke2",
         "sorted","enumerate","partition","is_int","is_float",
         "html_unescape","strip_html","css_escape","js_escape","xml_escape","build_query","url_resolve","mime_type_guess","parse_data_url",
         "parse_cookie_header","set_cookie_fields","content_type_charset","is_safe_http_redirect",
         "http_parse_request","parse_link_header","parse_content_disposition","url_normalize","html_sanitize_strict","css_url_escape",
         "http_build_response","html_nl2br","url_path_join","parse_authorization_basic","merge_query","parse_accept_language",
-        "ffi_allow_library","ffi_call",
+        "ffi_allow_library","ffi_call","ffi_call_typed",
         "std_math_fmod","std_math_hypot","std_math_log10","std_math_log2","std_math_exp","std_math_expm1","std_math_log1p",
         "std_math_cbrt","std_math_asin","std_math_acos","std_math_atan","std_math_sinh","std_math_cosh","std_math_tanh",
         "std_math_copysign","std_math_nextafter","std_math_trunc","std_math_round_to_int",
@@ -1810,7 +1811,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (buf) std::free(buf);
         return Value::fromString(std::move(result));
 #else
-        const char* v = std::getenv(key.c_str());
+        const char* v = kernGetEnv(key.c_str());
         return Value::fromString(v ? v : "");
 #endif
     });
@@ -4060,7 +4061,7 @@ inline void registerAllBuiltins(VM& vm) {
                 }
             }
 #else
-            const char* v = std::getenv("PATH");
+            const char* v = kernGetEnv("PATH");
             if (v) pathEnv = v;
             std::stringstream ss(pathEnv);
             std::string dir;
@@ -4898,6 +4899,41 @@ inline void registerAllBuiltins(VM& vm) {
         return *it->second;
     });
     setGlobalFn("error_traceback", 311);
+    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+        std::unordered_map<std::string, ValuePtr> out;
+        if (args.empty() || !args[0]) {
+            out["name"] = std::make_shared<Value>(Value::fromString("Error"));
+            out["message"] = std::make_shared<Value>(Value::fromString(""));
+            out["traceback"] = std::make_shared<Value>(Value::nil());
+            out["cause"] = std::make_shared<Value>(Value::nil());
+            return Value::fromMap(std::move(out));
+        }
+        ValuePtr e = args[0];
+        out["name"] = std::make_shared<Value>(Value::fromString("Error"));
+        out["message"] = std::make_shared<Value>(Value::fromString(e->toString()));
+        out["traceback"] = std::make_shared<Value>(Value::nil());
+        out["cause"] = (args.size() >= 2 && args[1]) ? args[1] : std::make_shared<Value>(Value::nil());
+        if (e->type == Value::Type::MAP) {
+            auto& m = std::get<std::unordered_map<std::string, ValuePtr>>(e->data);
+            auto setIf = [&](const char* key) {
+                auto it = m.find(key);
+                if (it != m.end() && it->second) out[key] = it->second;
+            };
+            setIf("name");
+            setIf("message");
+            setIf("code");
+            setIf("traceback");
+            setIf("line");
+            setIf("column");
+            if (m.find("cause") == m.end()) {
+                // keep explicit 2nd arg cause if provided
+            } else {
+                setIf("cause");
+            }
+        }
+        return Value::fromMap(std::move(out));
+    });
+    setGlobalFn("error_structured", i - 1);
 
     // invoke(fn, args_array) — dynamic call; extend_array(dest, src) — append elements (mutates dest)
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
@@ -5922,6 +5958,42 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("ffi_call", 346);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        if (!vm || args.empty() || !args[0] || args[0]->type != Value::Type::MAP) return Value::nil();
+        const auto& m = std::get<std::unordered_map<std::string, ValuePtr>>(args[0]->data);
+        auto getStr = [&m](const char* key, const char* fallback = "") {
+            auto it = m.find(key);
+            if (it == m.end() || !it->second) return std::string(fallback);
+            return it->second->toString();
+        };
+        auto getArr = [&m](const char* key) -> ValuePtr {
+            auto it = m.find(key);
+            if (it == m.end() || !it->second || it->second->type != Value::Type::ARRAY) return nullptr;
+            return it->second;
+        };
+        std::vector<ValuePtr> callArgs;
+        callArgs.push_back(std::make_shared<Value>(Value::fromString(getStr("library"))));
+        callArgs.push_back(std::make_shared<Value>(Value::fromString(getStr("symbol"))));
+        callArgs.push_back(std::make_shared<Value>(Value::fromString(getStr("returns", "i64"))));
+        callArgs.push_back(std::make_shared<Value>(Value::fromString(getStr("abi", "cdecl"))));
+        ValuePtr sig = getArr("params");
+        if (!sig) sig = std::make_shared<Value>(Value::fromArray(std::vector<ValuePtr>{}));
+        callArgs.push_back(sig);
+        ValuePtr inArgs = nullptr;
+        if (args.size() >= 2 && args[1] && args[1]->type == Value::Type::ARRAY) inArgs = args[1];
+        else inArgs = getArr("args");
+        if (inArgs) {
+            const auto& arr = std::get<std::vector<ValuePtr>>(inArgs->data);
+            for (const auto& v : arr) callArgs.push_back(v ? v : std::make_shared<Value>(Value::nil()));
+        }
+        ValuePtr ffiCallFn = vm->getGlobal("ffi_call");
+        if (!ffiCallFn) return Value::nil();
+        ValuePtr out = vm->callValue(ffiCallFn, callArgs);
+        if (!out) return Value::nil();
+        return *out;
+    });
+    setGlobalFn("ffi_call_typed", i - 1);
+
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         if (!vm || args.size() < 2 || !args[1]) return Value::nil();
         ValuePtr decoratorNameV = args[0];
         ValuePtr target = args[1];
@@ -6104,7 +6176,7 @@ inline void registerAllBuiltins(VM& vm) {
         vm->setGlobal("__decorator_registry", std::make_shared<Value>(Value::fromMap(std::move(registryMap))));
         return *target;
     });
-    setGlobalFn("__apply_decorator", 347);
+    setGlobalFn("__apply_decorator", 348);
 
     // Cooperative task: runs the callable on the current VM (same thread). Result map is awaitable via __await_task.
     // For OS threads or subprocesses use stdlib process / concurrency modules, not this helper.
@@ -6129,7 +6201,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromMap(std::move(task));
     });
-    setGlobalFn("__spawn_task", 348);
+    setGlobalFn("__spawn_task", 349);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0]) return Value::nil();
@@ -6148,7 +6220,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (itRes != m.end() && itRes->second) return *(itRes->second);
         return Value::nil();
     });
-    setGlobalFn("__await_task", 349);
+    setGlobalFn("__await_task", 350);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         if (!vm || args.empty() || !args[0] || args[0]->type != Value::Type::MAP) return Value::fromInt(0);
@@ -6338,7 +6410,7 @@ inline void registerAllBuiltins(VM& vm) {
 
         return Value::fromInt(applied);
     });
-    setGlobalFn("__runtime_apply_decorators", 350);
+    setGlobalFn("__runtime_apply_decorators", 351);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         std::unordered_map<std::string, ValuePtr> out;
@@ -6361,7 +6433,32 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromMap(std::move(out));
     });
-    setGlobalFn("__safe_invoke2", 351);
+    setGlobalFn("__safe_invoke2", 352);
+
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
+        std::unordered_map<std::string, ValuePtr> out;
+        std::vector<ValuePtr> granted;
+        std::vector<ValuePtr> groups;
+        if (vm) {
+            const RuntimeGuardPolicy& g = vm->getRuntimeGuards();
+            for (const auto& p : g.grantedPermissions)
+                granted.push_back(std::make_shared<Value>(Value::fromString(p)));
+            for (const auto& kv : permissionGroupMap()) {
+                bool ok = true;
+                for (const auto& need : kv.second) {
+                    if (g.grantedPermissions.find(need) == g.grantedPermissions.end()) {
+                        ok = false;
+                        break;
+                    }
+                }
+                if (ok) groups.push_back(std::make_shared<Value>(Value::fromString(kv.first)));
+            }
+        }
+        out["granted"] = std::make_shared<Value>(Value::fromArray(std::move(granted)));
+        out["groups"] = std::make_shared<Value>(Value::fromArray(std::move(groups)));
+        return Value::fromMap(std::move(out));
+    });
+    setGlobalFn("permissions_active", i - 1);
 
 #include "std_builtins_v1.inl"
 #include "std_builtins_socket.inl"

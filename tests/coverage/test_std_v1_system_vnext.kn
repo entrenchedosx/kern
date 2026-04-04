@@ -1,0 +1,20 @@
+// vNext std.v1 system-access smoke
+let std = import("std.v1")
+let net = std["net"]
+let os = std["os"]
+let mem = std["memory"]
+let task = std["task"]
+let sync = std["sync"]
+
+if type(net["url_encode"]) != "function" { panic("std.v1.net.url_encode missing") }
+if type(os["runtime_info"]) != "function" { panic("std.v1.os.runtime_info missing") }
+if type(mem["map_file"]) != "function" { panic("std.v1.memory.map_file missing") }
+if type(task["spawn"]) != "function" { panic("std.v1.task.spawn missing") }
+if type(sync["retry_call"]) != "function" { panic("std.v1.sync.retry_call missing") }
+
+// Process v2 aliases
+let proc = std["process"]
+if type(proc["run"]) != "function" { panic("std.v1.process.run missing") }
+if type(proc["capture"]) != "function" { panic("std.v1.process.capture missing") }
+
+print("test_std_v1_system_vnext: ok")

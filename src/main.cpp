@@ -41,6 +41,7 @@
 #include <windows.h>
 #include "platform/win32_associate_kn.hpp"
 #endif
+#include "platform/env_compat.hpp"
 
 using namespace kern;
 
@@ -52,7 +53,10 @@ static void parseAllowCsv(const std::string& csv, RuntimeGuardPolicy& g) {
         while (j < csv.size() && csv[j] != ',') ++j;
         std::string tok = csv.substr(i, j - i);
         while (!tok.empty() && (tok.back() == ' ' || tok.back() == '\t')) tok.pop_back();
-        if (!tok.empty()) g.grantedPermissions.insert(std::move(tok));
+        if (!tok.empty()) {
+            for (const auto& p : resolvePermissionToken(tok))
+                g.grantedPermissions.insert(p);
+        }
         i = j + 1;
     }
 }
@@ -266,7 +270,7 @@ static bool runSource(VM& vm, const std::string& sourceIn, const std::string& fi
 }
 
 static void setEnvVarIfEmpty(const char* key, const std::string& value) {
-    const char* existing = std::getenv(key);
+    const char* existing = kernGetEnv(key);
     if (existing && existing[0]) return;
     if (value.empty()) return;
 #ifdef _WIN32
@@ -349,6 +353,8 @@ static void printUsage(const char* prog) {
         << "  --allow-unsafe        Allow raw memory ops globally (without unsafe block).\n"
         << "  --unsafe              Alias for --allow-unsafe (global unlock for permission-gated builtins).\n"
         << "  --allow=a,b           Pre-grant permission ids (e.g. filesystem.read,network.http,system.exec).\n"
+        << "                        Supports groups: fs.readonly, fs.readwrite, net.client, proc.control, env.manage.\n"
+        << "  --profile=<name>      Apply capability profile before run (secure|dev|ci).\n"
         << "  --ffi                 Enable ffi_call builtin.\n"
         << "  --ffi-allow <dll>     Add DLL allowlist entry for sandboxed ffi_call.\n"
         << "  --no-sandbox          Disable FFI allowlist sandbox checks.\n\n"
@@ -367,6 +373,8 @@ static void printUsage(const char* prog) {
         << "  " << prog << " remove <dep>     Remove dependency from kern.json.\n"
         << "  " << prog << " install          Refresh lockfile from kern.json (not system install; see ./install.sh).\n"
         << "  " << prog << " verify           Exit 0 if kern.lock matches kern.json dependencies (CI-friendly).\n"
+        << "  " << prog << " capability profile [list|show|apply]\n"
+        << "                        Inspect/apply secure-default capability profiles.\n"
         << "  " << prog << " graph [opts] <entry.kn>\n"
         << "                        Static .kn import graph from entry (JSON with --json). See docs/FEATURE_PLAN_20.md.\n\n"
         << "Modules: import \"math\"; from \"math\" import sqrt; import(\"path\") (expression form) still works.\n"
@@ -586,6 +594,7 @@ static int cmdDoctor(const char* prog) {
     std::cout << "  tip: kern test [dir] runs .kn files recursively (default tests/coverage).\n";
     std::cout << "  tip: kern verify checks kern.lock matches kern.json dependencies.\n";
     std::cout << "  tip: kern graph <entry.kn> prints static import graph (--json for tools).\n";
+    std::cout << "  tip: kern capability profile list shows grouped permission presets.\n";
     return 0;
 }
 
@@ -596,6 +605,7 @@ static int cmdDocs(const char* /*prog*/) {
               << "Troubleshooting: docs/TROUBLESHOOTING.md\n"
               << "Language sketch: docs/LANGUAGE_SYNTAX.md\n"
               << "Stdlib (std.v1): docs/STDLIB_STD_V1.md\n"
+              << "System access vNext: docs/VNEXT_SYSTEM_ACCESS.md\n"
               << "Adoption roadmap: docs/ADOPTION_ROADMAP.md\n"
               << "Feature backlog: docs/FEATURE_PLAN_20.md\n"
               << "Contributing: CONTRIBUTING.md\n"
@@ -614,6 +624,53 @@ static int cmdBuildHint() {
               << "  cmake --build build --parallel --target kern kernc kern-scan\n\n"
               << "See docs/GETTING_STARTED.md for OS-specific steps (vcpkg, Raylib, portable packaging).\n";
     return 0;
+}
+
+static int cmdCapabilityProfile(int argc, char** argv, int argBase, RuntimeGuardPolicy& guards, const char* prog) {
+    // Usage: kern capability profile [list|show <name>|apply <name>]
+    if (argc <= argBase + 1 || std::string(argv[argBase + 1]) != "profile") {
+        std::cerr << "capability: expected `profile` subcommand\n";
+        std::cerr << "usage: " << prog << " capability profile [list|show <name>|apply <name>]\n";
+        return 1;
+    }
+    if (argc <= argBase + 2 || std::string(argv[argBase + 2]) == "list") {
+        std::cout << "capability profiles:\n";
+        for (const auto& kv : capabilityProfiles()) {
+            std::cout << "  " << kv.first << "\n";
+        }
+        return 0;
+    }
+    const std::string action = argv[argBase + 2];
+    if ((action == "show" || action == "apply") && argc > argBase + 3) {
+        const std::string name = argv[argBase + 3];
+        auto it = capabilityProfiles().find(name);
+        if (it == capabilityProfiles().end()) {
+            std::cerr << "capability profile not found: " << name << "\n";
+            return 1;
+        }
+        std::vector<std::string> expanded;
+        for (const auto& tok : it->second) {
+            std::vector<std::string> r = resolvePermissionToken(tok);
+            expanded.insert(expanded.end(), r.begin(), r.end());
+        }
+        std::sort(expanded.begin(), expanded.end());
+        expanded.erase(std::unique(expanded.begin(), expanded.end()), expanded.end());
+        std::cout << "profile: " << name << "\n";
+        std::cout << "  groups: ";
+        for (size_t i = 0; i < it->second.size(); ++i) std::cout << (i ? ", " : "") << it->second[i];
+        if (it->second.empty()) std::cout << "(none)";
+        std::cout << "\n  permissions: ";
+        for (size_t i = 0; i < expanded.size(); ++i) std::cout << (i ? ", " : "") << expanded[i];
+        if (expanded.empty()) std::cout << "(none)";
+        std::cout << "\n";
+        if (action == "apply") {
+            (void)applyCapabilityProfile(name, guards);
+            std::cout << "applied to current runtime guard set\n";
+        }
+        return 0;
+    }
+    std::cerr << "usage: " << prog << " capability profile [list|show <name>|apply <name>]\n";
+    return 1;
 }
 
 struct TestCliOptions {
@@ -1234,7 +1291,7 @@ int main(int argc, char** argv) {
     runtimeGuards.ffiEnabled = false;
     runtimeGuards.sandboxEnabled = true;
     {
-        const char* kEnf = std::getenv("KERN_ENFORCE_PERMISSIONS");
+        const char* kEnf = kernGetEnv("KERN_ENFORCE_PERMISSIONS");
         if (kEnf && (std::strcmp(kEnf, "0") == 0 || std::strcmp(kEnf, "false") == 0))
             runtimeGuards.enforcePermissions = false;
     }
@@ -1257,6 +1314,15 @@ int main(int argc, char** argv) {
         }
         if (flag.rfind("--allow=", 0) == 0) {
             parseAllowCsv(flag.substr(8), runtimeGuards);
+            ++argBase;
+            continue;
+        }
+        if (flag.rfind("--profile=", 0) == 0) {
+            std::string prof = flag.substr(10);
+            if (!applyCapabilityProfile(prof, runtimeGuards)) {
+                std::cerr << "error: unknown capability profile: " << prof << "\n";
+                return 1;
+            }
             ++argBase;
             continue;
         }
@@ -1457,6 +1523,9 @@ int main(int argc, char** argv) {
         }
         if (arg == "verify") {
             return cmdVerify();
+        }
+        if (arg == "capability") {
+            return cmdCapabilityProfile(argc, argv, argBase, runtimeGuards, prog);
         }
     }
 
