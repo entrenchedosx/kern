@@ -4,7 +4,13 @@
 [![Version](https://img.shields.io/badge/version-1.0.7-blue.svg)](KERN_VERSION.txt)
 [![Discord](https://img.shields.io/badge/discord-Kern-5865F2?logo=discord&logoColor=white)](https://discord.gg/JBa4RfT2tE)
 
-**Kern** is a small, compiled scripting language: an explicit lexer → parser → bytecode pipeline and a bytecode **VM**, with a growing **standard library** (`lib/kern/`) and a **`kern`** CLI for running scripts, linting, and the REPL.
+**Kern** is a practical **Python-like + C++-level system access** language: readable scripts, compiled to bytecode, executed by a fast VM, with explicit tooling for diagnostics, scanning, packaging, and deployment.
+
+Use Kern when you want:
+- **Python-style productivity** for day-to-day scripting and app logic.
+- **C++-style system reach** (process, filesystem, networking, memory/interop).
+- **Inspectability** (`--ast`, `--bytecode`, `--check`, scanner tooling) instead of black-box runtime behavior.
+- **A real toolchain** (`kern`, `kernc`, `kern-scan`, tests, CI, docs) in one repo.
 
 This repository is the **language and toolchain** (compiler, VM, stdlib, tests, docs). **Editors** (desktop IDE, VS Code extension) live under **[`Kern-IDE/`](Kern-IDE/)** and are published separately.
 
@@ -42,8 +48,15 @@ Official Kern Discord: **[discord.gg/JBa4RfT2tE](https://discord.gg/JBa4RfT2tE)*
 - **Readable surface:** familiar statements, functions, classes, and modules without a huge runtime.
 - **Inspectable pipeline:** `--ast`, `--bytecode`, and `--check` for learning and debugging.
 - **Solid diagnostics:** errors aim for file, line, hint, and stable codes (see [Troubleshooting](docs/TROUBLESHOOTING.md)).
+- **System-first stdlib:** growing `std.v1.*` surface for fs/process/net/os/memory-style workflows.
 - **Trust-based core:** Kern does not enforce a mandatory sandbox; power is explicit, and optional policy libraries exist for stricter designs — see [TRUST_MODEL.md](docs/TRUST_MODEL.md).
 - **Optional graphics:** build with Raylib for `g2d` / `game` samples when you need them.
+
+### Why click this repo?
+
+- You get both the **language runtime** and the **full build/test/release toolchain**.
+- It is active and iterative, with concrete roadmap execution and cross-platform CI.
+- It targets real-world scripting + systems automation, not only toy examples.
 
 ---
 
