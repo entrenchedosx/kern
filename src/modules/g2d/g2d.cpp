@@ -11,6 +11,7 @@
 #include <vector>
 #include <unordered_map>
 #include <functional>
+#include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <cmath>
@@ -80,6 +81,14 @@ struct G2DSprite { int imageId; int frameW; int frameH; int currentFrame; float 
 static std::vector<G2DSprite> g_g2d_sprites;
 static int g_g2d_draw_r = 255, g_g2d_draw_g = 255, g_g2d_draw_b = 255, g_g2d_draw_a = 255;
 static bool g_g2d_camera_enabled = false;
+static bool g_g2d_camera_has_target = false;
+static float g_g2d_camera_target_x = 0.0f;
+static float g_g2d_camera_target_y = 0.0f;
+static bool g_g2d_camera_bounds_enabled = false;
+static float g_g2d_camera_min_x = 0.0f, g_g2d_camera_min_y = 0.0f, g_g2d_camera_max_x = 0.0f, g_g2d_camera_max_y = 0.0f;
+static float g_g2d_shake_time_left = 0.0f;
+static float g_g2d_shake_strength = 0.0f;
+static bool g_g2d_scissor_active = false;
 static std::unordered_map<int64_t, RenderTexture2D> g_g2d_render_targets;
 static int64_t g_g2d_next_rt_id = 1;
 static bool g_g2d_in_render_target = false;
@@ -107,6 +116,25 @@ static void getColorFromArgs(const std::vector<ValuePtr>& args, size_t start, in
     *g = start + 1 < args.size() ? toInt(args[start + 1]) : 255;
     *b = start + 2 < args.size() ? toInt(args[start + 2]) : 255;
     *a = start + 3 < args.size() ? toInt(args[start + 3]) : 255;
+}
+
+static void applyG2dCameraTarget() {
+    if (!g_g2d_camera_enabled || !g_g2d_camera_has_target) return;
+    float tx = g_g2d_camera_target_x;
+    float ty = g_g2d_camera_target_y;
+    if (g_g2d_camera_bounds_enabled) {
+        tx = std::max(g_g2d_camera_min_x, std::min(tx, g_g2d_camera_max_x));
+        ty = std::max(g_g2d_camera_min_y, std::min(ty, g_g2d_camera_max_y));
+        g_g2d_camera_target_x = tx;
+        g_g2d_camera_target_y = ty;
+    }
+    if (g_g2d_shake_time_left > 0.0f && g_g2d_shake_strength > 0.0f) {
+        float ox = ((float)std::rand() / (float)RAND_MAX) * 2.0f - 1.0f;
+        float oy = ((float)std::rand() / (float)RAND_MAX) * 2.0f - 1.0f;
+        tx += ox * g_g2d_shake_strength;
+        ty += oy * g_g2d_shake_strength;
+    }
+    graphicsSetCameraTarget(tx, ty);
 }
 
 static void register2dGraphicsToVM(VM& vm, std::function<void(const std::string&, ValuePtr)> onFn) {
@@ -144,11 +172,23 @@ static void register2dGraphicsToVM(VM& vm, std::function<void(const std::string&
 
     add("close", [](VM*, std::vector<ValuePtr>) {
         unloadAllG2dRenderTargets();
+        g_g2d_scissor_active = false;
+        g_g2d_camera_enabled = false;
+        g_g2d_camera_has_target = false;
+        g_g2d_camera_bounds_enabled = false;
+        g_g2d_shake_time_left = 0.0f;
+        g_g2d_shake_strength = 0.0f;
         graphicsCloseWindow();
         return Value::nil();
     });
     add("closeWindow", [](VM*, std::vector<ValuePtr>) {
         unloadAllG2dRenderTargets();
+        g_g2d_scissor_active = false;
+        g_g2d_camera_enabled = false;
+        g_g2d_camera_has_target = false;
+        g_g2d_camera_bounds_enabled = false;
+        g_g2d_shake_time_left = 0.0f;
+        g_g2d_shake_strength = 0.0f;
         graphicsCloseWindow();
         return Value::nil();
     });
@@ -174,11 +214,20 @@ static void register2dGraphicsToVM(VM& vm, std::function<void(const std::string&
 
     add("beginFrame", [](VM*, std::vector<ValuePtr>) {
         if (!graphicsWindowOpen()) return Value::nil();
+        if (g_g2d_shake_time_left > 0.0f) {
+            g_g2d_shake_time_left -= GetFrameTime();
+            if (g_g2d_shake_time_left < 0.0f) g_g2d_shake_time_left = 0.0f;
+        }
+        applyG2dCameraTarget();
         graphicsBeginFrame();
         if (g_g2d_camera_enabled) graphicsBegin2D();
         return Value::nil();
     });
     add("endFrame", [](VM*, std::vector<ValuePtr>) {
+        if (g_g2d_scissor_active) {
+            EndScissorMode();
+            g_g2d_scissor_active = false;
+        }
         if (g_g2d_camera_enabled) graphicsEnd2D();
         graphicsEndFrame();
         return Value::nil();
@@ -195,6 +244,20 @@ static void register2dGraphicsToVM(VM& vm, std::function<void(const std::string&
             else
                 ClearWindowState(FLAG_VSYNC_HINT);
         }
+        return Value::nil();
+    });
+    add("beginScissor", [](VM*, std::vector<ValuePtr> args) {
+        if (!graphicsWindowOpen() || args.size() < 4) return Value::nil();
+        int x = toInt(args[0]), y = toInt(args[1]), w = toInt(args[2]), h = toInt(args[3]);
+        if (w <= 0 || h <= 0) return Value::nil();
+        BeginScissorMode(x, y, w, h);
+        g_g2d_scissor_active = true;
+        return Value::nil();
+    });
+    add("endScissor", [](VM*, std::vector<ValuePtr>) {
+        if (!g_g2d_scissor_active) return Value::nil();
+        EndScissorMode();
+        g_g2d_scissor_active = false;
         return Value::nil();
     });
     add("setColor", [](VM*, std::vector<ValuePtr> args) {
@@ -263,6 +326,17 @@ static void register2dGraphicsToVM(VM& vm, std::function<void(const std::string&
         if (args.size() >= 7) { r = toInt(args[4]); g = toInt(args[5]); b = toInt(args[6]); }
         if (args.size() >= 8) a = toInt(args[7]);
         DrawLine(x1, y1, x2, y2, makeColor(r, g, b, a));
+        return Value::nil();
+    });
+    add("drawLineThick", [](VM*, std::vector<ValuePtr> args) {
+        if (!graphicsWindowOpen() || args.size() < 5) return Value::nil();
+        graphicsBeginFrame();
+        Vector2 a{toFloat(args[0]), toFloat(args[1])};
+        Vector2 b{toFloat(args[2]), toFloat(args[3])};
+        float thick = toFloat(args[4]);
+        if (thick <= 0.0f) thick = 1.0f;
+        int r, g, bl, al; getColorFromArgs(args, 5, &r, &g, &bl, &al);
+        DrawLineEx(a, b, thick, makeColor(r, g, bl, al));
         return Value::nil();
     });
     add("drawLine", [](VM*, std::vector<ValuePtr> args) {
@@ -379,6 +453,83 @@ static void register2dGraphicsToVM(VM& vm, std::function<void(const std::string&
             DrawRectangleGradientH(x, y, w, h, c1, c2);
         return Value::nil();
     });
+    add("fillGradientRect4", [](VM*, std::vector<ValuePtr> args) {
+        // x y w h  r1 g1 b1 a1  r2 g2 b2 a2  r3 g3 b3 a3  r4 g4 b4 a4
+        if (!graphicsWindowOpen() || args.size() < 20) return Value::nil();
+        graphicsBeginFrame();
+        Rectangle rec{toFloat(args[0]), toFloat(args[1]), toFloat(args[2]), toFloat(args[3])};
+        if (rec.width <= 0 || rec.height <= 0) return Value::nil();
+        Color c1 = makeColor(toInt(args[4]), toInt(args[5]), toInt(args[6]), toInt(args[7]));
+        Color c2 = makeColor(toInt(args[8]), toInt(args[9]), toInt(args[10]), toInt(args[11]));
+        Color c3 = makeColor(toInt(args[12]), toInt(args[13]), toInt(args[14]), toInt(args[15]));
+        Color c4 = makeColor(toInt(args[16]), toInt(args[17]), toInt(args[18]), toInt(args[19]));
+        DrawRectangleGradientEx(rec, c1, c2, c3, c4);
+        return Value::nil();
+    });
+    add("fillRoundedRect", [](VM*, std::vector<ValuePtr> args) {
+        // x y w h roundness[0..1] segments [color...]
+        if (!graphicsWindowOpen() || args.size() < 6) return Value::nil();
+        graphicsBeginFrame();
+        Rectangle rec{toFloat(args[0]), toFloat(args[1]), toFloat(args[2]), toFloat(args[3])};
+        float roundness = toFloat(args[4]);
+        int segments = toInt(args[5]);
+        if (roundness < 0.0f) roundness = 0.0f;
+        if (roundness > 1.0f) roundness = 1.0f;
+        if (segments < 1) segments = 1;
+        int r, g, b, a; getColorFromArgs(args, 6, &r, &g, &b, &a);
+        DrawRectangleRounded(rec, roundness, segments, makeColor(r, g, b, a));
+        return Value::nil();
+    });
+    add("strokeRoundedRect", [](VM*, std::vector<ValuePtr> args) {
+        // x y w h roundness[0..1] segments thickness [color...]
+        if (!graphicsWindowOpen() || args.size() < 7) return Value::nil();
+        graphicsBeginFrame();
+        Rectangle rec{toFloat(args[0]), toFloat(args[1]), toFloat(args[2]), toFloat(args[3])};
+        float roundness = toFloat(args[4]);
+        int segments = toInt(args[5]);
+        float thick = toFloat(args[6]);
+        if (roundness < 0.0f) roundness = 0.0f;
+        if (roundness > 1.0f) roundness = 1.0f;
+        if (segments < 1) segments = 1;
+        if (thick <= 0.0f) thick = 1.0f;
+        int r, g, b, a; getColorFromArgs(args, 7, &r, &g, &b, &a);
+        DrawRectangleRoundedLines(rec, roundness, segments, thick, makeColor(r, g, b, a));
+        return Value::nil();
+    });
+    add("fillArc", [](VM*, std::vector<ValuePtr> args) {
+        // cx cy innerRadius outerRadius startDeg endDeg segments [color...]
+        if (!graphicsWindowOpen() || args.size() < 7) return Value::nil();
+        graphicsBeginFrame();
+        Vector2 c{toFloat(args[0]), toFloat(args[1])};
+        float inner = toFloat(args[2]);
+        float outer = toFloat(args[3]);
+        float start = toFloat(args[4]);
+        float end = toFloat(args[5]);
+        int segments = toInt(args[6]);
+        if (inner < 0.0f) inner = 0.0f;
+        if (outer < inner) std::swap(outer, inner);
+        if (segments < 3) segments = 3;
+        int r, g, b, a; getColorFromArgs(args, 7, &r, &g, &b, &a);
+        DrawRing(c, inner, outer, start, end, segments, makeColor(r, g, b, a));
+        return Value::nil();
+    });
+    add("strokeArc", [](VM*, std::vector<ValuePtr> args) {
+        // cx cy innerRadius outerRadius startDeg endDeg segments [color...]
+        if (!graphicsWindowOpen() || args.size() < 7) return Value::nil();
+        graphicsBeginFrame();
+        Vector2 c{toFloat(args[0]), toFloat(args[1])};
+        float inner = toFloat(args[2]);
+        float outer = toFloat(args[3]);
+        float start = toFloat(args[4]);
+        float end = toFloat(args[5]);
+        int segments = toInt(args[6]);
+        if (inner < 0.0f) inner = 0.0f;
+        if (outer < inner) std::swap(outer, inner);
+        if (segments < 3) segments = 3;
+        int r, g, b, a; getColorFromArgs(args, 7, &r, &g, &b, &a);
+        DrawRingLines(c, inner, outer, start, end, segments, makeColor(r, g, b, a));
+        return Value::nil();
+    });
 
     add("createRenderTarget", [](VM*, std::vector<ValuePtr> args) {
         if (!graphicsWindowOpen() || args.size() < 2) return Value::fromInt(-1);
@@ -492,6 +643,66 @@ static void register2dGraphicsToVM(VM& vm, std::function<void(const std::string&
         int w = MeasureText(s.c_str(), fontSize);
         int r, g, b, a; getColorFromArgs(args, 4, &r, &g, &b, &a);
         DrawText(s.c_str(), cx - (w / 2), cy - (fontSize / 2), fontSize, makeColor(r, g, b, a));
+        return Value::nil();
+    });
+    add("drawTextBox", [](VM*, std::vector<ValuePtr> args) {
+        if (!graphicsWindowOpen() || args.size() < 5 || !args[0]) return Value::nil();
+        graphicsBeginFrame();
+        std::string text = args[0]->toString();
+        int x = toInt(args[1]), y = toInt(args[2]);
+        int maxWidth = toInt(args[3]);
+        int fontSize = toInt(args[4]);
+        if (maxWidth <= 0) maxWidth = 1;
+        if (fontSize <= 0) fontSize = 20;
+        int lineHeight = args.size() >= 6 ? toInt(args[5]) : (fontSize + 4);
+        if (lineHeight <= 0) lineHeight = fontSize + 4;
+        int r, g, b, a; getColorFromArgs(args, 6, &r, &g, &b, &a);
+
+        std::string current;
+        int cy = y;
+        auto flushLine = [&]() {
+            if (!current.empty()) {
+                DrawText(current.c_str(), x, cy, fontSize, makeColor(r, g, b, a));
+                cy += lineHeight;
+                current.clear();
+            }
+        };
+
+        size_t pos = 0;
+        while (pos < text.size()) {
+            if (text[pos] == '\n') {
+                flushLine();
+                ++pos;
+                continue;
+            }
+            size_t start = pos;
+            while (pos < text.size() && text[pos] != ' ' && text[pos] != '\n' && text[pos] != '\t') ++pos;
+            std::string word = text.substr(start, pos - start);
+            while (pos < text.size() && (text[pos] == ' ' || text[pos] == '\t')) ++pos;
+            std::string candidate = current.empty() ? word : (current + " " + word);
+            if (!word.empty() && MeasureText(candidate.c_str(), fontSize) <= maxWidth) {
+                current = std::move(candidate);
+                continue;
+            }
+            flushLine();
+            if (word.empty()) continue;
+            if (MeasureText(word.c_str(), fontSize) <= maxWidth) {
+                current = std::move(word);
+                continue;
+            }
+            std::string chunk;
+            for (char c : word) {
+                std::string test = chunk + c;
+                if (!chunk.empty() && MeasureText(test.c_str(), fontSize) > maxWidth) {
+                    DrawText(chunk.c_str(), x, cy, fontSize, makeColor(r, g, b, a));
+                    cy += lineHeight;
+                    chunk.clear();
+                }
+                chunk.push_back(c);
+            }
+            current = std::move(chunk);
+        }
+        flushLine();
         return Value::nil();
     });
 
@@ -658,14 +869,58 @@ static void register2dGraphicsToVM(VM& vm, std::function<void(const std::string&
 
     add("setCamera", [](VM*, std::vector<ValuePtr> args) {
         if (args.size() >= 2) {
-            graphicsSetCameraTarget(toFloat(args[0]), toFloat(args[1]));
             graphicsSetCameraEnabled(true);
             g_g2d_camera_enabled = true;
+            g_g2d_camera_has_target = true;
+            g_g2d_camera_target_x = toFloat(args[0]);
+            g_g2d_camera_target_y = toFloat(args[1]);
+            applyG2dCameraTarget();
         }
         return Value::nil();
     });
     add("moveCamera", [](VM*, std::vector<ValuePtr> args) {
-        if (args.size() >= 2) graphicsMoveCameraTarget(toFloat(args[0]), toFloat(args[1]));
+        if (args.size() >= 2) {
+            if (!g_g2d_camera_has_target) {
+                g_g2d_camera_has_target = true;
+                g_g2d_camera_target_x = 0.0f;
+                g_g2d_camera_target_y = 0.0f;
+            }
+            g_g2d_camera_target_x += toFloat(args[0]);
+            g_g2d_camera_target_y += toFloat(args[1]);
+            g_g2d_camera_enabled = true;
+            graphicsSetCameraEnabled(true);
+            applyG2dCameraTarget();
+        }
+        return Value::nil();
+    });
+    add("setCameraBounds", [](VM*, std::vector<ValuePtr> args) {
+        if (args.size() < 4) {
+            g_g2d_camera_bounds_enabled = false;
+            return Value::nil();
+        }
+        float minX = toFloat(args[0]), minY = toFloat(args[1]);
+        float maxX = toFloat(args[2]), maxY = toFloat(args[3]);
+        if (maxX < minX) std::swap(maxX, minX);
+        if (maxY < minY) std::swap(maxY, minY);
+        g_g2d_camera_min_x = minX;
+        g_g2d_camera_min_y = minY;
+        g_g2d_camera_max_x = maxX;
+        g_g2d_camera_max_y = maxY;
+        g_g2d_camera_bounds_enabled = true;
+        applyG2dCameraTarget();
+        return Value::nil();
+    });
+    add("clearCameraBounds", [](VM*, std::vector<ValuePtr>) {
+        g_g2d_camera_bounds_enabled = false;
+        return Value::nil();
+    });
+    add("screenShake", [](VM*, std::vector<ValuePtr> args) {
+        float strength = args.size() >= 1 ? toFloat(args[0]) : 0.0f;
+        float duration = args.size() >= 2 ? toFloat(args[1]) : 0.2f;
+        if (strength < 0.0f) strength = -strength;
+        if (duration < 0.0f) duration = 0.0f;
+        g_g2d_shake_strength = strength;
+        g_g2d_shake_time_left = duration;
         return Value::nil();
     });
     add("zoomCamera", [](VM*, std::vector<ValuePtr> args) {

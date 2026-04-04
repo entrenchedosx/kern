@@ -1,0 +1,17 @@
+// Build-agnostic surface test: validates g3d API names by source registration strings.
+require("filesystem.read")
+let src = read_file("src/modules/g3d/g3d.cpp")
+
+assert_eq(regex_match(src, "add\\(\"setCameraPath\""), true)
+assert_eq(regex_match(src, "add\\(\"sampleCameraPath\""), true)
+assert_eq(regex_match(src, "add\\(\"applyCameraPath\""), true)
+assert_eq(regex_match(src, "add\\(\"clearCameraPath\""), true)
+
+assert_eq(regex_match(src, "add\\(\"visibleObjectsFiltered\""), true)
+assert_eq(regex_match(src, "add\\(\"pickObjectFiltered\""), true)
+assert_eq(regex_match(src, "add\\(\"pickObjectInfoFiltered\""), true)
+
+assert_eq(regex_match(src, "add\\(\"setDebugOverlays\""), true)
+assert_eq(regex_match(src, "add\\(\"drawObjectBounds\""), true)
+print("g3d-api-surface-vnext-source-ok")
+

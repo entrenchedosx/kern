@@ -52,6 +52,13 @@ static Color g_clear_color = BLACK;
 static int g_camera_mode = 0; // 0=manual, 1=free, 2=orbital, 3=first-person
 static bool g_show_stats = false;
 static bool g_debug_draw = false;
+static bool g_debug_draw_axes = true;
+static bool g_debug_draw_grid = true;
+static bool g_debug_draw_bounds = false;
+static float g_orbit_yaw_deg = 45.0f;
+static float g_orbit_pitch_deg = 30.0f;
+static float g_orbit_radius = 6.0f;
+static bool g_orbit_state_initialized = false;
 // after g2d: G2D_BASE 286 + 73 g2d builtins -> indices 286..358; g3d starts at 359.
 static const size_t G3D_BASE = 359;
 
@@ -94,6 +101,13 @@ struct G3DGroup {
     bool visible = true;
 };
 static std::vector<G3DGroup> g_groups;
+
+struct G3DCameraPathNode {
+    Vector3 position;
+    Vector3 target;
+};
+static std::vector<G3DCameraPathNode> g_camera_path_nodes;
+static bool g_camera_path_closed = false;
 
 struct G3DLight {
     std::string type; // directional | point
@@ -306,6 +320,197 @@ static Value makeHitMap(bool hit, float distance, Vector3 p) {
     m["x"] = std::make_shared<Value>(Value::fromFloat(p.x));
     m["y"] = std::make_shared<Value>(Value::fromFloat(p.y));
     m["z"] = std::make_shared<Value>(Value::fromFloat(p.z));
+    return Value::fromMap(std::move(m));
+}
+
+static Value makePickMap(bool hit, int objectId, float distance, Vector3 p) {
+    std::unordered_map<std::string, ValuePtr> m;
+    m["hit"] = std::make_shared<Value>(Value::fromBool(hit));
+    m["id"] = std::make_shared<Value>(Value::fromInt(objectId));
+    m["distance"] = std::make_shared<Value>(Value::fromFloat(distance));
+    m["x"] = std::make_shared<Value>(Value::fromFloat(p.x));
+    m["y"] = std::make_shared<Value>(Value::fromFloat(p.y));
+    m["z"] = std::make_shared<Value>(Value::fromFloat(p.z));
+    return Value::fromMap(std::move(m));
+}
+
+static Vector3 pickNormalFromAabb(const SimpleAABB& aabb, Vector3 p) {
+    const float eps = 0.02f;
+    if (std::fabs(p.x - aabb.min.x) <= eps) return {-1.0f, 0.0f, 0.0f};
+    if (std::fabs(p.x - aabb.max.x) <= eps) return { 1.0f, 0.0f, 0.0f};
+    if (std::fabs(p.y - aabb.min.y) <= eps) return { 0.0f,-1.0f, 0.0f};
+    if (std::fabs(p.y - aabb.max.y) <= eps) return { 0.0f, 1.0f, 0.0f};
+    if (std::fabs(p.z - aabb.min.z) <= eps) return { 0.0f, 0.0f,-1.0f};
+    if (std::fabs(p.z - aabb.max.z) <= eps) return { 0.0f, 0.0f, 1.0f};
+    return {0.0f, 1.0f, 0.0f};
+}
+
+static Value makePickInfoMap(bool hit, int objectId, float distance, Vector3 p, Vector3 n) {
+    std::unordered_map<std::string, ValuePtr> m;
+    m["hit"] = std::make_shared<Value>(Value::fromBool(hit));
+    m["id"] = std::make_shared<Value>(Value::fromInt(objectId));
+    m["distance"] = std::make_shared<Value>(Value::fromFloat(distance));
+    m["x"] = std::make_shared<Value>(Value::fromFloat(p.x));
+    m["y"] = std::make_shared<Value>(Value::fromFloat(p.y));
+    m["z"] = std::make_shared<Value>(Value::fromFloat(p.z));
+    m["nx"] = std::make_shared<Value>(Value::fromFloat(n.x));
+    m["ny"] = std::make_shared<Value>(Value::fromFloat(n.y));
+    m["nz"] = std::make_shared<Value>(Value::fromFloat(n.z));
+    if (hit && validObjectId(objectId)) {
+        const auto& o = g_objects[objectId];
+        m["type"] = std::make_shared<Value>(Value::fromString(o.type));
+        m["material"] = std::make_shared<Value>(Value::fromString(o.material));
+    } else {
+        m["type"] = std::make_shared<Value>(Value::fromString(""));
+        m["material"] = std::make_shared<Value>(Value::fromString(""));
+    }
+    return Value::fromMap(std::move(m));
+}
+
+static Vector3 cameraForwardDir() {
+    Vector3 f{
+        g_camera.target.x - g_camera.position.x,
+        g_camera.target.y - g_camera.position.y,
+        g_camera.target.z - g_camera.position.z
+    };
+    float len = std::sqrt(f.x * f.x + f.y * f.y + f.z * f.z);
+    if (len <= 0.0001f) return {0.0f, 0.0f, 1.0f};
+    return {f.x / len, f.y / len, f.z / len};
+}
+
+static bool objectLikelyVisibleByCamera(const G3DObject& o, float marginPx) {
+    if (!graphicsWindowOpen()) return false;
+    if (!objectIsActive(o) || !o.visible) return false;
+    Vector3 toObj{
+        o.position.x - g_camera.position.x,
+        o.position.y - g_camera.position.y,
+        o.position.z - g_camera.position.z
+    };
+    Vector3 fwd = cameraForwardDir();
+    float dot = toObj.x * fwd.x + toObj.y * fwd.y + toObj.z * fwd.z;
+    if (dot <= 0.0f) return false;
+    Vector2 s = GetWorldToScreen(o.position, g_camera);
+    float w = (float)GetScreenWidth();
+    float h = (float)GetScreenHeight();
+    return (s.x >= -marginPx && s.x <= w + marginPx && s.y >= -marginPx && s.y <= h + marginPx);
+}
+
+static void drawObjectBoundsInternal(const G3DObject& o, Color c) {
+    if (!objectIsActive(o) || !o.visible) return;
+    SimpleAABB a = objectAABB(o);
+    BoundingBox box{a.min, a.max};
+    DrawBoundingBox(box, c);
+}
+
+static bool valueIsNil(ValuePtr v) {
+    return !v || v->type == Value::Type::NIL;
+}
+
+static bool objectInGroup(int objectId, int groupId) {
+    if (!validGroupId(groupId)) return false;
+    const auto& ids = g_groups[groupId].objectIds;
+    for (int id : ids) if (id == objectId) return true;
+    return false;
+}
+
+static bool objectMatchesFilters(int objectId, const std::string& typeFilter, const std::string& materialFilter, int groupIdFilter) {
+    if (!validObjectId(objectId)) return false;
+    const auto& o = g_objects[objectId];
+    if (!typeFilter.empty() && toLower(o.type) != toLower(typeFilter)) return false;
+    if (!materialFilter.empty() && toLower(o.material) != toLower(materialFilter)) return false;
+    if (groupIdFilter >= 0 && !objectInGroup(objectId, groupIdFilter)) return false;
+    return true;
+}
+
+static bool pickBestObjectWithFilters(const Ray& ray, const std::string& typeFilter, const std::string& materialFilter, int groupIdFilter, int& bestId, float& bestDist, Vector3& bestPoint, Vector3& bestNormal) {
+    bestId = -1;
+    bestDist = 0.0f;
+    bestPoint = {0.0f, 0.0f, 0.0f};
+    bestNormal = {0.0f, 1.0f, 0.0f};
+    for (int i = 0; i < (int)g_objects.size(); ++i) {
+        const auto& o = g_objects[i];
+        if (!objectIsActive(o) || !o.visible) continue;
+        if (!objectMatchesFilters(i, typeFilter, materialFilter, groupIdFilter)) continue;
+        const SimpleAABB aabb = objectAABB(o);
+        BoundingBox box{aabb.min, aabb.max};
+        RayCollision hit = GetRayCollisionBox(ray, box);
+        if (!hit.hit) continue;
+        if (bestId < 0 || hit.distance < bestDist) {
+            bestId = i;
+            bestDist = hit.distance;
+            bestPoint = hit.point;
+            bestNormal = pickNormalFromAabb(aabb, hit.point);
+        }
+    }
+    return bestId >= 0;
+}
+
+static Vector3 vec3Lerp(Vector3 a, Vector3 b, float t) {
+    return {
+        a.x + (b.x - a.x) * t,
+        a.y + (b.y - a.y) * t,
+        a.z + (b.z - a.z) * t
+    };
+}
+
+static Vector3 vec3CatmullRom(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t) {
+    float t2 = t * t;
+    float t3 = t2 * t;
+    return {
+        0.5f * ((2.0f * p1.x) + (-p0.x + p2.x) * t + (2.0f * p0.x - 5.0f * p1.x + 4.0f * p2.x - p3.x) * t2 + (-p0.x + 3.0f * p1.x - 3.0f * p2.x + p3.x) * t3),
+        0.5f * ((2.0f * p1.y) + (-p0.y + p2.y) * t + (2.0f * p0.y - 5.0f * p1.y + 4.0f * p2.y - p3.y) * t2 + (-p0.y + 3.0f * p1.y - 3.0f * p2.y + p3.y) * t3),
+        0.5f * ((2.0f * p1.z) + (-p0.z + p2.z) * t + (2.0f * p0.z - 5.0f * p1.z + 4.0f * p2.z - p3.z) * t2 + (-p0.z + 3.0f * p1.z - 3.0f * p2.z + p3.z) * t3)
+    };
+}
+
+static bool sampleCameraPath(float t, Camera3D& outCam) {
+    if (g_camera_path_nodes.size() < 2) return false;
+    if (t < 0.0f) t = 0.0f;
+    if (t > 1.0f) t = 1.0f;
+    int n = (int)g_camera_path_nodes.size();
+    int segCount = g_camera_path_closed ? n : (n - 1);
+    if (segCount <= 0) return false;
+    float scaled = t * (float)segCount;
+    int seg = (int)std::floor(scaled);
+    if (seg >= segCount) seg = segCount - 1;
+    float u = scaled - (float)seg;
+    auto wrap = [n](int i) {
+        int r = i % n;
+        return r < 0 ? r + n : r;
+    };
+    int i1 = seg;
+    int i2 = g_camera_path_closed ? wrap(seg + 1) : std::min(seg + 1, n - 1);
+    int i0 = g_camera_path_closed ? wrap(i1 - 1) : std::max(0, i1 - 1);
+    int i3 = g_camera_path_closed ? wrap(i2 + 1) : std::min(n - 1, i2 + 1);
+    const auto& p0 = g_camera_path_nodes[i0];
+    const auto& p1 = g_camera_path_nodes[i1];
+    const auto& p2 = g_camera_path_nodes[i2];
+    const auto& p3 = g_camera_path_nodes[i3];
+
+    outCam = g_camera;
+    if (n >= 4) {
+        outCam.position = vec3CatmullRom(p0.position, p1.position, p2.position, p3.position, u);
+        outCam.target = vec3CatmullRom(p0.target, p1.target, p2.target, p3.target, u);
+    } else {
+        outCam.position = vec3Lerp(p1.position, p2.position, u);
+        outCam.target = vec3Lerp(p1.target, p2.target, u);
+    }
+    return true;
+}
+
+static Value makeCameraMap(const Camera3D& cam) {
+    std::unordered_map<std::string, ValuePtr> m;
+    m["px"] = std::make_shared<Value>(Value::fromFloat(cam.position.x));
+    m["py"] = std::make_shared<Value>(Value::fromFloat(cam.position.y));
+    m["pz"] = std::make_shared<Value>(Value::fromFloat(cam.position.z));
+    m["tx"] = std::make_shared<Value>(Value::fromFloat(cam.target.x));
+    m["ty"] = std::make_shared<Value>(Value::fromFloat(cam.target.y));
+    m["tz"] = std::make_shared<Value>(Value::fromFloat(cam.target.z));
+    m["ux"] = std::make_shared<Value>(Value::fromFloat(cam.up.x));
+    m["uy"] = std::make_shared<Value>(Value::fromFloat(cam.up.y));
+    m["uz"] = std::make_shared<Value>(Value::fromFloat(cam.up.z));
+    m["fov"] = std::make_shared<Value>(Value::fromFloat(cam.fovy));
+    m["projection"] = std::make_shared<Value>(Value::fromInt((int64_t)cam.projection));
     return Value::fromMap(std::move(m));
 }
 
@@ -647,6 +852,13 @@ static void register3dGraphicsToVM(VM& vm, std::function<void(const std::string&
         unloadTextures();
         unloadModels();
         unloadLightingShader();
+        g_debug_draw = false;
+        g_debug_draw_axes = true;
+        g_debug_draw_grid = true;
+        g_debug_draw_bounds = false;
+        g_orbit_state_initialized = false;
+        g_camera_path_nodes.clear();
+        g_camera_path_closed = false;
         graphicsCloseWindow();
         return Value::nil();
     });
@@ -712,6 +924,14 @@ static void register3dGraphicsToVM(VM& vm, std::function<void(const std::string&
 
     add("setDebug", [](VM*, std::vector<ValuePtr> args) {
         g_debug_draw = !args.empty() && args[0] && args[0]->isTruthy();
+        if (g_debug_draw) {
+            g_debug_draw_axes = true;
+            g_debug_draw_grid = true;
+        } else {
+            g_debug_draw_axes = false;
+            g_debug_draw_grid = false;
+            g_debug_draw_bounds = false;
+        }
         return Value::nil();
     });
 
@@ -1010,6 +1230,122 @@ static void register3dGraphicsToVM(VM& vm, std::function<void(const std::string&
         float dz = g_objects[a].position.z - g_objects[b].position.z;
         return Value::fromFloat(std::sqrt(dx * dx + dy * dy + dz * dz));
     });
+    add("worldToScreen", [](VM*, std::vector<ValuePtr> args) {
+        if (!graphicsWindowOpen() || args.size() < 3) return Value::nil();
+        ensureDefaultCamera();
+        Vector3 w{toFloat(args[0]), toFloat(args[1]), toFloat(args[2])};
+        Vector2 s = GetWorldToScreen(w, g_camera);
+        auto arr = std::make_shared<Value>(Value::fromArray({}));
+        auto& out = std::get<std::vector<ValuePtr>>(arr->data);
+        out.push_back(std::make_shared<Value>(Value::fromFloat(s.x)));
+        out.push_back(std::make_shared<Value>(Value::fromFloat(s.y)));
+        return Value(*arr);
+    });
+    add("isObjectVisible", [](VM*, std::vector<ValuePtr> args) {
+        if (args.empty()) return Value::fromBool(false);
+        int id = toInt(args[0]);
+        if (!validObjectId(id)) return Value::fromBool(false);
+        ensureDefaultCamera();
+        float marginPx = args.size() >= 2 ? toFloat(args[1]) : 24.0f;
+        if (marginPx < 0.0f) marginPx = 0.0f;
+        return Value::fromBool(objectLikelyVisibleByCamera(g_objects[id], marginPx));
+    });
+    add("pickObject", [](VM*, std::vector<ValuePtr> args) {
+        if (!graphicsWindowOpen()) return Value::fromInt(-1);
+        ensureDefaultCamera();
+        Vector2 m{
+            args.size() >= 1 ? toFloat(args[0]) : static_cast<float>(GetMouseX()),
+            args.size() >= 2 ? toFloat(args[1]) : static_cast<float>(GetMouseY())
+        };
+        Ray ray = GetMouseRay(m, g_camera);
+        int bestId = -1;
+        float bestDist = 0.0f;
+        Vector3 bestPoint{0.0f, 0.0f, 0.0f};
+        Vector3 bestNormal{0.0f, 1.0f, 0.0f};
+        pickBestObjectWithFilters(ray, "", "", -1, bestId, bestDist, bestPoint, bestNormal);
+        return Value::fromInt(bestId);
+    });
+    add("pickObjectInfo", [](VM*, std::vector<ValuePtr> args) {
+        if (!graphicsWindowOpen()) return makePickInfoMap(false, -1, 0.0f, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f});
+        ensureDefaultCamera();
+        Vector2 m{
+            args.size() >= 1 ? toFloat(args[0]) : static_cast<float>(GetMouseX()),
+            args.size() >= 2 ? toFloat(args[1]) : static_cast<float>(GetMouseY())
+        };
+        Ray ray = GetMouseRay(m, g_camera);
+        int bestId = -1;
+        float bestDist = 0.0f;
+        Vector3 bestPoint{0.0f, 0.0f, 0.0f};
+        Vector3 bestNormal{0.0f, 1.0f, 0.0f};
+        pickBestObjectWithFilters(ray, "", "", -1, bestId, bestDist, bestPoint, bestNormal);
+        return makePickInfoMap(bestId >= 0, bestId, bestDist, bestPoint, bestNormal);
+    });
+    add("pickObjectFiltered", [](VM*, std::vector<ValuePtr> args) {
+        if (!graphicsWindowOpen()) return Value::fromInt(-1);
+        ensureDefaultCamera();
+        Vector2 m{
+            args.size() >= 1 ? toFloat(args[0]) : static_cast<float>(GetMouseX()),
+            args.size() >= 2 ? toFloat(args[1]) : static_cast<float>(GetMouseY())
+        };
+        std::string typeFilter = (args.size() >= 3 && !valueIsNil(args[2])) ? toString(args[2]) : "";
+        std::string materialFilter = (args.size() >= 4 && !valueIsNil(args[3])) ? toString(args[3]) : "";
+        int groupIdFilter = (args.size() >= 5 && !valueIsNil(args[4])) ? toInt(args[4]) : -1;
+        Ray ray = GetMouseRay(m, g_camera);
+        int bestId = -1;
+        float bestDist = 0.0f;
+        Vector3 bestPoint{0.0f, 0.0f, 0.0f};
+        Vector3 bestNormal{0.0f, 1.0f, 0.0f};
+        pickBestObjectWithFilters(ray, typeFilter, materialFilter, groupIdFilter, bestId, bestDist, bestPoint, bestNormal);
+        return Value::fromInt(bestId);
+    });
+    add("pickObjectInfoFiltered", [](VM*, std::vector<ValuePtr> args) {
+        if (!graphicsWindowOpen()) return makePickInfoMap(false, -1, 0.0f, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f});
+        ensureDefaultCamera();
+        Vector2 m{
+            args.size() >= 1 ? toFloat(args[0]) : static_cast<float>(GetMouseX()),
+            args.size() >= 2 ? toFloat(args[1]) : static_cast<float>(GetMouseY())
+        };
+        std::string typeFilter = (args.size() >= 3 && !valueIsNil(args[2])) ? toString(args[2]) : "";
+        std::string materialFilter = (args.size() >= 4 && !valueIsNil(args[3])) ? toString(args[3]) : "";
+        int groupIdFilter = (args.size() >= 5 && !valueIsNil(args[4])) ? toInt(args[4]) : -1;
+        Ray ray = GetMouseRay(m, g_camera);
+        int bestId = -1;
+        float bestDist = 0.0f;
+        Vector3 bestPoint{0.0f, 0.0f, 0.0f};
+        Vector3 bestNormal{0.0f, 1.0f, 0.0f};
+        pickBestObjectWithFilters(ray, typeFilter, materialFilter, groupIdFilter, bestId, bestDist, bestPoint, bestNormal);
+        return makePickInfoMap(bestId >= 0, bestId, bestDist, bestPoint, bestNormal);
+    });
+    add("visibleObjects", [](VM*, std::vector<ValuePtr> args) {
+        ensureDefaultCamera();
+        float marginPx = args.size() >= 1 ? toFloat(args[0]) : 24.0f;
+        if (marginPx < 0.0f) marginPx = 0.0f;
+        auto arr = std::make_shared<Value>(Value::fromArray({}));
+        auto& out = std::get<std::vector<ValuePtr>>(arr->data);
+        for (int i = 0; i < (int)g_objects.size(); ++i) {
+            const auto& o = g_objects[i];
+            if (!objectLikelyVisibleByCamera(o, marginPx)) continue;
+            out.push_back(std::make_shared<Value>(Value::fromInt(i)));
+        }
+        return Value(*arr);
+    });
+    add("visibleObjectsFiltered", [](VM*, std::vector<ValuePtr> args) {
+        ensureDefaultCamera();
+        float marginPx = args.size() >= 1 ? toFloat(args[0]) : 24.0f;
+        if (marginPx < 0.0f) marginPx = 0.0f;
+        std::string typeFilter = (args.size() >= 2 && !valueIsNil(args[1])) ? toString(args[1]) : "";
+        std::string materialFilter = (args.size() >= 3 && !valueIsNil(args[2])) ? toString(args[2]) : "";
+        int groupIdFilter = (args.size() >= 4 && !valueIsNil(args[3])) ? toInt(args[3]) : -1;
+        auto arr = std::make_shared<Value>(Value::fromArray({}));
+        auto& out = std::get<std::vector<ValuePtr>>(arr->data);
+        for (int i = 0; i < (int)g_objects.size(); ++i) {
+            if (!objectMatchesFilters(i, typeFilter, materialFilter, groupIdFilter)) continue;
+            const auto& o = g_objects[i];
+            if (!objectLikelyVisibleByCamera(o, marginPx)) continue;
+            out.push_back(std::make_shared<Value>(Value::fromInt(i)));
+        }
+        return Value(*arr);
+    });
 
     add("getObject", [](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
@@ -1288,6 +1624,169 @@ static void register3dGraphicsToVM(VM& vm, std::function<void(const std::string&
         g_camera.target.x += dx; g_camera.target.y += dy; g_camera.target.z += dz;
         return Value::nil();
     });
+    add("orbitCameraToObject", [](VM*, std::vector<ValuePtr> args) {
+        if (args.size() < 4) return Value::nil();
+        int id = toInt(args[0]);
+        if (!validObjectId(id) || !objectIsActive(g_objects[id])) return Value::nil();
+        ensureDefaultCamera();
+        float yawDeg = toFloat(args[1]);
+        float pitchDeg = toFloat(args[2]);
+        float radius = toFloat(args[3]);
+        if (radius < 0.05f) radius = 0.05f;
+        const Vector3 c = g_objects[id].position;
+        float yaw = yawDeg * (3.1415926535f / 180.0f);
+        float pitch = pitchDeg * (3.1415926535f / 180.0f);
+        float cp = std::cos(pitch), sp = std::sin(pitch);
+        float cyaw = std::cos(yaw), syaw = std::sin(yaw);
+        g_camera.target = c;
+        g_camera.position = {c.x + cyaw * cp * radius, c.y + sp * radius, c.z + syaw * cp * radius};
+        g_orbit_yaw_deg = yawDeg;
+        g_orbit_pitch_deg = pitchDeg;
+        g_orbit_radius = radius;
+        g_orbit_state_initialized = true;
+        return Value::nil();
+    });
+    add("focusCameraOnObject", [](VM*, std::vector<ValuePtr> args) {
+        if (args.empty()) return Value::nil();
+        int id = toInt(args[0]);
+        if (!validObjectId(id) || !objectIsActive(g_objects[id])) return Value::nil();
+        ensureDefaultCamera();
+        const SimpleAABB a = objectAABB(g_objects[id]);
+        Vector3 center{
+            0.5f * (a.min.x + a.max.x),
+            0.5f * (a.min.y + a.max.y),
+            0.5f * (a.min.z + a.max.z)
+        };
+        float ex = a.max.x - a.min.x;
+        float ey = a.max.y - a.min.y;
+        float ez = a.max.z - a.min.z;
+        float radius = 0.5f * std::sqrt(ex * ex + ey * ey + ez * ez);
+        float padding = args.size() >= 2 ? toFloat(args[1]) : 1.3f;
+        if (padding < 1.0f) padding = 1.0f;
+        Vector3 fwd = cameraForwardDir();
+        float dist = std::max(0.3f, radius * padding + 0.1f);
+        g_camera.target = center;
+        g_camera.position = {center.x - fwd.x * dist, center.y - fwd.y * dist, center.z - fwd.z * dist};
+        g_orbit_state_initialized = false;
+        return Value::nil();
+    });
+    add("lerpCamera", [](VM*, std::vector<ValuePtr> args) {
+        if (args.size() < 7) return Value::nil();
+        ensureDefaultCamera();
+        float alpha = toFloat(args[6]);
+        if (alpha < 0.0f) alpha = 0.0f;
+        if (alpha > 1.0f) alpha = 1.0f;
+        Vector3 targetPos{toFloat(args[0]), toFloat(args[1]), toFloat(args[2])};
+        Vector3 targetLook{toFloat(args[3]), toFloat(args[4]), toFloat(args[5])};
+        g_camera.position.x += (targetPos.x - g_camera.position.x) * alpha;
+        g_camera.position.y += (targetPos.y - g_camera.position.y) * alpha;
+        g_camera.position.z += (targetPos.z - g_camera.position.z) * alpha;
+        g_camera.target.x += (targetLook.x - g_camera.target.x) * alpha;
+        g_camera.target.y += (targetLook.y - g_camera.target.y) * alpha;
+        g_camera.target.z += (targetLook.z - g_camera.target.z) * alpha;
+        return Value::nil();
+    });
+    add("orbitCamera", [](VM*, std::vector<ValuePtr> args) {
+        if (args.size() < 6) return Value::nil();
+        ensureDefaultCamera();
+        float yawDeg = toFloat(args[0]);
+        float pitchDeg = toFloat(args[1]);
+        float radius = toFloat(args[2]);
+        if (radius < 0.05f) radius = 0.05f;
+        float cx = toFloat(args[3]), cy = toFloat(args[4]), cz = toFloat(args[5]);
+        float yaw = yawDeg * (3.1415926535f / 180.0f);
+        float pitch = pitchDeg * (3.1415926535f / 180.0f);
+        float cp = std::cos(pitch), sp = std::sin(pitch);
+        float cyaw = std::cos(yaw), syaw = std::sin(yaw);
+        g_camera.target = {cx, cy, cz};
+        g_camera.position = {cx + cyaw * cp * radius, cy + sp * radius, cz + syaw * cp * radius};
+        g_orbit_yaw_deg = yawDeg;
+        g_orbit_pitch_deg = pitchDeg;
+        g_orbit_radius = radius;
+        g_orbit_state_initialized = true;
+        return Value::nil();
+    });
+    add("orbitCameraStep", [](VM*, std::vector<ValuePtr> args) {
+        if (args.size() < 2) return Value::nil();
+        ensureDefaultCamera();
+        if (!g_orbit_state_initialized) {
+            Vector3 d{
+                g_camera.position.x - g_camera.target.x,
+                g_camera.position.y - g_camera.target.y,
+                g_camera.position.z - g_camera.target.z
+            };
+            g_orbit_radius = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
+            if (g_orbit_radius < 0.05f) g_orbit_radius = 0.05f;
+            g_orbit_yaw_deg = std::atan2(d.z, d.x) * (180.0f / 3.1415926535f);
+            g_orbit_pitch_deg = std::asin(std::max(-1.0f, std::min(1.0f, d.y / g_orbit_radius))) * (180.0f / 3.1415926535f);
+            g_orbit_state_initialized = true;
+        }
+        g_orbit_yaw_deg += toFloat(args[0]);
+        g_orbit_pitch_deg += toFloat(args[1]);
+        if (g_orbit_pitch_deg > 89.0f) g_orbit_pitch_deg = 89.0f;
+        if (g_orbit_pitch_deg < -89.0f) g_orbit_pitch_deg = -89.0f;
+        if (args.size() >= 3) {
+            g_orbit_radius += toFloat(args[2]);
+            if (g_orbit_radius < 0.05f) g_orbit_radius = 0.05f;
+        }
+        float yaw = g_orbit_yaw_deg * (3.1415926535f / 180.0f);
+        float pitch = g_orbit_pitch_deg * (3.1415926535f / 180.0f);
+        float cp = std::cos(pitch), sp = std::sin(pitch);
+        float cyaw = std::cos(yaw), syaw = std::sin(yaw);
+        Vector3 c = g_camera.target;
+        g_camera.position = {c.x + cyaw * cp * g_orbit_radius, c.y + sp * g_orbit_radius, c.z + syaw * cp * g_orbit_radius};
+        return Value::nil();
+    });
+    add("setCameraPath", [](VM*, std::vector<ValuePtr> args) {
+        if (args.empty() || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::fromInt(0);
+        const auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
+        std::vector<G3DCameraPathNode> nodes;
+        nodes.reserve(arr.size() / 6);
+        size_t i = 0;
+        while (i + 5 < arr.size()) {
+            if (!isNumber(arr[i]) || !isNumber(arr[i + 1]) || !isNumber(arr[i + 2]) ||
+                !isNumber(arr[i + 3]) || !isNumber(arr[i + 4]) || !isNumber(arr[i + 5])) {
+                i += 6;
+                continue;
+            }
+            G3DCameraPathNode n;
+            n.position = {toFloat(arr[i]), toFloat(arr[i + 1]), toFloat(arr[i + 2])};
+            n.target = {toFloat(arr[i + 3]), toFloat(arr[i + 4]), toFloat(arr[i + 5])};
+            nodes.push_back(n);
+            i += 6;
+        }
+        if (nodes.size() < 2) {
+            g_camera_path_nodes.clear();
+            return Value::fromInt(0);
+        }
+        g_camera_path_nodes = std::move(nodes);
+        g_camera_path_closed = (args.size() >= 2 && args[1] && args[1]->isTruthy());
+        return Value::fromInt((int64_t)g_camera_path_nodes.size());
+    });
+    add("clearCameraPath", [](VM*, std::vector<ValuePtr>) {
+        g_camera_path_nodes.clear();
+        g_camera_path_closed = false;
+        return Value::nil();
+    });
+    add("sampleCameraPath", [](VM*, std::vector<ValuePtr> args) {
+        ensureDefaultCamera();
+        if (g_camera_path_nodes.size() < 2) return Value::nil();
+        float t = args.empty() ? 0.0f : toFloat(args[0]);
+        Camera3D sample = g_camera;
+        if (!sampleCameraPath(t, sample)) return Value::nil();
+        return makeCameraMap(sample);
+    });
+    add("applyCameraPath", [](VM*, std::vector<ValuePtr> args) {
+        ensureDefaultCamera();
+        if (g_camera_path_nodes.size() < 2) return Value::fromBool(false);
+        float t = args.empty() ? 0.0f : toFloat(args[0]);
+        Camera3D sample = g_camera;
+        if (!sampleCameraPath(t, sample)) return Value::fromBool(false);
+        g_camera.position = sample.position;
+        g_camera.target = sample.target;
+        g_orbit_state_initialized = false;
+        return Value::fromBool(true);
+    });
     add("lookAt", [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 3) return Value::nil();
         ensureDefaultCamera();
@@ -1296,19 +1795,25 @@ static void register3dGraphicsToVM(VM& vm, std::function<void(const std::string&
     });
     add("getCamera", [](VM*, std::vector<ValuePtr>) {
         ensureDefaultCamera();
-        std::unordered_map<std::string, ValuePtr> m;
-        m["px"] = std::make_shared<Value>(Value::fromFloat(g_camera.position.x));
-        m["py"] = std::make_shared<Value>(Value::fromFloat(g_camera.position.y));
-        m["pz"] = std::make_shared<Value>(Value::fromFloat(g_camera.position.z));
-        m["tx"] = std::make_shared<Value>(Value::fromFloat(g_camera.target.x));
-        m["ty"] = std::make_shared<Value>(Value::fromFloat(g_camera.target.y));
-        m["tz"] = std::make_shared<Value>(Value::fromFloat(g_camera.target.z));
-        m["ux"] = std::make_shared<Value>(Value::fromFloat(g_camera.up.x));
-        m["uy"] = std::make_shared<Value>(Value::fromFloat(g_camera.up.y));
-        m["uz"] = std::make_shared<Value>(Value::fromFloat(g_camera.up.z));
-        m["fov"] = std::make_shared<Value>(Value::fromFloat(g_camera.fovy));
-        m["projection"] = std::make_shared<Value>(Value::fromInt((int64_t)g_camera.projection));
-        return Value::fromMap(std::move(m));
+        return makeCameraMap(g_camera);
+    });
+    add("setDebugOverlays", [](VM*, std::vector<ValuePtr> args) {
+        if (args.size() >= 1) g_debug_draw_axes = args[0] && args[0]->isTruthy();
+        if (args.size() >= 2) g_debug_draw_grid = args[1] && args[1]->isTruthy();
+        if (args.size() >= 3) g_debug_draw_bounds = args[2] && args[2]->isTruthy();
+        g_debug_draw = g_debug_draw_axes || g_debug_draw_grid || g_debug_draw_bounds;
+        return Value::nil();
+    });
+    add("drawObjectBounds", [](VM*, std::vector<ValuePtr> args) {
+        if (!graphicsWindowOpen() || args.empty()) return Value::nil();
+        int id = toInt(args[0]);
+        if (!validObjectId(id)) return Value::nil();
+        int r = args.size() >= 2 ? toInt(args[1]) : 255;
+        int g = args.size() >= 3 ? toInt(args[2]) : 255;
+        int b = args.size() >= 4 ? toInt(args[3]) : 0;
+        int a = args.size() >= 5 ? toInt(args[4]) : 255;
+        drawObjectBoundsInternal(g_objects[id], makeColor(r, g, b, a));
+        return Value::nil();
     });
 
     add("status", [](VM*, std::vector<ValuePtr>) {
@@ -1318,6 +1823,11 @@ static void register3dGraphicsToVM(VM& vm, std::function<void(const std::string&
         m["height"] = std::make_shared<Value>(Value::fromInt(graphicsWindowOpen() ? GetScreenHeight() : 0));
         m["cameraMode"] = std::make_shared<Value>(Value::fromInt(g_camera_mode));
         m["mouseCaptured"] = std::make_shared<Value>(Value::fromBool(g_mouse_captured));
+        m["debugAxes"] = std::make_shared<Value>(Value::fromBool(g_debug_draw_axes));
+        m["debugGrid"] = std::make_shared<Value>(Value::fromBool(g_debug_draw_grid));
+        m["debugBounds"] = std::make_shared<Value>(Value::fromBool(g_debug_draw_bounds));
+        m["cameraPathNodes"] = std::make_shared<Value>(Value::fromInt((int64_t)g_camera_path_nodes.size()));
+        m["cameraPathClosed"] = std::make_shared<Value>(Value::fromBool(g_camera_path_closed));
         m["objectCount"] = std::make_shared<Value>(Value::fromInt((int64_t)g_objects.size()));
         m["groupCount"] = std::make_shared<Value>(Value::fromInt((int64_t)g_groups.size()));
         m["lightCount"] = std::make_shared<Value>(Value::fromInt((int64_t)g_lights.size()));
@@ -1393,10 +1903,12 @@ static void register3dGraphicsToVM(VM& vm, std::function<void(const std::string&
             ClearBackground(g_clear_color);
             BeginMode3D(g_camera);
             if (g_debug_draw) {
-                DrawGrid(20, 1.0f);
-                DrawLine3D({0, 0, 0}, {2, 0, 0}, RED);   // +x
-                DrawLine3D({0, 0, 0}, {0, 2, 0}, GREEN); // +y
-                DrawLine3D({0, 0, 0}, {0, 0, 2}, BLUE);  // +z
+                if (g_debug_draw_grid) DrawGrid(20, 1.0f);
+                if (g_debug_draw_axes) {
+                    DrawLine3D({0, 0, 0}, {2, 0, 0}, RED);   // +x
+                    DrawLine3D({0, 0, 0}, {0, 2, 0}, GREEN); // +y
+                    DrawLine3D({0, 0, 0}, {0, 0, 2}, BLUE);  // +z
+                }
             }
             try {
                 vm->callValue(d, {});
@@ -1415,6 +1927,9 @@ static void register3dGraphicsToVM(VM& vm, std::function<void(const std::string&
             for (int i = 0; i < (int)g_objects.size(); ++i) {
                 if (hidden.find(i) != hidden.end()) continue;
                 drawObjectInternal(g_objects[i]);
+                if (g_debug_draw_bounds) {
+                    drawObjectBoundsInternal(g_objects[i], makeColor(255, 220, 40));
+                }
             }
             EndMode3D();
             if (g_show_stats) DrawFPS(10, 10);

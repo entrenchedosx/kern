@@ -70,6 +70,7 @@ jobs:
         run: |
           build\Release\kern.exe --scan --registry-only
           build\Release\kern.exe graph --json tests\compile_pipeline_fixture\main.kn
+          build\Release\kern.exe --allow=filesystem.read tests\coverage\test_g3d_api_surface_vnext_source.kn
           build\Release\kern.exe tests\std_v1_builtins_smoke.kn
           build\Release\kern.exe examples\basic\01_hello_world.kn
 
