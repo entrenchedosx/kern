@@ -202,7 +202,7 @@ See **[CONTRIBUTING.md](CONTRIBUTING.md)** for coding expectations, how to run t
 
 ## Donations
 
-If Kern is useful to you, optional tips are welcome. **Always verify** the address in your wallet before sending; on-chain transfers are irreversible.
+If Kern is useful to you, optional tips are welcome. Contributions directly support ongoing maintenance, release cadence, and new feature development; sustained funding helps keep long-term improvement work active. **Always verify** the address in your wallet before sending; on-chain transfers are irreversible.
 
 | Network | Address |
 |---------|---------|
