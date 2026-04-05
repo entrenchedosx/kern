@@ -493,7 +493,14 @@ static void register2dGraphicsToVM(VM& vm, std::function<void(const std::string&
         if (segments < 1) segments = 1;
         if (thick <= 0.0f) thick = 1.0f;
         int r, g, b, a; getColorFromArgs(args, 7, &r, &g, &b, &a);
-        DrawRectangleRoundedLines(rec, roundness, segments, thick, makeColor(r, g, b, a));
+        // Keep compatibility across Raylib versions where DrawRectangleRoundedLines
+        // accepts only 4 args (no thickness). Approximate thickness by drawing
+        // outward expanded outlines.
+        int passes = std::max(1, (int)std::round(thick));
+        for (int i = 0; i < passes; ++i) {
+            Rectangle ri{rec.x - (float)i, rec.y - (float)i, rec.width + 2.0f * (float)i, rec.height + 2.0f * (float)i};
+            DrawRectangleRoundedLines(ri, roundness, segments, makeColor(r, g, b, a));
+        }
         return Value::nil();
     });
     add("fillArc", [](VM*, std::vector<ValuePtr> args) {
