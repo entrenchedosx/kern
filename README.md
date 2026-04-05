@@ -1,7 +1,7 @@
 # Kern
 
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.7-blue.svg)](KERN_VERSION.txt)
+[![Version](https://img.shields.io/badge/version-1.0.10-blue.svg)](KERN_VERSION.txt)
 [![Discord](https://img.shields.io/badge/discord-Kern-5865F2?logo=discord&logoColor=white)](https://discord.gg/JBa4RfT2tE)
 
 **Kern** is a practical **Python-like + C++-level system access** language: readable scripts, compiled to bytecode, executed by a fast VM, with explicit tooling for diagnostics, scanning, packaging, and deployment.
@@ -221,9 +221,9 @@ See [docs/TESTING.md](docs/TESTING.md) for example sweeps, `kernc` tests, and st
 
 ## Releases & versioning
 
-- **Version:** `KERN_VERSION.txt` at repo root (e.g. `1.0.7`).
+- **Version:** `KERN_VERSION.txt` at repo root (e.g. `1.0.10`).
 - **Changelog:** [CHANGELOG.md](CHANGELOG.md) follows [Keep a Changelog](https://keepachangelog.com/).
-- **Tags:** release tags look like `v1.0.7` (see [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)).
+- **Tags:** release tags look like `v1.0.10` (see [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)).
 - **CI:** [`.github/workflows/windows-kern.yml`](.github/workflows/windows-kern.yml), [`.github/workflows/linux-kern.yml`](.github/workflows/linux-kern.yml), and [`.github/workflows/macos-kern.yml`](.github/workflows/macos-kern.yml) build and smoke-test on pushes and PRs.
 - **Releases:** Pushing a `v*` tag runs [`.github/workflows/release.yml`](.github/workflows/release.yml), which uploads **Windows** (zip, Raylib-enabled), **Linux** (`.tar.gz`, headless), and **macOS** (`.tar.gz`, headless) assets to the GitHub Release.
 
