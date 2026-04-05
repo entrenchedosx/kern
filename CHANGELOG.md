@@ -8,6 +8,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+#### Package registry foundation (`kern-registry`) + CLI integration
+
+- **Purpose:** Introduce a production-oriented package workflow for Kern with registry metadata, semver resolution, lockfile generation, integrity checks, offline cache reuse, and first-class CLI entrypoints.
+- **New monorepo:** [`kern-registry/`](kern-registry/) with:
+  - static registry layout (`registry/registry.json`, `packages/<name>/metadata.json`, `packages/<name>/versions/<ver>.json`)
+  - Node API server (`server/index.js`, routes for publish/package/search)
+  - CLI (`kern-pkg`) with `publish`, `install`, `search`, `info`
+  - schemas and unit tests
+- **Install pipeline:** lockfile-aware recursive dependency resolution with semver (`exact`, `^`, `~`), cycle detection, dedupe, SHA256 verification, extraction into `.kern/packages/<pkg>/<version>/`, and cache in `~/.kern/cache`.
+- **Publish pipeline:** package validation + tarball creation + SHA256, static registry index updates, optional public release flow (`--public`) and preview mode (`--dry-run`).
+- **Kern command surface:** `kern install [pkg@range]`, `kern publish`, `kern search`, `kern info` delegate to registry CLI; `kern add pkg@range` uses registry install flow when available.
+
+### Changed
+
+- **Manifest/lock compatibility:** `kern.json` dependency parsing now accepts both legacy array and object map forms; lockfile refresh emits lockVersion 2 package map shape.
+- **Import resolution:** bare package imports now resolve through `.kern/package-paths.json` when present, enabling runtime loading of installed packages by package name.
+- **Documentation:** root [`README.md`](README.md) now includes package command quickstart and links to [`kern-registry/README.md`](kern-registry/README.md).
+
+### Security
+
+- **Integrity enforcement:** downloaded package artifacts are validated against SHA256 integrity metadata before extraction; tampered artifacts fail installation.
+
 ---
 
 ## [1.0.7] - 2026-04-03
