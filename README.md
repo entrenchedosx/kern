@@ -117,9 +117,26 @@ kern --scan [.kn files or dirs]  # cross-layer scan (see docs/KERN_SCAN.md)
 kern test [options] [directory]  # --grep, --list, --fail-fast; default tests/coverage
 kern docs                        # documentation paths + optional MkDocs
 kern build                       # CMake build hints (toolchain is CMake-built)
+kern add pkg@^1.2.0              # add+resolve+install package (registry flow)
+kern install [pkg@range]         # lockfile-aware install via kern-registry
+kern publish                     # publish current package via registry CLI
+kern search <query>              # package search
+kern info <pkg> [range]          # package metadata
 kern verify                      # kern.lock matches kern.json (CI)
 kern --trace script.kn           # verbose VM trace (noisy)
 kern --version / --help
+```
+
+### Package quickstart
+
+```powershell
+# in a Kern project folder
+kern add example-http@^1.0.0
+kern search http
+kern info example-http
+
+# publish (if this project is a package)
+kern publish
 ```
 
 **Imports:** `import "math"`, `from "math" import sqrt`, or `import("path")` / `let m = import("math")`. Set **`KERN_LIB`** to the directory that **contains** `lib/kern` (often the repo root) so `import("lib/kern/...")` resolves when your working directory is not the project root.
@@ -156,6 +173,7 @@ cmake --build build --config Release --target kern kernc kern-scan
 | `examples/` | Sample programs |
 | `tests/` | Automated and regression tests |
 | `docs/` | Guides, references, troubleshooting |
+| `kern-registry/` | Package registry monorepo (static registry, Node API, CLI) |
 | `kern-to-exe/` | Packager: `.kn` → standalone executable |
 | `Kern-IDE/` | **Editor bundle** (Python/Qt/VS Code) — not required to build `kern` |
 | `framework/` | Optional document-runtime demo (CMake-gated) |
@@ -187,6 +205,7 @@ The canonical version string is the root **`KERN_VERSION.txt`** file (used by `k
 | [MEMORY_MODEL.md](docs/MEMORY_MODEL.md) | Value lifetimes and FFI boundaries |
 | [ERROR_CODES.md](docs/ERROR_CODES.md) | Stable diagnostic codes |
 | [IMPLEMENTATION_SUMMARY.md](docs/IMPLEMENTATION_SUMMARY.md) | Recent toolchain upgrade summary |
+| [kern-registry/README.md](kern-registry/README.md) | Package registry architecture and command workflow |
 
 ---
 

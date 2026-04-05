@@ -1,0 +1,11 @@
+{
+  "name": "example-http",
+  "version": "1.0.0",
+  "main": "src/index.kn",
+  "dependencies": {},
+  "trusted": true,
+  "dist": {
+    "tarball": "https://example.invalid/example-http-1.0.0.tgz",
+    "shasum": "sha256-placeholder"
+  }
+}

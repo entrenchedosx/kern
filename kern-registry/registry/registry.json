@@ -1,0 +1,10 @@
+{
+  "registryVersion": 1,
+  "generatedAt": "2026-04-05T00:00:00Z",
+  "packages": {
+    "example-http": {
+      "latest": "1.0.0",
+      "metadata": "packages/example-http/metadata.json"
+    }
+  }
+}

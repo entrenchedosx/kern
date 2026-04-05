@@ -1,0 +1,575 @@
+================================================================================
+KERN — COMPLETE FEATURE REFERENCE (TEMPORARY HANDOFF DOCUMENT)
+================================================================================
+Generated for: sharing with a third party who needs a single-file overview.
+
+IMPORTANT DISCLAIMERS
+-------------------
+1) Kern evolves. This file is a snapshot assembled from the repository layout
+   (builtins, stdlib maps, modules, CLI strings, docs). For an authoritative
+   machine list of VM builtins, see: src/vm/builtins.hpp → getBuiltinNames().
+2) Some features are conditional on CMake/build flags (e.g. KERN_BUILD_GAME,
+   Raylib-linked g2d/g3d). If a symbol is missing at runtime, check how the
+   binary was built.
+3) "All features" here means: everything the repo exposes as language surface,
+   VM opcodes, registered builtins, stdlib module maps, optional game/graphics
+   modules, and primary tooling. Third-party editor plugins or unreleased
+   branches are out of scope.
+
+================================================================================
+1. WHAT KERN IS (STACK)
+================================================================================
+- Source language: .kn scripts (C/JavaScript-like syntax; see §3).
+- Pipeline: Lexer → Parser → AST → Codegen → Bytecode → VM execution.
+- Core entrypoints:
+  • `kern`     — interpret/compile-check/format/test/REPL (src/main.cpp).
+  • `kernc`    — standalone / AOT-oriented compiler + project tooling
+                 (src/kernc_main.cpp).
+  • `kern-scan` — cross-layer scanner (registry + static analysis).
+  • LSP server — diagnostics/hover aligned with compiler + builtin registry
+                 (src/lsp/lsp_main.cpp).
+- Optional: `kern` / `kern-game` style builds with Raylib + game builtins
+  (src/game/) and native 2D/3D modules (src/modules/g2d/, g3d/).
+
+================================================================================
+2. LANGUAGE SYNTAX & SEMANTICS (HIGH LEVEL)
+================================================================================
+(Compiler + examples are ground truth; see docs/LANGUAGE_SYNTAX.md.)
+
+Statements and control flow
+----------------------------
+- Bindings: let, var, const.
+- Functions: def name(...) { ... } with return.
+- Types / OOP: class with methods; Instance(...) for construction where used.
+- Conditionals: if / else.
+- Loops: while, for (including for-in style iteration supported by VM opcodes
+  FOR_IN_NEXT / FOR_IN_ITER).
+- Pattern / branching: match (where grammar supports it).
+- Errors: try / catch / finally, throw.
+- Defer: defer — schedules cleanup via Opcode::DEFER (operand = stack values).
+- Generators: functions can be generator-marked; yield suspends execution
+  (Opcode YIELD, SET_FUNC_GENERATOR).
+- Unsafe regions: unsafe { ... } or unsafe: block — required by semantic pass
+  for certain low-level builtins and FFI calls (see src/compiler/semantic.cpp).
+- Decorators: @Name(...) before declarations desugar to calls to the runtime
+  hook __apply_decorator (and related __runtime_apply_decorators).
+
+Operators (non-exhaustive)
+--------------------------
+- Arithmetic: + - * / %
+- Comparison: == != < <= > >=
+- Logic: && || !
+- Optional chaining: ?.
+- Null coalescing: ??
+- Bitwise: present in bytecode (BIT_AND, BIT_OR, BIT_XOR, SHL, SHR).
+
+Values
+------
+- Numbers (int / float), strings, booleans, nil.
+- Arrays: [a, b, c]
+- Maps / objects: { "key": value }  (often referred to as maps or dictionaries
+  in APIs and tests).
+
+Modules and imports
+-------------------
+- import("moduleName") returns a map of exports.
+- String module names resolve to:
+  • Native stdlib modules (see §7–§8).
+  • Filesystem paths under project / KERN_LIB (see docs/TROUBLESHOOTING.md).
+- `from "x" import y` style imports (see main.cpp help text).
+- Duplicate-load caching and cycle detection; import errors use VM error codes
+  IMPORT_* (src/vm/vm_error_codes.hpp).
+
+Foreign functions (FFI)
+-----------------------
+- extern def Name(...) : ReturnType from "library" — declares a symbol tied to
+  a native library; actual calls still require unsafe { ... } in strict
+  semantic mode.
+- Runtime: ffi_allow_library, ffi_call, ffi_call_typed (see §6) plus CLI
+  --ffi, --ffi-allow, --no-sandbox.
+
+================================================================================
+3. BYTECODE / VM MODEL
+================================================================================
+Schema: kBytecodeSchemaVersion = 1 (src/vm/bytecode.hpp). Bumped when serialized
+bytecode or opcode semantics change incompatibly.
+
+Opcode categories (Opcode enum)
+-------------------------------
+Constants: CONST_I64, CONST_F64, CONST_STR, CONST_TRUE, CONST_FALSE, CONST_NULL
+Variables: LOAD, STORE, LOAD_GLOBAL, STORE_GLOBAL
+Stack: POP, DUP
+Arithmetic: ADD, SUB, MUL, DIV, MOD, POW, NEG
+Compare: EQ, NE, LT, LE, GT, GE
+Logic: AND, OR, NOT
+Bitwise: BIT_AND, BIT_OR, BIT_XOR, SHL, SHR
+Control: JMP, JMP_IF_FALSE, JMP_IF_TRUE, LOOP
+Exceptions: TRY_BEGIN, TRY_END, THROW, RETHROW, DEFER
+Iteration: FOR_IN_NEXT, FOR_IN_ITER
+Functions: CALL, RETURN, BUILD_FUNC, BUILD_CLOSURE, SET_FUNC_ARITY,
+           SET_FUNC_PARAM_NAMES, SET_FUNC_NAME, SET_FUNC_GENERATOR, YIELD
+Objects: NEW_OBJECT, BUILD_ARRAY, SPREAD, GET_FIELD, SET_FIELD, GET_INDEX,
+         SET_INDEX, ARRAY_LEN, SLICE, NEW_INSTANCE, INVOKE_METHOD, LOAD_THIS
+Low-level VM memory ops: ALLOC, FREE, MEM_COPY
+Builtins: PRINT, BUILTIN (operand = builtin index)
+Meta: NOP, UNSAFE_BEGIN, UNSAFE_END, HALT
+
+Runtime guards (policy on VM)
+------------------------------
+- set_step_limit, set_max_call_depth, set_callback_guard — cap execution.
+- deterministic_mode — influence reproducibility-sensitive behavior.
+- runtime_info — introspection.
+- Permission enforcement toggled via policy / env (see §5); KERN_ENFORCE_PERMISSIONS=0
+  disables enforcement (dev/CI only; documented in permission errors).
+
+Bytecode verification
+---------------------
+- Optional verifier catches stack depth inconsistencies (VMErrorCode::BYTECODE_VERIFY_STACK).
+
+================================================================================
+4. PERMISSIONS & CAPABILITY PROFILES
+================================================================================
+Core permission IDs (src/vm/permissions.hpp, namespace Perm)
+------------------------------------------------------------
+- filesystem.read
+- filesystem.write
+- system.exec
+- process.control
+- env.access
+- network.http   (http_get, http_request, http_post)
+- network.tcp    (TCP socket family APIs)
+- network.udp    (UDP socket family APIs)
+
+Shortcut groups (CLI, require(), --allow=)
+------------------------------------------
+- fs.readonly   → filesystem.read
+- fs.readwrite  → filesystem.read + filesystem.write
+- net.client    → network.http + network.tcp + network.udp
+- proc.control  → process.control + system.exec
+- env.manage    → env.access
+- system.full   → all of the above
+
+Capability profiles (kern --profile=..., kernconfig capability_profile)
+-----------------------------------------------------------------------
+- secure — no pre-grants
+- dev    — fs.readwrite, net.client, proc.control, env.manage
+- ci     — fs.readwrite, net.client, proc.control
+
+How privileges are granted
+--------------------------
+- require("permission_or_group") builtin — inserts into granted set for rest of run.
+- kern --allow=a,b,c
+- unsafe { ... } or kern --allow-unsafe / --unsafe (global unsafe for gated builtins)
+- Test harness / REPL may register all standard permissions (registerAllStandardPermissions).
+
+Introspection
+-------------
+- permissions_active() → map including granted permission info; implementation
+  may expose granted_with_source (which grants came from where).
+
+================================================================================
+5. CORE VM BUILTINS (GLOBAL FUNCTIONS)
+================================================================================
+Listed in registration order in getBuiltinNames() (src/vm/builtins.hpp).
+Alternate spellings / extra globals: PI, E, readFile, writeFile, appendFile,
+file_exists, list_dir (getBuiltinExtraGlobalNames).
+
+I/O & strings (basics)
+----------------------
+print, read_file, write_file, append_file, readline, require,
+fileExists, listDir, listDirRecursive, copy_file, delete_file, move_file,
+create_dir, is_file, is_dir, file_size, glob,
+basename, dirname, path_join, path_normalize, realpath, cwd, chdir, temp_dir,
+inspect, type, dir, repr, len, str, int, float, format,
+upper, lower, replace, join, split, trim, starts_with, ends_with,
+repeat, pad_left, pad_right, pad_center (via std_string_*), split_lines,
+chr, ord, hex, bin, parse_int, parse_float, is_nan, is_inf,
+is_string, is_array, is_map, is_number, is_int, is_float, is_function,
+round_to, insert_at, remove_at
+
+Math
+----
+sqrt, pow, sin, cos, tan, atan2, floor, ceil, round, abs, log,
+clamp, lerp, min, max, sign, deg_to_rad, rad_to_deg,
+std_math_* (re-exported as std.v1.math): fmod, hypot, log10, log2, exp, expm1,
+log1p, cbrt, asin, acos, atan, sinh, cosh, tanh, copysign, nextafter, trunc,
+round_to_int
+
+Collections & FP-style helpers
+------------------------------
+array, push, push_front, slice, map, filter, reduce, flat_map, zip, chunk, unique,
+reverse, find, sort, sorted, sort_by, first, last, take, drop,
+flatten, enumerate, partition, window, cartesian, deep_equal, copy, merge,
+default, keys, values, has, all, any, extend_array, range,
+vec2, vec3, rand_vec2, rand_vec3
+
+Random
+------
+random, random_int, random_choice, random_shuffle
+
+Time & process environment
+--------------------------
+time, sleep, sleep_ms, monotonic_time, time_format,
+cli_args, env_get, env_all, env_set, hostname, cpu_count, getpid, which,
+exec, exec_capture, exec_args, spawn, wait_process, kill_process,
+process_spawn_v2, process_wait, process_kill_tree, process_list,
+process_job_create, process_job_add, process_job_kill,
+exit_code
+
+JSON / TOML / CSV / data
+------------------------
+json_parse, json_stringify, toml_parse, toml_stringify, csv_parse, csv_stringify
+
+Regex
+-----
+regex_match, regex_replace, regex_split, regex_find_all,
+regex_compile, regex_match_pattern, regex_replace_pattern, escape_regex
+
+HTTP / URL / web helpers
+------------------------
+url_encode, url_decode, http_get, http_request, http_post,
+url_parse, parse_query, build_query, merge_query, url_resolve, url_normalize,
+url_path_join, parse_data_url, mime_type_guess,
+http_parse_response, http_parse_request, http_build_response,
+parse_cookie_header, set_cookie_fields, content_type_charset,
+is_safe_http_redirect, parse_link_header, parse_content_disposition,
+parse_authorization_basic, parse_accept_language,
+html_escape, html_unescape, strip_html, html_sanitize_strict, html_nl2br,
+css_escape, css_url_escape, js_escape, xml_escape
+
+Networking (sockets)
+--------------------
+tcp_connect, tcp_connect_start, tcp_connect_check, tcp_listen, tcp_accept,
+tcp_send, tcp_recv, tcp_close,
+udp_open, udp_bind, udp_send, udp_recv, udp_close,
+socket_set_nonblocking, socket_select_read, socket_select_write,
+net_tcp_server, net_tcp_poll, net_dns_lookup, net_tls_connect,
+net_ws_connect, net_ws_listen
+
+Filesystem (low-level “wave 30” style)
+--------------------------------------
+fs_fd_open, fs_fd_close, fs_fd_read, fs_fd_write, fs_fd_pread, fs_fd_pwrite,
+fs_flock, fs_statx, fs_atomic_write, fs_watch, fs_space, fs_mounts
+
+OS signals & features
+---------------------
+os_signal_trap, os_signal_untrap, os_runtime_limits, os_features
+
+Encoding & hashing
+------------------
+base64_encode, base64_decode, sha1, sha256, hash_fnv, uuid,
+string_to_bytes, bytes_to_string,
+std_bytes_* (std.v1.bytes): crc32, to_hex, from_hex, xor, concat, slice, equal,
+get_u16_le, get_u32_le, set_u32_le, get_u8, from_string, len
+
+std_string_* & std_col_* — see §8 (re-exported under std.v1.string / collections)
+
+Errors & debugging
+------------------
+Error, panic, error_message, error_name, error_cause,
+ValueError, TypeError, RuntimeError, OSError, KeyError, is_error_type,
+stack_trace, stack_trace_array, format_exception, error_traceback, error_structured,
+assertType, assert_eq, log_info, log_warn, log_error, log_debug,
+profile_cycles, profile_fn
+
+Runtime control & meta-invocation
+---------------------------------
+set_step_limit, set_max_call_depth, set_callback_guard, deterministic_mode,
+runtime_info, permissions_active, retry_call, with_cleanup, invoke,
+kern_version, platform, os_name, arch,
+freeze, Instance (constructor helper),
+__apply_decorator, __spawn_task, __await_task, __runtime_apply_decorators,
+__safe_invoke2
+
+FFI
+---
+ffi_allow_library, ffi_call, ffi_call_typed
+
+Low-level memory / unsafe surface (large)
+-----------------------------------------
+alloc, free, realloc, alloc_zeroed, alloc_aligned, alloc_tracked, free_tracked,
+get_tracked_allocations, dump_memory,
+mem_copy, mem_set, mem_set_zero, mem_move, mem_swap, mem_cmp, mem_reverse,
+mem_scan, mem_overlaps, mem_find, mem_fill_pattern, mem_count, mem_is_zero,
+mem_xor, mem_zero,
+ptr_address, ptr_from_address, ptr_offset, ptr_add, ptr_sub, ptr_diff,
+ptr_eq, ptr_compare, ptr_min, ptr_max, ptr_in_range, ptr_is_null, size_of_ptr,
+ptr_align_up, ptr_align_down, is_aligned, ptr_tag, ptr_untag, ptr_get_tag,
+align_up, align_down, memory_barrier,
+peek8, peek16, peek32, peek64, poke8, poke16, poke32, poke64,
+peek8s, peek16s, peek32s, peek64s,
+peek_float, poke_float, peek_double, poke_double,
+volatile_load8/16/32/64, volatile_store8/16/32/64,
+atomic_load32, atomic_store32, atomic_add32, atomic_cmpxchg32,
+read_le16/32/64, write_le16/32/64, read_be16/32/64, write_be16/32/64,
+read_le_float, write_le_float, read_le_double, write_le_double,
+read_be_float, write_be_float, read_be_double, write_be_double,
+get_endianness,
+map_file, unmap_file, memory_protect, memory_page_size,
+struct_define, offsetof_struct, sizeof_struct,
+pool_create, pool_alloc, pool_free, pool_destroy,
+bytes_read, bytes_write
+
+================================================================================
+6. std.v1 VERSIONED STANDARD MODULES
+================================================================================
+Import: import("std") → map with v1 bundle; import("std.v1") → submodule map;
+        import("std.v1.math") etc.
+
+Aliases (resolveStdlibModuleAlias): std.math → std.v1.math (same for string,
+bytes, collections, fs, process, net, os, signal, memory, task, sync, time).
+
+Submodules and exports (src/stdlib_stdv1_exports.hpp)
+-----------------------------------------------------
+std.v1.math — see std_math_* list in §5.
+std.v1.string — index_of, last_index_of, count_substr, substr,
+  equals_ignore_case, compare, trim_left, trim_right, split_first, char_at,
+  is_empty, remove_prefix, remove_suffix, pad_center
+std.v1.bytes — see std_bytes_* in §5.
+std.v1.collections — array_index_of, array_last_index_of, swap, rotate_left,
+  dict_merge_shallow, array_zip_pairs, array_unique, array_fill, map_invert,
+  array_intersect
+std.v1.fs — read_text→read_file, write_text→write_file, append_text→append_file,
+  fd_*, flock, statx, atomic_write, watch, space, mounts, file_exists, list_dir,
+  list_recursive, is_file, is_dir, create_dir, copy_file, delete_file, move_file,
+  map_file, unmap_file, memory_protect, file_size, glob, path helpers
+std.v1.process — cli_args, cwd, chdir, env_*, getpid, hostname, cpu_count, which,
+  run→exec_args, capture→exec_capture, spawn, spawn_v2, wait_process, wait,
+  kill_process, kill_tree, list, job_create, job_add, job_kill,
+  permissions_active, sleep_ms
+std.v1.net — full HTTP/URL surface + tcp_*, net_tcp_server, net_tcp_poll,
+  dns_lookup, tls_connect, ws_connect, ws_listen, udp_*, socket_select_*
+std.v1.os — platform, os_name, arch, hostname, cpu_count, getpid, cwd, chdir,
+  temp_dir, realpath, which, runtime_info, runtime_limits, features,
+  permissions_active
+std.v1.signal — send/cancel_process→kill_process, trap, untrap
+std.v1.memory — alloc, free, ptr_*, map_file, unmap_file, memory_protect,
+  bytes_read, bytes_write
+std.v1.task — spawn→__spawn_task, await→__await_task, sleep_ms, monotonic
+std.v1.sync — retry_call, with_cleanup
+std.v1.time — now→time, monotonic, sleep, sleep_ms, time_format
+
+Design note (docs/STDLIB_STD_V1.md): new native APIs prefer internal std_* names
+with stable user-facing keys on std.v1.* maps.
+
+================================================================================
+7. LEGACY FLAT STDLIB MODULE NAMES (import("math"), import("web"), …)
+================================================================================
+These are curated export bundles (src/stdlib_modules.cpp). Each name maps to a
+subset of globals (same underlying builtins):
+
+math, string, json, net, web, data, random, sys, io, array, env, map, types,
+debug, log, time, memory, util, profiling, path, errors, iter, collections, fs,
+regex, csv, b64, logging, hash, uuid, os, copy, datetime, secrets, itools, cli,
+encoding, run, interop, concurrency, observability, security, automation,
+binary, websec, netops, datatools, runtime_controls
+
+(Each module’s member list is long; the union roughly matches §5–§6. Use the
+source MODULES table for exact per-module exports.)
+
+================================================================================
+8. OPTIONAL GAME BUILTINS (KERN_BUILD_GAME)
+================================================================================
+Registered when game mode is compiled in (src/game/game_builtins.cpp).
+Names from getGameBuiltinNames():
+
+window_create, window_close, window_should_close, window_open,
+window_set_size, window_toggle_fullscreen,
+clear, draw_rect, draw_circle, draw_line, draw_triangle, present,
+load_image, draw_image, draw_image_ex,
+key_down, key_pressed, key_released,
+mouse_x, mouse_y, mouse_pressed, mouse_down,
+set_target_fps, delta_time, input_chars, screen_width, screen_height,
+load_sound, play_sound,
+draw_text, rect_collision, circle_collision, set_pixel, game_loop,
+camera_set, camera_zoom, get_fps, debug_overlay,
+set_master_volume, bind_action, action_pressed, action_down,
+is_gamepad_available, gamepad_axis, gamepad_button_down, gamepad_button_pressed
+
+================================================================================
+9. NATIVE 2D MODULE — import("g2d")  (Raylib-backed when enabled)
+================================================================================
+API surface (src/modules/g2d/g2d.cpp) — function keys on returned map:
+
+Window / frame: create, createWindow, open, close, closeWindow, setWindowSize,
+  toggleFullscreen, should_close, is_open, isOpen, beginFrame, endFrame,
+  setTargetFps, setVsync, beginScissor, endScissor, present, run, width, height,
+  delta_time, fps, set_title
+
+Drawing — color & primitives: setColor, clear, rgb, rgba, hexColor,
+  fill_rect, stroke_rect, fill_circle, stroke_circle, line, drawLineThick,
+  drawLine, drawRect, fillRect, drawCircle, fillCircle, drawPolygon,
+  drawTriangle, fillTriangle, drawEllipse, fillEllipse,
+  fillGradientRect, fillGradientRect4, fillRoundedRect, strokeRoundedRect,
+  fillArc, strokeArc
+
+Render targets: createRenderTarget, beginRenderTarget, endRenderTarget,
+  drawRenderTarget, unloadRenderTarget
+
+Text: text, loadFont, drawText, measureText, drawTextCentered, drawTextBox
+
+Images & sprites: load_image, loadImage, draw_image, drawImage, drawImageScaled,
+  drawImageRotated, spriteSheet, playAnimation, drawSprite
+
+Input: isKeyPressed, isKeyDown, mouseX, mouseY, isMousePressed, isMouseDown,
+  mousePressed, mouseDown, mousePos, mouseWheel
+
+Collision helpers: rectsOverlap, pointInRect, circlesOverlap
+
+2D camera: setCamera, moveCamera, setCameraBounds, clearCameraBounds,
+  screenShake, zoomCamera
+
+================================================================================
+10. NATIVE 3D MODULE — import("g3d")  (Raylib-backed when enabled)
+================================================================================
+API surface (src/modules/g3d/g3d.cpp) — representative groups:
+
+Window / frame: createWindow, closeWindow, clear, width, height, run, status
+
+Camera: setCamera, setProjection, setFov, setCameraMode, moveCamera,
+  orbitCamera, orbitCameraStep, orbitCameraToObject, focusCameraOnObject,
+  lerpCamera, setCameraPath, clearCameraPath, sampleCameraPath, applyCameraPath,
+  lookAt, getCamera
+
+Debug: setDebug, setDebugOverlays, drawObjectBounds, showStats
+
+Scene / objects: createObject, loadModel, clearScene, objectCount, activeObjectCount,
+  setPosition, setRotation, setScale, setObjectColor, setMaterial, setTexture,
+  saveScene, loadScene, setVisible, destroyObject, objectIntersects, objectDistance,
+  worldToScreen, isObjectVisible, pickObject, pickObjectInfo, pickObjectFiltered,
+  pickObjectInfoFiltered, visibleObjects, visibleObjectsFiltered, getObject,
+  drawObject, drawAll
+
+Groups: createGroup, addToGroup, setGroupVisible
+
+Lights: addDirectionalLight, addPointLight, setAmbientLight
+
+Input & picking: isKeyDown, isKeyPressed, mouseX, mouseY, isMouseDown,
+  rayFromMouse, intersectObject, captureMouse, centerMouse
+
+Immediate primitives: drawCube, drawSphere, drawPlane, drawCylinder, drawGrid
+
+Drawing uses setColor for tint/state where applicable.
+
+================================================================================
+11. CLI — `kern` (INTERPRETER / TOOLING)
+================================================================================
+(See printUsage in src/main.cpp.)
+
+Execution
+---------
+- kern script.kn  |  kern run script.kn  |  kern (no args → REPL)
+- Shebang #! support on Unix; .kn extension optional (tries path.kn)
+
+Developer / compiler passes
+---------------------------
+- --check / --lint [file] — compile only; optional --json, --strict-types,
+  --skip-lock-verify; kern.json lock verification when present
+- --fmt file — brace-aware indent (skips strings and comments)
+- --ast file — AST dump
+- --bytecode file — disassembly
+- --bytecode-normalized file — stable dump (no source locations)
+- --vm-error-codes-json — machine-readable VM error catalog
+- --scan [opts] [paths] — cross-layer scan (same as kern-scan)
+
+Watch mode
+----------
+- --watch [--check] [--strict-types] file — rerun on save
+- kern watch test [opts] [dir] — watch test directory
+
+Runtime flags
+-------------
+- --trace — VM instruction trace
+- --debug / --release — guard profile
+- --allow-unsafe / --unsafe — global unsafe
+- --allow=a,b — CSV permissions or groups
+- --profile=secure|dev|ci
+- --ffi, --ffi-allow <dll>, --no-sandbox
+
+Project / package commands
+--------------------------
+- kern test [options] [path] — recursive .kn tests (default tests/coverage);
+  --grep, --list, --fail-fast (-x), --skip-lock-verify
+- kern docs — doc paths
+- kern build — CMake hints
+- kern doctor — diagnostics
+- kern init — kern.json + src/main.kn bootstrap
+- kern add / remove <dep> — manifest edit
+- kern install — refresh lockfile from kern.json
+- kern verify — kern.lock matches kern.json (CI)
+- kern capability profile list|show|apply
+- kern graph [opts] entry.kn — static import graph (--json)
+
+Windows-only: --repair-association — .kn file association repair
+
+================================================================================
+12. CLI — `kernc` (STANDALONE COMPILER)
+================================================================================
+(See printUsage in src/kernc_main.cpp.)
+
+- kern input.kn -o out.exe [--release|--debug] [--opt 0..3] [--console|--no-console]
+- kern --config kernconfig.json
+- kern --fix-all [root] [--dry-run] [--report-json path]
+- kern --analyze [root] [--report-json path]
+- kern --undo-fixes <backup-path>
+- kern --target kernel entry.kn -o kernel.bin [--freestanding] [--iso] [--run-qemu]
+- kern --pkg-init, --pkg-lock, --pkg-validate (kernpackage / lock workflow)
+- Feature flags: --feature-set stable|preview|experimental,
+  --enable-feature / --disable-feature
+- Runtime build toggles: --debug-runtime, --allow-unsafe, --ffi, --ffi-allow,
+  --no-sandbox; kernconfig capability_profile secure|dev|ci
+- Env: KERN_REPO_ROOT (and KERN_SRC_ROOT) for source tree detection
+
+================================================================================
+13. PROJECT FILES & WORKFLOWS
+================================================================================
+- kern.json — project name, version, entry, dependencies[]
+- kern.lock — lockfile; kern verify / default CI checks
+- kernconfig.json — kernc build configuration
+- KERN_LIB — search path for library roots
+- Capability / permission profiles integrated into CLI and standalone builds
+
+================================================================================
+14. TESTING, SCANNER, LSP
+================================================================================
+- kern test — discovery of .kn files; documentation: docs/TESTING.md
+- kern-scan — builtin registry, stdlib export validation, compile + static passes;
+  flags such as --registry-only, --json, --strict-types, --test
+- LSP — uses same builtin/game name sets for completion/hover; permission hints
+  for privileged APIs (see docs/VNEXT_SYSTEM_ACCESS.md)
+
+================================================================================
+15. VM ERROR CODES (SELECTED)
+================================================================================
+See src/vm/vm_error_codes.hpp and --vm-error-codes-json for full catalog.
+
+Examples: STACK_UNDERFLOW, STEP_LIMIT_EXCEEDED, INVALID_BYTECODE, DIVISION_BY_ZERO,
+PERMISSION_DENIED, BYTECODE_VERIFY_STACK, IMPORT_* codes, BrowserKit_* reserved
+range for embedded browser tooling if present.
+
+================================================================================
+16. DOCUMENTATION MAP (IN REPO)
+================================================================================
+- docs/GETTING_STARTED.md — onboarding
+- docs/LANGUAGE_SYNTAX.md — syntax overview
+- docs/LANGUAGE_ROADMAP.md — evolution / design direction
+- docs/STDLIB_STD_V1.md — std.v1 policy
+- docs/VNEXT_SYSTEM_ACCESS.md — system access & permission notes
+- docs/TESTING.md — test runner
+- docs/FEATURE_PLAN_20.md — graph / tooling plans
+- LOW_LEVEL_AND_MEMORY.md (referenced from stdlib for memory module)
+
+================================================================================
+17. HOW TO VERIFY THIS LIST LATER
+================================================================================
+1) Builtin names: src/vm/builtins.hpp → getBuiltinNames(), getBuiltinExtraGlobalNames()
+2) std.v1 exports: src/stdlib_stdv1_exports.hpp → stdV1NamedExports()
+3) Legacy modules: src/stdlib_modules.cpp → MODULES
+4) Opcodes: src/vm/bytecode.hpp → enum Opcode
+5) Game: src/game/game_builtins.cpp → getGameBuiltinNames()
+6) g2d/g3d: src/modules/g2d/g2d.cpp, g3d/g3d.cpp → add("...")
+7) CLI strings: src/main.cpp, src/kernc_main.cpp → printUsage
+
+================================================================================
+END OF TEMPORARY REFERENCE (safe to delete from tree when no longer needed)
+================================================================================

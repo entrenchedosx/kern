@@ -115,6 +115,61 @@ static bool isSubpathOf(const fs::path& candidate, const fs::path& root) {
     return rIt == r.end();
 }
 
+static std::string regexEscape(const std::string& s) {
+    std::string out;
+    out.reserve(s.size() * 2);
+    for (char c : s) {
+        switch (c) {
+            case '\\': case '^': case '$': case '.': case '|': case '?':
+            case '*': case '+': case '(': case ')': case '[': case '{':
+                out.push_back('\\');
+                out.push_back(c);
+                break;
+            default:
+                out.push_back(c);
+                break;
+        }
+    }
+    return out;
+}
+
+static std::string resolveInstalledPackageMain(const std::string& packageName, std::string* errOut = nullptr) {
+    std::error_code ec;
+    fs::path cwd = fs::current_path(ec);
+    if (ec) {
+        if (errOut) *errOut = "cannot determine current directory";
+        return "";
+    }
+    fs::path pathsFile = cwd / ".kern" / "package-paths.json";
+    if (!fs::exists(pathsFile)) {
+        if (errOut) *errOut = ".kern/package-paths.json not found";
+        return "";
+    }
+    std::ifstream f(pathsFile, std::ios::in | std::ios::binary);
+    if (!f) {
+        if (errOut) *errOut = "cannot read .kern/package-paths.json";
+        return "";
+    }
+    std::stringstream buf;
+    buf << f.rdbuf();
+    std::string json = buf.str();
+    const std::string escaped = regexEscape(packageName);
+    std::regex mainRe("\"" + escaped + "\"\\s*:\\s*\\{[\\s\\S]*?\"main\"\\s*:\\s*\"([^\"]+)\"");
+    std::smatch m;
+    if (!std::regex_search(json, m, mainRe) || m.size() < 2) {
+        if (errOut) *errOut = "package not installed in .kern/package-paths.json";
+        return "";
+    }
+    fs::path mainPath(m[1].str());
+    std::error_code ecCan;
+    fs::path can = fs::weakly_canonical(mainPath, ecCan);
+    if (ecCan || !fs::exists(can)) {
+        if (errOut) *errOut = "installed package main path does not exist";
+        return "";
+    }
+    return can.string();
+}
+
 /* *
  * resolve file path using deterministic order:
  * 1) current working directory
@@ -333,8 +388,18 @@ static Value runImportBuiltin(VM* v, std::vector<ValuePtr> args) {
         return cacheIt->second ? *cacheIt->second : Value::nil();
     }
 
-    if (path.find('.') == std::string::npos)
+    if (path.find('/') == std::string::npos && path.find('\\') == std::string::npos &&
+        path.find('.') == std::string::npos && path.find(':') == std::string::npos) {
+        std::string pkgErr;
+        std::string pkgMain = resolveInstalledPackageMain(path, &pkgErr);
+        if (!pkgMain.empty()) {
+            path = pkgMain;
+        } else {
+            path += ".kn";
+        }
+    } else if (path.find('.') == std::string::npos) {
         path += ".kn";
+    }
 
     // embedded module path resolution (used by standalone bundled executables).
     if (kernGetEnv("KERNC_TRACE_IMPORTS")) {

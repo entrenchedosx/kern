@@ -24,6 +24,7 @@
 #include <exception>
 #include <iostream>
 #include <unordered_set>
+#include <unordered_map>
 #include <variant>
 #include <fstream>
 #include <sstream>
@@ -37,6 +38,7 @@
 #include <thread>
 #include <chrono>
 #include <regex>
+#include <optional>
 #ifdef _WIN32
 #include <windows.h>
 #include "platform/win32_associate_kn.hpp"
@@ -369,9 +371,12 @@ static void printUsage(const char* prog) {
         << "  " << prog << " build            Show CMake build instructions (toolchain is built with CMake).\n"
         << "  " << prog << " doctor           Print runtime/tooling diagnostics.\n"
         << "  " << prog << " init             Bootstrap kern.json and src/main.kn.\n"
-        << "  " << prog << " add <dep>        Add dependency to kern.json.\n"
+        << "  " << prog << " add <dep>        Add dependency to kern.json (or package@range via registry flow).\n"
         << "  " << prog << " remove <dep>     Remove dependency from kern.json.\n"
-        << "  " << prog << " install          Refresh lockfile from kern.json (not system install; see ./install.sh).\n"
+        << "  " << prog << " install [pkg]    Install dependencies via kern-registry (lockfile-aware).\n"
+        << "  " << prog << " publish [opts]   Publish current package via kern-registry CLI.\n"
+        << "  " << prog << " search <query>   Search packages in configured Kern registry.\n"
+        << "  " << prog << " info <pkg> [rng] Show package metadata from registry.\n"
         << "  " << prog << " verify           Exit 0 if kern.lock matches kern.json dependencies (CI-friendly).\n"
         << "  " << prog << " capability profile [list|show|apply]\n"
         << "                        Inspect/apply secure-default capability profiles.\n"
@@ -394,65 +399,137 @@ static std::vector<std::string> parseDependenciesFromManifest(const std::string&
     const std::string key = "\"dependencies\"";
     size_t k = s.find(key);
     if (k == std::string::npos) return deps;
-    size_t lb = s.find('[', k);
-    size_t rb = (lb == std::string::npos) ? std::string::npos : s.find(']', lb);
-    if (lb == std::string::npos || rb == std::string::npos || rb <= lb) return deps;
-    std::string body = s.substr(lb + 1, rb - lb - 1);
-    size_t i = 0;
-    while (i < body.size()) {
-        while (i < body.size() && body[i] != '"') ++i;
-        if (i >= body.size()) break;
-        size_t j = i + 1;
-        while (j < body.size() && body[j] != '"') ++j;
-        if (j >= body.size()) break;
-        std::string dep = body.substr(i + 1, j - i - 1);
-        if (!dep.empty()) deps.push_back(dep);
-        i = j + 1;
+    size_t colon = s.find(':', k);
+    if (colon == std::string::npos) return deps;
+    size_t i = colon + 1;
+    while (i < s.size() && std::isspace(static_cast<unsigned char>(s[i]))) ++i;
+    if (i >= s.size()) return deps;
+
+    if (s[i] == '[') {
+        size_t lb = i;
+        size_t rb = s.find(']', lb);
+        if (rb == std::string::npos || rb <= lb) return deps;
+        std::string body = s.substr(lb + 1, rb - lb - 1);
+        size_t p = 0;
+        while (p < body.size()) {
+            while (p < body.size() && body[p] != '"') ++p;
+            if (p >= body.size()) break;
+            size_t q = p + 1;
+            while (q < body.size() && body[q] != '"') ++q;
+            if (q >= body.size()) break;
+            std::string dep = body.substr(p + 1, q - p - 1);
+            if (!dep.empty()) deps.push_back(dep);
+            p = q + 1;
+        }
+        return deps;
+    }
+
+    if (s[i] == '{') {
+        size_t depth = 0;
+        size_t start = i;
+        size_t end = std::string::npos;
+        for (size_t p = start; p < s.size(); ++p) {
+            if (s[p] == '{') ++depth;
+            else if (s[p] == '}') {
+                if (depth == 0) break;
+                --depth;
+                if (depth == 0) {
+                    end = p;
+                    break;
+                }
+            }
+        }
+        if (end == std::string::npos || end <= start) return deps;
+        std::string body = s.substr(start + 1, end - start - 1);
+        std::regex keyRe(R"re("([^"]+)"\s*:)re");
+        for (std::sregex_iterator it(body.begin(), body.end(), keyRe), e; it != e; ++it) {
+            std::string dep = (*it)[1].str();
+            if (!dep.empty()) deps.push_back(dep);
+        }
     }
     return deps;
 }
 
-static std::string buildManifestJson(const std::vector<std::string>& deps) {
+static std::unordered_map<std::string, std::string> parseDependencyMapFromManifest(const std::string& s) {
+    std::unordered_map<std::string, std::string> out;
+    std::vector<std::string> names = parseDependenciesFromManifest(s);
+    for (const auto& n : names) out[n] = "*";
+
+    const std::string key = "\"dependencies\"";
+    size_t k = s.find(key);
+    if (k == std::string::npos) return out;
+    size_t colon = s.find(':', k);
+    if (colon == std::string::npos) return out;
+    size_t i = colon + 1;
+    while (i < s.size() && std::isspace(static_cast<unsigned char>(s[i]))) ++i;
+    if (i >= s.size() || s[i] != '{') return out;
+
+    size_t start = i;
+    size_t depth = 0;
+    size_t end = std::string::npos;
+    for (size_t p = start; p < s.size(); ++p) {
+        if (s[p] == '{') ++depth;
+        else if (s[p] == '}') {
+            if (depth == 0) break;
+            --depth;
+            if (depth == 0) {
+                end = p;
+                break;
+            }
+        }
+    }
+    if (end == std::string::npos || end <= start) return out;
+    std::string body = s.substr(start + 1, end - start - 1);
+    std::regex pairRe(R"re("([^"]+)"\s*:\s*"([^"]*)")re");
+    for (std::sregex_iterator it(body.begin(), body.end(), pairRe), e; it != e; ++it) {
+        out[(*it)[1].str()] = (*it)[2].str();
+    }
+    return out;
+}
+
+static std::string buildManifestJson(const std::unordered_map<std::string, std::string>& deps) {
+    std::vector<std::pair<std::string, std::string>> ordered;
+    ordered.reserve(deps.size());
+    for (const auto& kv : deps) ordered.push_back(kv);
+    std::sort(ordered.begin(), ordered.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+
     std::ostringstream out;
     out << "{\n";
     out << "  \"name\": \"kern-project\",\n";
     out << "  \"version\": \"1.0.0\",\n";
     out << "  \"entry\": \"src/main.kn\",\n";
-    out << "  \"dependencies\": [";
-    for (size_t i = 0; i < deps.size(); ++i) {
-        if (i) out << ", ";
-        out << "\"" << deps[i] << "\"";
+    out << "  \"dependencies\": {\n";
+    for (size_t i = 0; i < ordered.size(); ++i) {
+        out << "    \"" << ordered[i].first << "\": \"" << ordered[i].second << "\"";
+        if (i + 1 < ordered.size()) out << ",";
+        out << "\n";
     }
-    out << "]\n";
+    out << "  }\n";
     out << "}\n";
     return out.str();
 }
 
 static bool upsertDependency(const std::string& manifestPath, const std::string& dep, bool removeDep) {
-    std::vector<std::string> deps = parseDependenciesFromManifest(readTextFile(manifestPath));
-    std::vector<std::string> next;
-    bool found = false;
-    for (const auto& d : deps) {
-        if (d == dep) {
-            found = true;
-            if (!removeDep) next.push_back(d);
-        } else {
-            next.push_back(d);
-        }
-    }
-    if (!removeDep && !found) next.push_back(dep);
-    return writeTextFile(manifestPath, buildManifestJson(next));
+    std::unordered_map<std::string, std::string> deps = parseDependencyMapFromManifest(readTextFile(manifestPath));
+    if (removeDep) deps.erase(dep);
+    else if (deps.find(dep) == deps.end()) deps[dep] = "*";
+    return writeTextFile(manifestPath, buildManifestJson(deps));
 }
 
 static bool refreshLockfile(const std::string& lockPath, const std::string& manifestPath) {
-    std::vector<std::string> deps = parseDependenciesFromManifest(readTextFile(manifestPath));
+    std::unordered_map<std::string, std::string> depMap = parseDependencyMapFromManifest(readTextFile(manifestPath));
+    std::vector<std::string> deps;
+    deps.reserve(depMap.size());
+    for (const auto& kv : depMap) deps.push_back(kv.first);
+    std::sort(deps.begin(), deps.end());
     std::ostringstream out;
-    out << "{\n  \"lockVersion\": 1,\n  \"dependencies\": [";
+    out << "{\n  \"lockVersion\": 2,\n  \"registry\": \"local\",\n  \"packages\": {";
     for (size_t i = 0; i < deps.size(); ++i) {
         if (i) out << ", ";
-        out << "{\"name\":\"" << deps[i] << "\",\"resolved\":\"local:" << deps[i] << "\"}";
+        out << "\"" << deps[i] << "\":{\"version\":\"0.0.0\",\"resolved\":\"local:" << deps[i]
+            << "\",\"integrity\":\"sha256-local\"}";
     }
-    out << "]\n}\n";
+    out << "}\n}\n";
     return writeTextFile(lockPath, out.str());
 }
 
@@ -461,9 +538,98 @@ static std::vector<std::string> parseLockDependencyNames(const std::string& lock
     std::regex re(R"re("name"\s*:\s*"([^"]+)")re");
     for (std::sregex_iterator it(lockText.begin(), lockText.end(), re), end; it != end; ++it)
         out.push_back((*it)[1].str());
+    const std::string key = "\"packages\"";
+    size_t k = lockText.find(key);
+    if (k != std::string::npos) {
+        size_t colon = lockText.find(':', k);
+        size_t i = (colon == std::string::npos) ? std::string::npos : colon + 1;
+        while (i != std::string::npos && i < lockText.size() && std::isspace(static_cast<unsigned char>(lockText[i]))) ++i;
+        if (i != std::string::npos && i < lockText.size() && lockText[i] == '{') {
+            size_t start = i;
+            size_t depth = 0;
+            size_t end = std::string::npos;
+            for (size_t p = start; p < lockText.size(); ++p) {
+                if (lockText[p] == '{') ++depth;
+                else if (lockText[p] == '}') {
+                    if (depth == 0) break;
+                    --depth;
+                    if (depth == 0) {
+                        end = p;
+                        break;
+                    }
+                }
+            }
+            if (end != std::string::npos && end > start) {
+                std::string body = lockText.substr(start + 1, end - start - 1);
+                std::regex keyRe(R"re("([^"]+)"\s*:\s*\{)re");
+                for (std::sregex_iterator it(body.begin(), body.end(), keyRe), e; it != e; ++it) {
+                    out.push_back((*it)[1].str());
+                }
+            }
+        }
+    }
     std::sort(out.begin(), out.end());
     out.erase(std::unique(out.begin(), out.end()), out.end());
     return out;
+}
+
+static std::string shellQuote(const std::string& raw) {
+#ifdef _WIN32
+    std::string out = "\"";
+    for (char c : raw) {
+        if (c == '"') out += "\\\"";
+        else out += c;
+    }
+    out += "\"";
+    return out;
+#else
+    std::string out = "'";
+    for (char c : raw) {
+        if (c == '\'') out += "'\\''";
+        else out += c;
+    }
+    out += "'";
+    return out;
+#endif
+}
+
+static std::optional<std::string> detectRegistryCliPath() {
+    if (const char* env = kernGetEnv("KERN_REGISTRY_CLI")) {
+        if (env[0]) return std::string(env);
+    }
+    namespace fs = std::filesystem;
+    fs::path cwd = fs::current_path();
+    fs::path local = cwd / "kern-registry" / "cli" / "entry.js";
+    if (fs::exists(local)) return local.string();
+    fs::path parent = cwd.parent_path() / "kern-registry" / "cli" / "entry.js";
+    if (fs::exists(parent)) return parent.string();
+    return std::nullopt;
+}
+
+static int runRegistryCliSubcommand(const std::string& sub, int argc, char** argv, int argBase) {
+    auto cliPath = detectRegistryCliPath();
+    if (!cliPath.has_value()) {
+        std::cerr << sub << ": kern-registry CLI not found. Set KERN_REGISTRY_CLI or place kern-registry/ next to cwd.\n";
+        return 1;
+    }
+    std::ostringstream cmd;
+    cmd << "node " << shellQuote(*cliPath) << " " << shellQuote(sub);
+    for (int i = argBase + 1; i < argc; ++i) {
+        cmd << " " << shellQuote(argv[i]);
+    }
+    return std::system(cmd.str().c_str());
+}
+
+static int runRegistryCliSubcommandWithArgs(const std::string& sub, const std::vector<std::string>& args) {
+    auto cliPath = detectRegistryCliPath();
+    if (!cliPath.has_value()) {
+        std::cerr << sub << ": kern-registry CLI not found. Set KERN_REGISTRY_CLI or place kern-registry/ next to cwd.\n";
+        return 1;
+    }
+    std::ostringstream cmd;
+    cmd << "node " << shellQuote(*cliPath) << " " << shellQuote(sub);
+    for (const auto& a : args) cmd << " " << shellQuote(a);
+    return std::system(cmd.str().c_str());
 }
 
 // requireKernJson: true for `kern verify` (missing kern.json is an error). false for test/check (no project → skip).
@@ -1496,6 +1662,12 @@ int main(int argc, char** argv) {
             return cmdInit();
         }
         if (arg == "add" && argc > argBase + 1) {
+            const std::string depArg = argv[argBase + 1];
+            // DX shortcut: if registry CLI is available, route add through install flow so
+            // `kern add pkg@^1.2.0` immediately resolves, installs, and updates lockfile.
+            if (detectRegistryCliPath().has_value()) {
+                return runRegistryCliSubcommandWithArgs("install", {depArg});
+            }
             if (!upsertDependency("kern.json", argv[argBase + 1], false)) {
                 std::cerr << "add: failed to update kern.json\n";
                 return 1;
@@ -1514,12 +1686,16 @@ int main(int argc, char** argv) {
             return 0;
         }
         if (arg == "install") {
-            if (!refreshLockfile("kern.lock", "kern.json")) {
-                std::cerr << "install: failed to refresh kern.lock\n";
-                return 1;
-            }
-            std::cout << "Dependencies locked from kern.json\n";
-            return 0;
+            return runRegistryCliSubcommand("install", argc, argv, argBase);
+        }
+        if (arg == "publish") {
+            return runRegistryCliSubcommand("publish", argc, argv, argBase);
+        }
+        if (arg == "search") {
+            return runRegistryCliSubcommand("search", argc, argv, argBase);
+        }
+        if (arg == "info") {
+            return runRegistryCliSubcommand("info", argc, argv, argBase);
         }
         if (arg == "verify") {
             return cmdVerify();
