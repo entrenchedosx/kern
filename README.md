@@ -1,6 +1,6 @@
 # Kern
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.0.7-blue.svg)](KERN_VERSION.txt)
 [![Discord](https://img.shields.io/badge/discord-Kern-5865F2?logo=discord&logoColor=white)](https://discord.gg/JBa4RfT2tE)
 
@@ -34,6 +34,7 @@ Kern is a **solo-built project by a 15-year-old developer**. That does not mean 
 - [Testing](#testing)
 - [Releases & versioning](#releases--versioning)
 - [Contributing](#contributing)
+- [Attribution & trademark](#attribution--trademark)
 - [Donations](#donations)
 - [License](#license)
 
@@ -215,6 +216,15 @@ See **[CONTRIBUTING.md](CONTRIBUTING.md)** for coding expectations, how to run t
 
 ---
 
+## Attribution & trademark
+
+- Attribution expectations: see [docs/ATTRIBUTION_POLICY.md](docs/ATTRIBUTION_POLICY.md).
+- Naming/branding guidance: see [docs/TRADEMARK_POLICY.md](docs/TRADEMARK_POLICY.md).
+- Contributor/project credits: see [CREDITS.md](CREDITS.md).
+- Research/reference citation metadata: see [CITATION.cff](CITATION.cff).
+
+---
+
 ## Donations
 
 If Kern is useful to you, optional tips are welcome. Contributions directly support ongoing maintenance, release cadence, and new feature development; sustained funding helps keep long-term improvement work active. **Always verify** the address in your wallet before sending; on-chain transfers are irreversible.
@@ -231,4 +241,4 @@ Donations are needed to accelerate development velocity and ship updates faster.
 
 ## License
 
-[MIT](LICENSE).
+[GNU GPL v3.0](LICENSE).

@@ -43,4 +43,4 @@ For real-time chat, use the **official Kern Discord**: [discord.gg/JBa4RfT2tE](h
 
 ## License
 
-By contributing, you agree your contributions are licensed under the same license as the project ([MIT](LICENSE)).
+By contributing, you agree your contributions are licensed under the same license as the project ([GNU GPL v3.0](LICENSE)).
