@@ -6,7 +6,7 @@ import { ensureDir, exists, readJson, writeJsonAtomic } from "./utils/io.js";
 import { incrementVersion } from "./utils/semver.js";
 import { sha256Hex, toIntegrity } from "./utils/integrity.js";
 import { getManifestPath } from "./utils/paths.js";
-import { getRegistryApiBase } from "./utils/fetchRegistry.js";
+import { getEffectiveApiBase, getEffectiveApiKey } from "./utils/fetchRegistry.js";
 
 function parseArgs(argv) {
   const out = { dir: process.cwd(), bump: null, public: false, dryRun: false, api: null };
@@ -46,9 +46,9 @@ async function validatePackage(projectDir, manifest) {
   if (!(await exists(mainFile))) throw new Error(`main entry not found: ${manifest.main}`);
 }
 
-function getPublishApiBase(args) {
+async function getPublishApiBase(args) {
   if (args.api) return args.api;
-  const base = getRegistryApiBase();
+  const base = await getEffectiveApiBase();
   if (base) return base;
   return process.env.KERN_REGISTRY_API_URL
     ? String(process.env.KERN_REGISTRY_API_URL).replace(/\/+$/, "")
@@ -58,7 +58,7 @@ function getPublishApiBase(args) {
 async function publishToApi(apiBase, payload) {
   const publishUrl = `${apiBase}/api/v1/packages`;
   const headers = { "content-type": "application/json" };
-  const key = process.env.KERN_REGISTRY_API_KEY || "";
+  const key = await getEffectiveApiKey();
   if (key) headers["x-api-key"] = key;
   const res = await fetch(publishUrl, {
     method: "POST",
@@ -147,7 +147,7 @@ export async function runPublish(argv) {
     console.warn("kern-pkg publish: --public is deprecated in API-first mode and is now ignored.");
   }
 
-  const apiBase = getPublishApiBase(args);
+  const apiBase = await getPublishApiBase(args);
   const payload = {
     name: packageName,
     version,

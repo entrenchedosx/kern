@@ -378,7 +378,9 @@ static void printUsage(const char* prog) {
         << "  " << prog << " publish [opts]   Publish current package to hosted kern-registry API.\n"
         << "  " << prog << " search <query>   Search packages from configured kern-registry API/index.\n"
         << "  " << prog << " info <pkg> [rng] Show package metadata from kern-registry API/index.\n"
+        << "  " << prog << " login [opts]     Save registry API URL/token for package commands.\n"
         << "  " << prog << " verify           Exit 0 if kern.lock matches kern.json dependencies (CI-friendly).\n"
+        << "                        Backend select: set KERN_PACKAGE_BACKEND=github to use kern-github-registry CLI.\n"
         << "  " << prog << " capability profile [list|show|apply]\n"
         << "                        Inspect/apply secure-default capability profiles.\n"
         << "  " << prog << " graph [opts] <entry.kn>\n"
@@ -624,6 +626,45 @@ static std::optional<std::string> detectRegistryCliPath() {
     return std::nullopt;
 }
 
+static bool useGithubPackageBackend() {
+    if (const char* backend = kernGetEnv("KERN_PACKAGE_BACKEND")) {
+        std::string b = backend;
+        std::transform(b.begin(), b.end(), b.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+        return b == "github" || b == "gh";
+    }
+    return false;
+}
+
+static std::optional<std::string> detectGithubRegistryCliPath() {
+    if (const char* env = kernGetEnv("KERN_GITHUB_REGISTRY_CLI")) {
+        if (env[0]) return std::string(env);
+    }
+    namespace fs = std::filesystem;
+    fs::path cwd = fs::current_path();
+    fs::path local = cwd / "kern-github-registry" / "cli" / "entry.js";
+    if (fs::exists(local)) return local.string();
+    fs::path parent = cwd.parent_path() / "kern-github-registry" / "cli" / "entry.js";
+    if (fs::exists(parent)) return parent.string();
+#ifdef _WIN32
+    char exeBuf[MAX_PATH];
+    DWORD got = GetModuleFileNameA(nullptr, exeBuf, MAX_PATH);
+    if (got > 0 && got < MAX_PATH) {
+        fs::path exeDir = fs::path(std::string(exeBuf, got)).parent_path();
+        fs::path besideA = exeDir / "kern-github-registry" / "cli" / "entry.js";
+        if (fs::exists(besideA)) return besideA.string();
+        fs::path besideB = exeDir / "github-registry-cli" / "cli" / "entry.js";
+        if (fs::exists(besideB)) return besideB.string();
+    }
+#endif
+    return std::nullopt;
+}
+
+static std::optional<std::string> detectActivePackageCliPath(bool* usingGithubOut = nullptr) {
+    const bool useGh = useGithubPackageBackend();
+    if (usingGithubOut) *usingGithubOut = useGh;
+    return useGh ? detectGithubRegistryCliPath() : detectRegistryCliPath();
+}
+
 static bool tryBootstrapRegistryCli() {
 #ifndef _WIN32
     return false;
@@ -685,18 +726,19 @@ static bool tryBootstrapRegistryCli() {
 }
 
 static int runRegistryCliSubcommand(const std::string& sub, int argc, char** argv, int argBase) {
-    auto cliPath = detectRegistryCliPath();
+    bool usingGithub = false;
+    auto cliPath = detectActivePackageCliPath(&usingGithub);
     if (!cliPath.has_value()) {
-        if (tryBootstrapRegistryCli()) {
-            cliPath = detectRegistryCliPath();
+        if (!usingGithub && tryBootstrapRegistryCli()) {
+            cliPath = detectActivePackageCliPath(&usingGithub);
         }
     }
     if (!cliPath.has_value()) {
-        std::cerr << sub << ": kern-registry CLI not found.\n"
+        std::cerr << sub << ": package CLI not found.\n"
                   << "  Fix options:\n"
-                  << "    - Set KERN_REGISTRY_CLI to <path>/kern-registry/cli/entry.js\n"
-                  << "    - Place kern-registry/ next to your working directory\n"
-                  << "    - On Windows, allow auto-bootstrap (default) unless KERN_DISABLE_REGISTRY_BOOTSTRAP is set\n"
+                  << "    - Set KERN_REGISTRY_CLI (default backend) or KERN_GITHUB_REGISTRY_CLI (github backend)\n"
+                  << "    - Place kern-registry/ or kern-github-registry/ next to your working directory\n"
+                  << "    - On Windows default backend can auto-bootstrap unless KERN_DISABLE_REGISTRY_BOOTSTRAP is set\n"
                   << "  Registry API config (once CLI is present):\n"
                   << "    - KERN_REGISTRY_API_URL=http://127.0.0.1:4873\n"
                   << "    - KERN_REGISTRY_API_KEY=<token> (required if server enforces publish auth)\n";
@@ -711,18 +753,19 @@ static int runRegistryCliSubcommand(const std::string& sub, int argc, char** arg
 }
 
 static int runRegistryCliSubcommandWithArgs(const std::string& sub, const std::vector<std::string>& args) {
-    auto cliPath = detectRegistryCliPath();
+    bool usingGithub = false;
+    auto cliPath = detectActivePackageCliPath(&usingGithub);
     if (!cliPath.has_value()) {
-        if (tryBootstrapRegistryCli()) {
-            cliPath = detectRegistryCliPath();
+        if (!usingGithub && tryBootstrapRegistryCli()) {
+            cliPath = detectActivePackageCliPath(&usingGithub);
         }
     }
     if (!cliPath.has_value()) {
-        std::cerr << sub << ": kern-registry CLI not found.\n"
+        std::cerr << sub << ": package CLI not found.\n"
                   << "  Fix options:\n"
-                  << "    - Set KERN_REGISTRY_CLI to <path>/kern-registry/cli/entry.js\n"
-                  << "    - Place kern-registry/ next to your working directory\n"
-                  << "    - On Windows, allow auto-bootstrap (default) unless KERN_DISABLE_REGISTRY_BOOTSTRAP is set\n"
+                  << "    - Set KERN_REGISTRY_CLI (default backend) or KERN_GITHUB_REGISTRY_CLI (github backend)\n"
+                  << "    - Place kern-registry/ or kern-github-registry/ next to your working directory\n"
+                  << "    - On Windows default backend can auto-bootstrap unless KERN_DISABLE_REGISTRY_BOOTSTRAP is set\n"
                   << "  Registry API config (once CLI is present):\n"
                   << "    - KERN_REGISTRY_API_URL=http://127.0.0.1:4873\n"
                   << "    - KERN_REGISTRY_API_KEY=<token> (required if server enforces publish auth)\n";
@@ -1767,7 +1810,7 @@ int main(int argc, char** argv) {
             const std::string depArg = argv[argBase + 1];
             // DX shortcut: if registry CLI is available, route add through install flow so
             // `kern add pkg@^1.2.0` immediately resolves, installs, and updates lockfile.
-            if (detectRegistryCliPath().has_value()) {
+            if (detectActivePackageCliPath().has_value()) {
                 return runRegistryCliSubcommandWithArgs("install", {depArg});
             }
             if (!upsertDependency("kern.json", argv[argBase + 1], false)) {
@@ -1798,6 +1841,9 @@ int main(int argc, char** argv) {
         }
         if (arg == "info") {
             return runRegistryCliSubcommand("info", argc, argv, argBase);
+        }
+        if (arg == "login") {
+            return runRegistryCliSubcommand("login", argc, argv, argBase);
         }
         if (arg == "verify") {
             return cmdVerify();

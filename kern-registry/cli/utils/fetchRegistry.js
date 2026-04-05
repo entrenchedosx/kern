@@ -2,6 +2,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import { pathToFileURL, fileURLToPath } from "node:url";
+import { readAuthConfig } from "./auth.js";
 
 const DEFAULT_REGISTRY_URL =
   "https://raw.githubusercontent.com/kernlang/kern-registry/main/registry/registry.json";
@@ -29,6 +30,22 @@ export function getRegistryApiBase() {
   }
   if (process.env.KERN_REGISTRY_URL) return null;
   return DEFAULT_API_BASE;
+}
+
+export async function getEffectiveApiBase() {
+  if (process.env.KERN_REGISTRY_API_URL) {
+    return String(process.env.KERN_REGISTRY_API_URL).replace(/\/+$/, "");
+  }
+  const cfg = await readAuthConfig();
+  if (cfg.apiUrl) return String(cfg.apiUrl).replace(/\/+$/, "");
+  if (process.env.KERN_REGISTRY_URL) return null;
+  return DEFAULT_API_BASE;
+}
+
+export async function getEffectiveApiKey() {
+  if (process.env.KERN_REGISTRY_API_KEY) return String(process.env.KERN_REGISTRY_API_KEY);
+  const cfg = await readAuthConfig();
+  return cfg.apiKey || "";
 }
 
 export function toUrlMaybe(input) {
@@ -78,7 +95,7 @@ export function resolveRelativeUrl(baseUrlLike, relPath) {
 }
 
 export async function fetchRegistryIndex() {
-  const apiBase = getRegistryApiBase();
+  const apiBase = await getEffectiveApiBase();
   if (apiBase) {
     const registryUrl = `${apiBase}/api/v1/simple`;
     try {
