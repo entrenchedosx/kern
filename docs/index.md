@@ -2,12 +2,6 @@
 
 **Kern** is a small compiled language with a lexer → parser → bytecode VM pipeline, a growing standard library under `lib/kern/`, and a `kern` CLI.
 
-## Project status notice
-
-I will be taking a significant break from active production work on Kern due to school commitments and current funding constraints.
-
-Documentation and released artifacts will stay available, but updates may be less frequent during this period.
-
 ## Quick links
 
 | Topic | Document |
