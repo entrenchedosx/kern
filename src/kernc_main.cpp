@@ -512,7 +512,13 @@ int main(int argc, char** argv) {
     }
 
     if (cli.showVersion) {
-        std::cout << "kern 1.0.0\n";
+        std::cout << "kern " <<
+#ifdef KERN_VERSION
+            KERN_VERSION
+#else
+            "1.0.0"
+#endif
+            << "\n";
         return 0;
     }
 

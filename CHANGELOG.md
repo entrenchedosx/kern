@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.10] - 2026-04-05
+
 ### Added
 
 #### Package registry foundation (`kern-registry`) + CLI integration
@@ -223,7 +227,8 @@ Initial **Kern** release: **language** + **VM** + **builtins** + **`import`** mo
 
 - **CMake 3.14+**, **C++17**, optional **Raylib**; version from **`KERN_VERSION.txt`** (in post-1.0.0 trees; **`VERSION`** renamed in **1.0.6**).
 
-[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.7...HEAD
+[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.10...HEAD
+[1.0.10]: https://github.com/entrenchedosx/kern/compare/v1.0.9...v1.0.10
 [1.0.7]: https://github.com/entrenchedosx/kern/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/entrenchedosx/kern/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/entrenchedosx/kern/compare/v1.0.4...v1.0.5
