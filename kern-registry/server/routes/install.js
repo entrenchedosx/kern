@@ -1,5 +1,19 @@
+function metadataForPackage(pkg, packageName) {
+  const versions = {};
+  for (const v of Object.keys(pkg?.versions || {})) {
+    versions[v] = { manifest: `/api/v1/packages/${encodeURIComponent(packageName)}/${encodeURIComponent(v)}` };
+  }
+  return {
+    name: pkg?.name || packageName,
+    description: pkg?.description || "",
+    trusted: Boolean(pkg?.trusted),
+    latest: pkg?.latest || null,
+    versions
+  };
+}
+
 export function handlePackage(req, res, db, packageName, version) {
-  const pkg = db?.packages?.[packageName];
+  const pkg = db?.packages?.[packageName] || null;
   if (!pkg) {
     res.writeHead(404, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: "package not found" }));
@@ -8,7 +22,7 @@ export function handlePackage(req, res, db, packageName, version) {
 
   if (!version) {
     res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify(pkg));
+    res.end(JSON.stringify(metadataForPackage(pkg, packageName)));
     return;
   }
 

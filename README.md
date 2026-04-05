@@ -118,10 +118,10 @@ kern test [options] [directory]  # --grep, --list, --fail-fast; default tests/co
 kern docs                        # documentation paths + optional MkDocs
 kern build                       # CMake build hints (toolchain is CMake-built)
 kern add pkg@^1.2.0              # add+resolve+install package (registry flow)
-kern install [pkg@range]         # lockfile-aware install via kern-registry
-kern publish                     # publish current package via registry CLI
-kern search <query>              # package search
-kern info <pkg> [range]          # package metadata
+kern install [pkg@range]         # lockfile-aware install via API-first kern-registry
+kern publish                     # publish current package to hosted registry API
+kern search <query>              # package search (registry API/index)
+kern info <pkg> [range]          # package metadata (registry API/index)
 kern verify                      # kern.lock matches kern.json (CI)
 kern --trace script.kn           # verbose VM trace (noisy)
 kern --version / --help
@@ -130,12 +130,17 @@ kern --version / --help
 ### Package quickstart
 
 ```powershell
+# set registry API (example local server)
+$env:KERN_REGISTRY_API_URL = "http://127.0.0.1:4873"
+# optional publish auth token (if server enforces auth)
+# $env:KERN_REGISTRY_API_KEY = "your-token"
+
 # in a Kern project folder
 kern add example-http@^1.0.0
 kern search http
 kern info example-http
 
-# publish (if this project is a package)
+# publish this project as a package
 kern publish
 ```
 

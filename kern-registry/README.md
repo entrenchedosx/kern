@@ -1,116 +1,72 @@
 # kern-registry
 
-Production-grade package registry system for the Kern programming language.
+Registry service and CLI for Kern packages (API-first, Python-like workflow).
 
 ## What This Contains
 
-- A static, GitHub-hostable registry in `registry/` that works with no backend.
-- A future-ready Node.js server in `server/`.
-- A production CLI in `cli/` used by Kern commands (`kern publish`, `kern install`, `kern search`, `kern info`).
+- `server/`: hosted package registry API (publish/search/info/download).
+- `cli/`: package manager used by `kern install|publish|search|info`.
+- `registry/`: optional static mirror/export (compatibility and snapshots).
 
-## Architecture
+## API-First Flow
 
-```text
-kern-registry/
-  registry/
-    registry.json
-    packages/<name>/metadata.json
-    packages/<name>/versions/<version>.json
-  server/
-    index.js
-    routes/
-      publish.js
-      install.js
-      search.js
-  cli/
-    entry.js
-    publish.js
-    install.js
-    search.js
-    info.js
-    utils/
-  schemas/
-    package.schema.json
-    registry.schema.json
-    version-manifest.schema.json
-```
+- `kern publish` uploads package artifacts + metadata to a registry API.
+- `kern install` resolves versions, downloads artifacts, verifies SHA256 integrity, writes `kern.lock`.
+- `kern search` / `kern info` read from the same registry API index.
 
-## Static Registry Mode
+This is intentionally similar to `pip`/PyPI behavior: package publishing is not tied to GitHub release assets.
 
-The static registry is plain JSON content and can be hosted on GitHub Pages, raw GitHub, S3, or any static host.
+## API Endpoints (v1)
 
-- Root index: `registry/registry.json`
-- Package metadata: `registry/packages/<pkg>/metadata.json`
-- Version manifests: `registry/packages/<pkg>/versions/<version>.json`
+- `POST /api/v1/packages` (auth optional, enabled by API keys)
+- `GET /api/v1/simple`
+- `GET /api/v1/simple/:name`
+- `GET /api/v1/packages/:name`
+- `GET /api/v1/packages/:name/:version`
+- `GET /api/v1/files/:name/:version/:filename`
+- `GET /health`
 
 ## CLI Commands
 
-- `kern-pkg publish [--dir <path>] [--bump patch|minor|major] [--public] [--dry-run]`
-- `kern-pkg install [<pkg>]`
-- `kern-pkg search <query>`
-- `kern-pkg info <pkg> [range]`
+- `kern-pkg publish [--dir <path>] [--bump patch|minor|major] [--api <url>] [--dry-run]`
+- `kern-pkg install [<pkg>[@range]] [--project <path>] [--update] [--api <url>]`
+- `kern-pkg search <query> [--api <url>]`
+- `kern-pkg info <pkg> [range] [--api <url>]`
 
-## 60-second Quickstart
+## Quickstart
 
 ```bash
-# 1) install deps
+# 1) Start registry server
 cd kern-registry
 npm install
+PORT=4873 node ./server/index.js
 
-# 2) query local static registry
-node ./cli/entry.js search example
-node ./cli/entry.js info example-http
+# 2) Publish a package
+KERN_REGISTRY_API_URL=http://127.0.0.1:4873 \
+node ./cli/entry.js publish --dir /path/to/package
 
-# 3) from a Kern project: install a package and lock it
-# (creates/updates kern.json, kern.lock, .kern/package-paths.json)
-node ../kern-registry/cli/entry.js install example-http@^1.0.0
-
-# 4) publish your package into static registry checkout
-KERN_REGISTRY_ROOT=/path/to/kern-registry node ./cli/entry.js publish --dir /path/to/pkg
-
-# 5) publish publicly and auto-upload tarball with gh
-KERN_REGISTRY_ROOT=/path/to/kern-registry KERN_REGISTRY_GH_REPO=owner/repo node ./cli/entry.js publish --dir /path/to/pkg --public
-
-# 6) preview public publish without creating/uploading release assets
-KERN_REGISTRY_ROOT=/path/to/kern-registry KERN_REGISTRY_GH_REPO=owner/repo node ./cli/entry.js publish --dir /path/to/pkg --public --dry-run
+# 3) Install from a Kern project
+KERN_REGISTRY_API_URL=http://127.0.0.1:4873 \
+node ../kern-registry/cli/entry.js install package-name@^1.0.0
 ```
-
-## Core Behavior
-
-- Semver resolution (`exact`, `^`, `~`)
-- Recursive dependency resolution
-- Cycle detection
-- Deduplication
-- Lockfile generation (`kern.lock`, lockVersion 2)
-- Integrity verification with SHA256
-- Local cache in `~/.kern/cache`
 
 ## Security Model
 
-- Every resolved artifact is validated against `integrity` (`sha256-...`) before extraction.
-- Tampered artifacts fail installation.
-- Optional package trust signal via `trusted: true` in version metadata.
+- Artifacts are hashed on publish (`sha256-...`) and verified on install.
+- Publish endpoint can require API keys.
+- Installer supports offline cache reuse in `~/.kern/cache`.
 
 ## Environment Variables
 
-- `KERN_REGISTRY_URL`: URL to `registry.json`
-- `KERN_REGISTRY_ROOT`: writable local checkout path for static registry updates during publish
-- `KERN_REGISTRY_CLI`: absolute path to CLI entry for Kern runtime delegation
-- `GH_TOKEN`: optional token for release upload workflows
-- `KERN_REGISTRY_GH_REPO`: required for `--public` auto-upload (`owner/repo`)
+- `KERN_REGISTRY_API_URL`: registry API base URL (default `http://127.0.0.1:4873`)
+- `KERN_REGISTRY_API_KEY`: publish auth token for `POST /api/v1/packages`
+- `KERN_REGISTRY_API_KEYS`: comma-separated server-side key list
+- `KERN_REGISTRY_STORAGE_ROOT`: server artifact storage directory
+- `KERN_REGISTRY_MAX_BODY_BYTES`: max publish payload size
+- `KERN_REGISTRY_URL`: legacy static index URL (compatibility fallback)
+- `KERN_REGISTRY_ROOT`: optional static mirror output path during publish
 
-## Run
+## Compatibility
 
-```bash
-cd kern-registry
-npm install
-node ./cli/entry.js --help
-node ./server/index.js
-```
-
-## Migration Path To Server
-
-1. Start with static registry (`registry/`) as source of truth.
-2. Serve static index from `server/` APIs for faster search/info.
-3. Move write traffic (`publish`) to server endpoints.
-4. Keep static JSON snapshots for auditability and CDN replication.
+- Existing lockfiles with `file://`, GitHub, or HTTP artifact URLs still install.
+- API mode is preferred; static index mode remains as fallback/mirror.

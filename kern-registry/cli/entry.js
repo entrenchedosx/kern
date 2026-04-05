@@ -8,10 +8,14 @@ function printHelp() {
   console.log(`kern-pkg
 
 Usage:
-  kern-pkg publish [--dir <path>] [--bump patch|minor|major] [--public] [--dry-run]
+  kern-pkg publish [--dir <path>] [--bump patch|minor|major] [--api <url>] [--public] [--dry-run]
   kern-pkg install [<pkg>[@range]] [--project <path>] [--update]
   kern-pkg search <query>
   kern-pkg info <package> [range]
+
+Env:
+  KERN_REGISTRY_API_URL  Registry API base URL (default: http://127.0.0.1:4873)
+  KERN_REGISTRY_API_KEY  API key used for publish
 `);
 }
 

@@ -374,10 +374,10 @@ static void printUsage(const char* prog) {
         << "  " << prog << " init             Bootstrap kern.json and src/main.kn.\n"
         << "  " << prog << " add <dep>        Add dependency to kern.json (or package@range via registry flow).\n"
         << "  " << prog << " remove <dep>     Remove dependency from kern.json.\n"
-        << "  " << prog << " install [pkg]    Install dependencies via kern-registry (lockfile-aware).\n"
-        << "  " << prog << " publish [opts]   Publish current package via kern-registry CLI.\n"
-        << "  " << prog << " search <query>   Search packages in configured Kern registry.\n"
-        << "  " << prog << " info <pkg> [rng] Show package metadata from registry.\n"
+        << "  " << prog << " install [pkg]    Install dependencies via API-first kern-registry (lockfile-aware).\n"
+        << "  " << prog << " publish [opts]   Publish current package to hosted kern-registry API.\n"
+        << "  " << prog << " search <query>   Search packages from configured kern-registry API/index.\n"
+        << "  " << prog << " info <pkg> [rng] Show package metadata from kern-registry API/index.\n"
         << "  " << prog << " verify           Exit 0 if kern.lock matches kern.json dependencies (CI-friendly).\n"
         << "  " << prog << " capability profile [list|show|apply]\n"
         << "                        Inspect/apply secure-default capability profiles.\n"
@@ -696,7 +696,10 @@ static int runRegistryCliSubcommand(const std::string& sub, int argc, char** arg
                   << "  Fix options:\n"
                   << "    - Set KERN_REGISTRY_CLI to <path>/kern-registry/cli/entry.js\n"
                   << "    - Place kern-registry/ next to your working directory\n"
-                  << "    - On Windows, allow auto-bootstrap (default) unless KERN_DISABLE_REGISTRY_BOOTSTRAP is set\n";
+                  << "    - On Windows, allow auto-bootstrap (default) unless KERN_DISABLE_REGISTRY_BOOTSTRAP is set\n"
+                  << "  Registry API config (once CLI is present):\n"
+                  << "    - KERN_REGISTRY_API_URL=http://127.0.0.1:4873\n"
+                  << "    - KERN_REGISTRY_API_KEY=<token> (required if server enforces publish auth)\n";
         return 1;
     }
     std::ostringstream cmd;
@@ -719,7 +722,10 @@ static int runRegistryCliSubcommandWithArgs(const std::string& sub, const std::v
                   << "  Fix options:\n"
                   << "    - Set KERN_REGISTRY_CLI to <path>/kern-registry/cli/entry.js\n"
                   << "    - Place kern-registry/ next to your working directory\n"
-                  << "    - On Windows, allow auto-bootstrap (default) unless KERN_DISABLE_REGISTRY_BOOTSTRAP is set\n";
+                  << "    - On Windows, allow auto-bootstrap (default) unless KERN_DISABLE_REGISTRY_BOOTSTRAP is set\n"
+                  << "  Registry API config (once CLI is present):\n"
+                  << "    - KERN_REGISTRY_API_URL=http://127.0.0.1:4873\n"
+                  << "    - KERN_REGISTRY_API_KEY=<token> (required if server enforces publish auth)\n";
         return 1;
     }
     std::ostringstream cmd;

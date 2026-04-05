@@ -2,8 +2,18 @@ import { fetchPackageMetadata, fetchRegistryIndex } from "./utils/fetchRegistry.
 import { maxSatisfyingVersion } from "./utils/semver.js";
 
 export async function runInfo(argv) {
-  const packageName = argv[0];
-  const range = argv[1] || "*";
+  let api = null;
+  const rest = [];
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === "--api" && i + 1 < argv.length) {
+      api = String(argv[++i]).replace(/\/+$/, "");
+    } else {
+      rest.push(argv[i]);
+    }
+  }
+  if (api) process.env.KERN_REGISTRY_API_URL = api;
+  const packageName = rest[0];
+  const range = rest[1] || "*";
   if (!packageName) throw new Error("package name is required");
 
   const { registryUrl, index } = await fetchRegistryIndex();

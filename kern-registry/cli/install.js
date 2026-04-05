@@ -33,11 +33,13 @@ function parseInstallSpec(spec) {
 }
 
 function parseArgs(argv) {
-  const out = { project: process.cwd(), update: false, spec: null };
+  const out = { project: process.cwd(), update: false, spec: null, api: null };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === "--project" && i + 1 < argv.length) {
       out.project = path.resolve(argv[++i]);
+    } else if (a === "--api" && i + 1 < argv.length) {
+      out.api = String(argv[++i]).replace(/\/+$/, "");
     } else if (a === "--update") {
       out.update = true;
     } else if (!out.spec) {
@@ -59,7 +61,8 @@ async function installFromLock(projectDir, lock) {
   for (const [name, item] of Object.entries(lock.packages || {})) {
     const version = item.version;
     const installRoot = path.join(packagesRoot, name, version);
-    const cacheTar = path.join(cacheRoot, `${name}-${version}.tgz`);
+    const integrityPart = String(item.integrity || "").replace(/^sha256-/, "").slice(0, 16) || "legacy";
+    const cacheTar = path.join(cacheRoot, `${name}-${version}-${integrityPart}.tgz`);
     const tarPath = await ensureTarballPresent(cacheTar, () => readBufferFromUrl(item.resolved));
     const bytes = await fs.readFile(tarPath);
     if (!verifyIntegrity(bytes, item.integrity)) {
@@ -87,6 +90,7 @@ async function installFromLock(projectDir, lock) {
 
 export async function runInstall(argv) {
   const args = parseArgs(argv);
+  if (args.api) process.env.KERN_REGISTRY_API_URL = args.api;
   const manifestPath = getManifestPath(args.project);
   const lockPath = getLockfilePath(args.project);
 

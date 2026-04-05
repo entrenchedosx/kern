@@ -1,21 +1,23 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 import { pathToFileURL } from "node:url";
-import { spawnSync } from "node:child_process";
 import { createTarball } from "./utils/zip.js";
 import { ensureDir, exists, readJson, writeJsonAtomic } from "./utils/io.js";
 import { incrementVersion } from "./utils/semver.js";
 import { sha256Hex, toIntegrity } from "./utils/integrity.js";
 import { getManifestPath } from "./utils/paths.js";
+import { getRegistryApiBase } from "./utils/fetchRegistry.js";
 
 function parseArgs(argv) {
-  const out = { dir: process.cwd(), bump: null, public: false, dryRun: false };
+  const out = { dir: process.cwd(), bump: null, public: false, dryRun: false, api: null };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === "--dir" && i + 1 < argv.length) {
       out.dir = path.resolve(argv[++i]);
     } else if (a === "--bump" && i + 1 < argv.length) {
       out.bump = argv[++i];
+    } else if (a === "--api" && i + 1 < argv.length) {
+      out.api = String(argv[++i]).replace(/\/+$/, "");
     } else if (a === "--public") {
       out.public = true;
     } else if (a === "--dry-run") {
@@ -44,29 +46,36 @@ async function validatePackage(projectDir, manifest) {
   if (!(await exists(mainFile))) throw new Error(`main entry not found: ${manifest.main}`);
 }
 
-function runGh(args) {
-  const result = spawnSync("gh", args, { encoding: "utf8", stdio: "pipe" });
-  if (result.status !== 0) {
-    const detail = (result.stderr || result.stdout || "").trim();
-    throw new Error(`gh ${args.join(" ")} failed${detail ? `: ${detail}` : ""}`);
-  }
-  return (result.stdout || "").trim();
+function getPublishApiBase(args) {
+  if (args.api) return args.api;
+  const base = getRegistryApiBase();
+  if (base) return base;
+  return process.env.KERN_REGISTRY_API_URL
+    ? String(process.env.KERN_REGISTRY_API_URL).replace(/\/+$/, "")
+    : "http://127.0.0.1:4873";
 }
 
-function ensureReleaseTag(repo, tag) {
-  const view = spawnSync("gh", ["release", "view", tag, "--repo", repo], { encoding: "utf8", stdio: "pipe" });
-  if (view.status === 0) return;
-  runGh([
-    "release",
-    "create",
-    tag,
-    "--repo",
-    repo,
-    "--title",
-    tag,
-    "--notes",
-    `Automated release for ${tag}`
-  ]);
+async function publishToApi(apiBase, payload) {
+  const publishUrl = `${apiBase}/api/v1/packages`;
+  const headers = { "content-type": "application/json" };
+  const key = process.env.KERN_REGISTRY_API_KEY || "";
+  if (key) headers["x-api-key"] = key;
+  const res = await fetch(publishUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload)
+  });
+  const text = await res.text();
+  let data = {};
+  try {
+    data = JSON.parse(text || "{}");
+  } catch {
+    data = { error: text || `HTTP ${res.status}` };
+  }
+  if (!res.ok) {
+    throw new Error(data.error || `publish failed with HTTP ${res.status}`);
+  }
+  return data;
 }
 
 export async function runPublish(argv) {
@@ -77,18 +86,18 @@ export async function runPublish(argv) {
   const manifest = await readJson(manifestPath);
   await validatePackage(projectDir, manifest);
 
-  const registryRoot = resolveRegistryRoot();
-  const indexPath = path.join(registryRoot, "registry", "registry.json");
-  if (!(await exists(indexPath))) {
-    throw new Error(`registry.json not found under ${registryRoot}`);
-  }
-  const index = await readJson(indexPath);
+  const mirrorRoot = process.env.KERN_REGISTRY_ROOT ? resolveRegistryRoot() : null;
+  const indexPath = mirrorRoot ? path.join(mirrorRoot, "registry", "registry.json") : null;
+  const mirrorEnabled = Boolean(indexPath && (await exists(indexPath)));
+  const index = mirrorEnabled ? await readJson(indexPath) : null;
   const packageName = manifest.name;
-  const pkgDir = path.join(registryRoot, "registry", "packages", packageName);
-  const metadataPath = path.join(pkgDir, "metadata.json");
-  const versionsDir = path.join(pkgDir, "versions");
-  const distDir = path.join(registryRoot, "registry", "dist", packageName);
-  await ensureDir(versionsDir);
+  const pkgDir = mirrorEnabled ? path.join(mirrorRoot, "registry", "packages", packageName) : null;
+  const metadataPath = mirrorEnabled ? path.join(pkgDir, "metadata.json") : null;
+  const versionsDir = mirrorEnabled ? path.join(pkgDir, "versions") : null;
+  const distDir = mirrorEnabled ? path.join(mirrorRoot, "registry", "dist", packageName) : path.join(projectDir, ".kern-pkg-dist", packageName);
+  if (mirrorEnabled) {
+    await ensureDir(versionsDir);
+  }
   await ensureDir(distDir);
 
   let metadata = {
@@ -98,7 +107,7 @@ export async function runPublish(argv) {
     latest: manifest.version,
     versions: {}
   };
-  if (await exists(metadataPath)) metadata = await readJson(metadataPath);
+  if (mirrorEnabled && (await exists(metadataPath))) metadata = await readJson(metadataPath);
 
   let version = manifest.version;
   if (args.bump) {
@@ -106,7 +115,7 @@ export async function runPublish(argv) {
     manifest.version = version;
     await writeJsonAtomic(manifestPath, manifest);
   }
-  if (metadata.versions?.[version]) {
+  if (mirrorEnabled && metadata.versions?.[version]) {
     throw new Error(`Version already exists: ${packageName}@${version}`);
   }
 
@@ -118,7 +127,7 @@ export async function runPublish(argv) {
   const tarballUrl = pathToFileURL(tarballPath).toString();
 
   const versionManifestRel = `versions/${version}.json`;
-  const versionManifestPath = path.join(versionsDir, `${version}.json`);
+  const versionManifestPath = mirrorEnabled ? path.join(versionsDir, `${version}.json`) : null;
   const versionManifest = {
     name: packageName,
     version,
@@ -130,71 +139,54 @@ export async function runPublish(argv) {
       shasum: integrity
     }
   };
-  await writeJsonAtomic(versionManifestPath, versionManifest);
+  if (mirrorEnabled) {
+    await writeJsonAtomic(versionManifestPath, versionManifest);
+  }
 
-  let publicReleaseUrl = "";
   if (args.public) {
-    const ghRepo = process.env.KERN_REGISTRY_GH_REPO || "";
-    if (!ghRepo) {
-      throw new Error("KERN_REGISTRY_GH_REPO is required for --public (format: owner/repo)");
-    }
-    const tag = `${packageName}-v${version}`;
-    if (!args.dryRun) {
-      ensureReleaseTag(ghRepo, tag);
-      runGh(["release", "upload", tag, tarballPath, "--repo", ghRepo, "--clobber"]);
-      publicReleaseUrl = `https://github.com/${ghRepo}/releases/download/${tag}/${tarballName}`;
-      versionManifest.dist.tarball = publicReleaseUrl;
+    console.warn("kern-pkg publish: --public is deprecated in API-first mode and is now ignored.");
+  }
+
+  const apiBase = getPublishApiBase(args);
+  const payload = {
+    name: packageName,
+    version,
+    manifest: {
+      name: packageName,
+      version,
+      main: manifest.main,
+      dependencies: manifest.dependencies || {},
+      description: manifest.description || ""
+    },
+    integrity,
+    tarballBase64: bytes.toString("base64")
+  };
+  if (!args.dryRun) {
+    const publishResult = await publishToApi(apiBase, payload);
+    if (mirrorEnabled && publishResult?.dist?.tarball) {
+      versionManifest.dist.tarball = publishResult.dist.tarball;
       await writeJsonAtomic(versionManifestPath, versionManifest);
-    } else {
-      publicReleaseUrl = `https://github.com/${ghRepo}/releases/download/${tag}/${tarballName}`;
     }
   }
 
-  metadata.latest = version;
-  metadata.description = manifest.description || metadata.description || "";
-  metadata.versions = metadata.versions || {};
-  metadata.versions[version] = { manifest: versionManifestRel };
-  await writeJsonAtomic(metadataPath, metadata);
+  if (mirrorEnabled) {
+    metadata.latest = version;
+    metadata.description = manifest.description || metadata.description || "";
+    metadata.versions = metadata.versions || {};
+    metadata.versions[version] = { manifest: versionManifestRel };
+    await writeJsonAtomic(metadataPath, metadata);
 
-  index.packages = index.packages || {};
-  index.packages[packageName] = {
-    latest: version,
-    metadata: `packages/${packageName}/metadata.json`
-  };
-  index.generatedAt = new Date().toISOString();
-  await writeJsonAtomic(indexPath, index);
-
-  if (args.public) {
-    const tag = `${packageName}-v${version}`;
-    const releaseManifestPath = path.join(distDir, `${packageName}-${version}.github-release.json`);
-    const releaseManifest = {
-      tag,
-      title: `${packageName}@${version}`,
-      notes: `Automated publish metadata for ${packageName}@${version}`,
-      assets: [
-        {
-          name: tarballName,
-          path: tarballPath,
-          integrity
-        }
-      ],
-      uploaded: Boolean(publicReleaseUrl),
-      releaseUrl: publicReleaseUrl || null,
-      hint: publicReleaseUrl
-        ? (args.dryRun
-            ? "Dry run: no gh side effects executed; this is the expected release URL."
-            : "Tarball uploaded with gh and version manifest updated to GitHub release URL.")
-        : "Upload this tarball to a GitHub Release using gh, then replace dist.tarball with the release URL."
+    index.packages = index.packages || {};
+    index.packages[packageName] = {
+      latest: version,
+      metadata: `packages/${packageName}/metadata.json`
     };
-    await writeJsonAtomic(releaseManifestPath, releaseManifest);
-    console.log(`Prepared public release metadata: ${releaseManifestPath}`);
-    if (publicReleaseUrl && !args.dryRun) {
-      console.log(`Uploaded release asset: ${publicReleaseUrl}`);
-    }
-    if (args.dryRun) {
-      console.log(`Dry run: skipped gh release create/upload for ${packageName}@${version}`);
-      console.log(`Dry run target release URL: ${publicReleaseUrl}`);
-    }
+    index.generatedAt = new Date().toISOString();
+    await writeJsonAtomic(indexPath, index);
+  }
+
+  if (args.dryRun) {
+    console.log(`Dry run: would publish ${packageName}@${version} to ${apiBase}/api/v1/packages`);
   }
 
   console.log(`Published ${packageName}@${version}`);

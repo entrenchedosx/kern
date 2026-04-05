@@ -9,8 +9,25 @@ function score(query, candidate) {
   return 1000 + Math.abs(c.length - q.length);
 }
 
+function parseArgs(argv) {
+  const out = { query: "", api: null };
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a === "--api" && i + 1 < argv.length) {
+      out.api = String(argv[++i]).replace(/\/+$/, "");
+    } else if (!out.query) {
+      out.query = a;
+    } else {
+      throw new Error(`Unknown search arg: ${a}`);
+    }
+  }
+  return out;
+}
+
 export async function runSearch(argv) {
-  const query = argv[0];
+  const args = parseArgs(argv);
+  if (args.api) process.env.KERN_REGISTRY_API_URL = args.api;
+  const query = args.query;
   if (!query) throw new Error("search query is required");
   const { index } = await fetchRegistryIndex();
   const names = Object.keys(index.packages || {});

@@ -5,6 +5,7 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 
 const DEFAULT_REGISTRY_URL =
   "https://raw.githubusercontent.com/kernlang/kern-registry/main/registry/registry.json";
+const DEFAULT_API_BASE = "http://127.0.0.1:4873";
 
 function withTimeout(ms) {
   const controller = new AbortController();
@@ -20,6 +21,14 @@ export function getRegistryUrl() {
   const localB = path.resolve(cwd, "kern-registry", "registry", "registry.json");
   if (fsSync.existsSync(localB)) return localB;
   return DEFAULT_REGISTRY_URL;
+}
+
+export function getRegistryApiBase() {
+  if (process.env.KERN_REGISTRY_API_URL) {
+    return String(process.env.KERN_REGISTRY_API_URL).replace(/\/+$/, "");
+  }
+  if (process.env.KERN_REGISTRY_URL) return null;
+  return DEFAULT_API_BASE;
 }
 
 export function toUrlMaybe(input) {
@@ -69,9 +78,19 @@ export function resolveRelativeUrl(baseUrlLike, relPath) {
 }
 
 export async function fetchRegistryIndex() {
+  const apiBase = getRegistryApiBase();
+  if (apiBase) {
+    const registryUrl = `${apiBase}/api/v1/simple`;
+    try {
+      const index = await readJsonFromUrl(registryUrl);
+      return { registryUrl, index, apiBase, mode: "api" };
+    } catch {
+      // fall through to legacy/static registry path
+    }
+  }
   const registryUrl = getRegistryUrl();
   const index = await readJsonFromUrl(registryUrl);
-  return { registryUrl, index };
+  return { registryUrl, index, apiBase: null, mode: "legacy" };
 }
 
 export async function fetchPackageMetadata(index, registryUrl, packageName) {
