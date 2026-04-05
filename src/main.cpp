@@ -39,6 +39,7 @@
 #include <chrono>
 #include <regex>
 #include <optional>
+#include <ctime>
 #ifdef _WIN32
 #include <windows.h>
 #include "platform/win32_associate_kn.hpp"
@@ -603,13 +604,99 @@ static std::optional<std::string> detectRegistryCliPath() {
     if (fs::exists(local)) return local.string();
     fs::path parent = cwd.parent_path() / "kern-registry" / "cli" / "entry.js";
     if (fs::exists(parent)) return parent.string();
+
+#ifdef _WIN32
+    char exeBuf[MAX_PATH];
+    DWORD got = GetModuleFileNameA(nullptr, exeBuf, MAX_PATH);
+    if (got > 0 && got < MAX_PATH) {
+        fs::path exeDir = fs::path(std::string(exeBuf, got)).parent_path();
+        fs::path besideA = exeDir / "kern-registry" / "cli" / "entry.js";
+        if (fs::exists(besideA)) return besideA.string();
+        fs::path besideB = exeDir / "registry-cli" / "cli" / "entry.js";
+        if (fs::exists(besideB)) return besideB.string();
+    }
+
+    if (const char* localApp = kernGetEnv("LOCALAPPDATA")) {
+        fs::path appLocalCli = fs::path(localApp) / "Kern" / "registry-cli" / "cli" / "entry.js";
+        if (fs::exists(appLocalCli)) return appLocalCli.string();
+    }
+#endif
     return std::nullopt;
+}
+
+static bool tryBootstrapRegistryCli() {
+#ifndef _WIN32
+    return false;
+#else
+    namespace fs = std::filesystem;
+    if (const char* disable = kernGetEnv("KERN_DISABLE_REGISTRY_BOOTSTRAP")) {
+        if (disable[0]) return false;
+    }
+    const char* localApp = kernGetEnv("LOCALAPPDATA");
+    if (!localApp || !localApp[0]) return false;
+
+    fs::path target = fs::path(localApp) / "Kern" / "registry-cli";
+    fs::path entry = target / "cli" / "entry.js";
+    if (fs::exists(entry)) return true;
+
+    fs::path tmpBase = fs::temp_directory_path() / ("kern_registry_bootstrap_" + std::to_string((long long)std::time(nullptr)));
+    std::error_code ec;
+    fs::create_directories(tmpBase, ec);
+    if (ec) return false;
+    fs::path scriptPath = tmpBase / "bootstrap_registry.ps1";
+    std::ofstream ps(scriptPath, std::ios::binary);
+    if (!ps) return false;
+
+    auto q = [](const std::string& s) -> std::string {
+        std::string out = "'";
+        for (char c : s) {
+            if (c == '\'') out += "''";
+            else out.push_back(c);
+        }
+        out += "'";
+        return out;
+    };
+
+    ps
+        << "$ErrorActionPreference = 'Stop'\n"
+        << "$target = " << q(target.string()) << "\n"
+        << "if (-not (Test-Path (Join-Path $target 'cli\\\\entry.js'))) {\n"
+        << "  $tmpRoot = Join-Path $env:TEMP ('kern-registry-bootstrap-' + [Guid]::NewGuid().ToString('N'))\n"
+        << "  New-Item -ItemType Directory -Path $tmpRoot | Out-Null\n"
+        << "  $zip = Join-Path $tmpRoot 'repo.zip'\n"
+        << "  Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/entrenchedosx/kern/archive/refs/heads/main.zip' -OutFile $zip\n"
+        << "  Expand-Archive -Path $zip -DestinationPath $tmpRoot -Force\n"
+        << "  $src = Join-Path $tmpRoot 'kern-main\\\\kern-registry'\n"
+        << "  if (-not (Test-Path $src)) { throw 'kern-registry folder not found in downloaded archive' }\n"
+        << "  if (Test-Path $target) { Remove-Item -Recurse -Force $target }\n"
+        << "  New-Item -ItemType Directory -Path $target | Out-Null\n"
+        << "  Copy-Item -Recurse -Force (Join-Path $src '*') $target\n"
+        << "  Push-Location $target\n"
+        << "  npm install --omit=dev | Out-Null\n"
+        << "  Pop-Location\n"
+        << "  Remove-Item -Recurse -Force $tmpRoot\n"
+        << "}\n";
+    ps.close();
+
+    std::string cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File " + shellQuote(scriptPath.string());
+    int rc = std::system(cmd.c_str());
+    return rc == 0 && fs::exists(entry);
+#endif
 }
 
 static int runRegistryCliSubcommand(const std::string& sub, int argc, char** argv, int argBase) {
     auto cliPath = detectRegistryCliPath();
     if (!cliPath.has_value()) {
-        std::cerr << sub << ": kern-registry CLI not found. Set KERN_REGISTRY_CLI or place kern-registry/ next to cwd.\n";
+        if (tryBootstrapRegistryCli()) {
+            cliPath = detectRegistryCliPath();
+        }
+    }
+    if (!cliPath.has_value()) {
+        std::cerr << sub << ": kern-registry CLI not found.\n"
+                  << "  Fix options:\n"
+                  << "    - Set KERN_REGISTRY_CLI to <path>/kern-registry/cli/entry.js\n"
+                  << "    - Place kern-registry/ next to your working directory\n"
+                  << "    - On Windows, allow auto-bootstrap (default) unless KERN_DISABLE_REGISTRY_BOOTSTRAP is set\n";
         return 1;
     }
     std::ostringstream cmd;
@@ -623,7 +710,16 @@ static int runRegistryCliSubcommand(const std::string& sub, int argc, char** arg
 static int runRegistryCliSubcommandWithArgs(const std::string& sub, const std::vector<std::string>& args) {
     auto cliPath = detectRegistryCliPath();
     if (!cliPath.has_value()) {
-        std::cerr << sub << ": kern-registry CLI not found. Set KERN_REGISTRY_CLI or place kern-registry/ next to cwd.\n";
+        if (tryBootstrapRegistryCli()) {
+            cliPath = detectRegistryCliPath();
+        }
+    }
+    if (!cliPath.has_value()) {
+        std::cerr << sub << ": kern-registry CLI not found.\n"
+                  << "  Fix options:\n"
+                  << "    - Set KERN_REGISTRY_CLI to <path>/kern-registry/cli/entry.js\n"
+                  << "    - Place kern-registry/ next to your working directory\n"
+                  << "    - On Windows, allow auto-bootstrap (default) unless KERN_DISABLE_REGISTRY_BOOTSTRAP is set\n";
         return 1;
     }
     std::ostringstream cmd;
