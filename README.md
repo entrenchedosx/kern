@@ -6,6 +6,12 @@
 
 **Kern** is a practical **Python-like + C++-level system access** language: readable scripts, compiled to bytecode, executed by a fast VM, with explicit tooling for diagnostics, scanning, packaging, and deployment.
 
+## Project status notice
+
+I will be taking a significant break from active production work on Kern due to school commitments and current funding constraints.
+
+Core code and releases remain available, but new feature delivery and response times may be slower during this period.
+
 Use Kern when you want:
 - **Python-style productivity** for day-to-day scripting and app logic.
 - **C++-style system reach** (process, filesystem, networking, memory/interop).
