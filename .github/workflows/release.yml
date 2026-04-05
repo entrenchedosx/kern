@@ -81,6 +81,10 @@ jobs:
           KERN_COVERAGE_SKIP_GRAPHICS: "1"
         run: pwsh -NoProfile -File ./tests/run_stable.ps1
 
+      - name: Install registry CLI deps for portable bundle
+        shell: pwsh
+        run: npm ci --prefix kern-registry --omit=dev
+
       - name: Package zip
         id: zip
         shell: pwsh
@@ -96,6 +100,11 @@ jobs:
           Copy-Item LICENSE pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
           Copy-Item README.md pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
           Copy-Item KERN_VERSION.txt pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path pkg/kern-${ver}-win64/kern-registry | Out-Null
+          Copy-Item kern-registry/cli pkg/kern-${ver}-win64/kern-registry/ -Recurse -Force
+          Copy-Item kern-registry/node_modules pkg/kern-${ver}-win64/kern-registry/ -Recurse -Force
+          Copy-Item kern-registry/package.json pkg/kern-${ver}-win64/kern-registry/ -Force
+          Copy-Item kern-registry/package-lock.json pkg/kern-${ver}-win64/kern-registry/ -Force
           Compress-Archive -Path pkg/kern-${ver}-win64 -DestinationPath $out -Force
           Add-Content -Path $env:GITHUB_OUTPUT -Value "zip_path=$out"
 
