@@ -97,8 +97,15 @@ On Windows from a fresh build:
 
 ### Scripted install (recommended)
 
-- **Windows:** `.\install.ps1 -AddToPath` (see script for options).
-- **Linux / macOS:** `chmod +x install.sh && ./install.sh` then add `~/.local/bin` to `PATH` if prompted.
+- **Windows:** `.\install.ps1 -Mode User` (or `-Mode Global` in Administrator PowerShell).
+- **Linux / macOS:** `chmod +x install.sh && ./install.sh --mode user` (or `--mode global` with `sudo`).
+
+Installer capabilities:
+- Detects existing `kern` in `PATH` and prints upgrade/downgrade/reinstall guidance.
+- Supports `User`, `Global`, and `Portable` install modes.
+- Installs versioned runtime layout (`versions/<version>/...`) plus active `bin/kern`.
+- Performs SHA-256 integrity printout for installed binary.
+- Updates PATH idempotently (no duplicate entries).
 
 ### Build from source
 
