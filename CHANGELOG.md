@@ -28,7 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **g2d:** `strokeRoundedRect` targets the 4-parameter `DrawRectangleRoundedLines` API and approximates line thickness when Raylib does not provide the thickness overload, restoring Release CI builds (Windows, Linux, macOS).
 - **Release CI:** ship missing `cmake/kern_paths.cmake` and builtin-module sources; set `KERN_ENFORCE_PERMISSIONS=0` for verify/coverage steps so trusted smoke and stable suites match permission-heavy std/process paths.
-- **`append_file`:** implement append via `fopen(..., "ab")` / `fwrite` / `fclose` so POSIX and Windows CI agree (ofstream append modes were failing Linux/macOS smoke).
+- **`append_file`:** implement append via `fopen(..., "ab")` / `fwrite` / `fclose`; fix `setGlobalFn` indices for `append_file` / `appendFile` / `require` (were computed after socket builtins, so globals called the wrong slots).
 
 ---
 

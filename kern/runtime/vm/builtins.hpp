@@ -6986,11 +6986,6 @@ inline void registerAllBuiltins(VM& vm) {
         return Value::fromMap(std::move(m));
     });
     setGlobalFn("net_ws_listen", i - 1);
-
-    constexpr size_t kSocketBuiltinCount = 16;
-    setGlobalFn("append_file", i - kSocketBuiltinCount - 2);
-    setGlobalFn("appendFile", i - kSocketBuiltinCount - 2);
-    setGlobalFn("require", i - kSocketBuiltinCount - 1);
 }
 
 } // namespace kern
