@@ -517,8 +517,9 @@
         }
         return Value::fromBool(std::fclose(fp) == 0);
     });
-    setGlobalFn("append_file", i - 2);
-    setGlobalFn("appendFile", i - 2);
+    // After makeBuiltin(i++, ...), last registered index is i - 1.
+    setGlobalFn("append_file", i - 1);
+    setGlobalFn("appendFile", i - 1);
 
     // require("filesystem.write") — grant a permission for the rest of the VM run (no-op if enforcement off)
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
