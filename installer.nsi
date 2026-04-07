@@ -28,7 +28,7 @@ Section "Kern"
   SetOutPath "$INSTDIR\bin"
   File /r "${BUILD_ROOT}\bin\*.*"
 
-  ; Lib (for import("lib/kern/...") when KERN_LIB=$INSTDIR)
+  ; Lib (kern stdlib + kargo CLI under lib\kargo for bin\kargo.cmd)
   SetOutPath "$INSTDIR\lib"
   IfFileExists "${BUILD_ROOT}\lib\*.*" 0 +2
   File /r "${BUILD_ROOT}\lib\*.*"

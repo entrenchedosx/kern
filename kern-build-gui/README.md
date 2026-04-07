@@ -33,7 +33,7 @@ Or double-click / run `kern-build-gui.bat` from this folder (uses `python -m ker
 
 ## kernconfig fields written
 
-The GUI writes JSON compatible with [`kernconfig`](../src/utils/kernconfig.hpp): `entry`, `output`, `include_paths`, `release`, `optimization`, `console`, and optional **`files`** (explicit list; each must be reachable from the entry via imports).
+The GUI writes JSON compatible with [`kernconfig`](../kern/core/utils/kernconfig.hpp): `entry`, `output`, `include_paths`, `release`, `optimization`, `console`, and optional **`files`** (explicit list; each must be reachable from the entry via imports).
 
 ## Packaging (Windows, PyInstaller)
 

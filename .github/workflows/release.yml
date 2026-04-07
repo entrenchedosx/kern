@@ -1,4 +1,5 @@
 # On version tag (v*): build Windows + Linux + macOS with Raylib (g2d/g3d); attach archives to GitHub Release.
+# Also ships a Node-based Kargo bundle (tar.gz + SHA256SUMS + kargo-release.json). See kargo/scripts/package-release.sh.
 # workflow_dispatch: build + artifacts only (no release unless ref is a tag).
 name: Release
 
@@ -240,8 +241,40 @@ jobs:
           name: kern-release-macos
           path: ${{ steps.tgz.outputs.tgz_path }}
 
+  kargo-dist:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: kargo/package-lock.json
+
+      - name: Package Kargo release bundle
+        run: |
+          chmod +x kargo/scripts/package-release.sh
+          kargo/scripts/package-release.sh "${{ github.ref_name }}" .
+
+      - name: Verify checksum + smoke
+        run: |
+          sha256sum -c kargo-SHA256SUMS
+          mkdir -p _kargo_smoke
+          tar -xzf "kargo-${{ github.ref_name }}.tar.gz" -C _kargo_smoke
+          node "_kargo_smoke/kargo-${{ github.ref_name }}/cli/entry.js" --version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kargo-release-dist
+          path: |
+            kargo-${{ github.ref_name }}.tar.gz
+            kargo-SHA256SUMS
+            kargo-release.json
+
   publish:
-    needs: [windows, linux, macos, docs]
+    needs: [windows, linux, macos, docs, kargo-dist]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -249,7 +282,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: release-assets
-          pattern: kern-release-*
           merge-multiple: true
 
       - name: Publish GitHub Release

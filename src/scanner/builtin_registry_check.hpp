@@ -1,7 +1,7 @@
 #ifndef KERN_SCANNER_BUILTIN_REGISTRY_CHECK_HPP
 #define KERN_SCANNER_BUILTIN_REGISTRY_CHECK_HPP
 
-#include "errors.hpp"
+#include "errors/errors.hpp"
 #include "vm/vm.hpp"
 
 namespace kern {

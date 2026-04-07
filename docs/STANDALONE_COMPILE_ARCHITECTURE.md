@@ -25,7 +25,7 @@ This document describes how Kern turns `.kn` sources into a **single Windows exe
 
 1. **Frontend (existing):** Lexer → Parser → AST → `CodeGenerator` when executing imports at runtime; for packaging, the driver uses **project resolution** + **per-module semantic scan** first.
 2. **Dependency resolution:** `resolveProjectGraph` walks `import` from the entry `.kn`, with `include_paths` / `kernconfig` rules.
-3. **Middle-end:** `buildIRFromResolvedGraph` then IR passes in `src/ir/passes/` (constant folding, DCE, inlining, typed IR cleanup).
+3. **Middle-end:** `buildIRFromResolvedGraph` then IR passes in `kern/pipeline/ir/passes/` (constant folding, DCE, inlining, typed IR cleanup).
 4. **Backend:** `generateCppBundle` → `writeBundleAsCppSource` (packager).
 5. **Link:** `buildStandaloneExe` generates a **temporary CMake project** and invokes the toolchain (MSVC-focused flags today).
 

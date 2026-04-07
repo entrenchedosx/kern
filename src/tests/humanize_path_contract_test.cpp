@@ -3,7 +3,7 @@
  * Built as a tiny executable; CI can run: kern_contract_humanize && echo OK
  */
 
-#include "errors.hpp"
+#include "errors/errors.hpp"
 
 #include <cstdlib>
 #include <iostream>

@@ -19,21 +19,22 @@ Not every run enables all **optional** stages; strict typing and IR passes depen
 
 | Area | Path | Role |
 |------|------|------|
-| **Driver / CLI** | [`src/main.cpp`](../src/main.cpp) | Arguments, `runSource`, REPL, `kern test`, `kern doctor`, permission setup |
-| **Lexer** | [`src/compiler/lexer.cpp`](../src/compiler/lexer.cpp), [`token.hpp`](../src/compiler/token.hpp) | Tokens, keywords, literals |
-| **Parser** | [`src/compiler/parser.cpp`](../src/compiler/parser.cpp), [`ast.hpp`](../src/compiler/ast.hpp) | AST construction |
-| **Semantic** | [`src/compiler/semantic.cpp`](../src/compiler/semantic.cpp) | Name resolution, preview strict paths |
-| **Codegen** | [`src/compiler/codegen.cpp`](../src/compiler/codegen.cpp) | AST → [`Bytecode`](../src/vm/bytecode.hpp) |
-| **VM** | [`src/vm/vm.cpp`](../src/vm/vm.cpp), [`vm.hpp`](../src/vm/vm.hpp) | Stack machine, dispatch, `VMError` |
-| **Bytecode helpers** | [`src/vm/bytecode_verifier.cpp`](../src/vm/bytecode_verifier.cpp), [`bytecode_peephole.cpp`](../src/vm/bytecode_peephole.cpp) | Safety checks, small optimizations |
-| **Values** | [`src/vm/value.hpp`](../src/vm/value.hpp) | Language values (RC handles) |
-| **Builtins** | [`src/vm/builtins.hpp`](../src/vm/builtins.hpp) | Native function table |
+| **Driver / CLI** | [`kern/tools/main.cpp`](../kern/tools/main.cpp) | Arguments, `runSource`, REPL, `kern test`, `kern doctor`, permission setup |
+| **Lexer** | [`kern/core/compiler/lexer.cpp`](../kern/core/compiler/lexer.cpp), [`token.hpp`](../kern/core/compiler/token.hpp) | Tokens, keywords, literals |
+| **Parser** | [`kern/core/compiler/parser.cpp`](../kern/core/compiler/parser.cpp), [`ast.hpp`](../kern/core/compiler/ast.hpp) | AST construction |
+| **Semantic** | [`kern/core/compiler/semantic.cpp`](../kern/core/compiler/semantic.cpp) | Name resolution, preview strict paths |
+| **Codegen** | [`kern/core/compiler/codegen.cpp`](../kern/core/compiler/codegen.cpp) | AST → [`Bytecode`](../kern/core/bytecode/bytecode.hpp) |
+| **VM** | [`kern/runtime/vm/vm.cpp`](../kern/runtime/vm/vm.cpp), [`vm.hpp`](../kern/runtime/vm/vm.hpp) | Stack machine, dispatch, `VMError` |
+| **Bytecode helpers** | [`kern/runtime/vm/bytecode_verifier.cpp`](../kern/runtime/vm/bytecode_verifier.cpp), [`bytecode_peephole.cpp`](../kern/core/bytecode/bytecode_peephole.cpp) | Safety checks, small optimizations |
+| **Values** | [`kern/core/bytecode/value.hpp`](../kern/core/bytecode/value.hpp) | Language values (RC handles) |
+| **Builtins** | [`kern/runtime/vm/builtins.hpp`](../kern/runtime/vm/builtins.hpp) | Native function table |
 | **Imports** | [`src/import_resolution.cpp`](../src/import_resolution.cpp) | `__import`, module load |
-| **Project** | [`src/compiler/project_resolver.cpp`](../src/compiler/project_resolver.cpp), [`analyzer/project_analyzer.cpp`](../src/analyzer/project_analyzer.cpp) | `kern.json`, static graph helpers |
-| **Diagnostics** | [`src/errors.cpp`](../src/errors.cpp), [`errors.hpp`](../src/errors.hpp) | Human + JSON reporting |
+| **Project** | [`kern/core/compiler/project_resolver.cpp`](../kern/core/compiler/project_resolver.cpp), [`analyzer/project_analyzer.cpp`](../kern/pipeline/analyzer/project_analyzer.cpp) | `kern.json`, static graph helpers |
+| **Diagnostics** | [`kern/core/errors/errors.cpp`](../kern/core/errors/errors.cpp), [`errors.hpp`](../kern/core/errors/errors.hpp) | Human + JSON reporting |
+| **Builtin module registry** | [`kern/modules/builtin_module_registry.hpp`](../kern/modules/builtin_module_registry.hpp) | **`get_builtin_modules()`** — names + future `init` hooks (Phase 10) |
 | **Scanner tool** | [`src/scanner/`](../src/scanner/) | `kern --scan` registry checks |
-| **LSP** | [`src/lsp/lsp_main.cpp`](../src/lsp/lsp_main.cpp) | Language server (when built) |
-| **Graphics** | [`src/modules/g2d/`](../src/modules/g2d/), [`src/modules/g3d/`](../src/modules/g3d/), [`src/game/`](../src/game/) | Raylib-backed modules when `KERN_BUILD_GAME=ON` |
+| **LSP** | [`kern/tools/lsp_main.cpp`](../kern/tools/lsp_main.cpp) | Language server (when built) |
+| **Graphics / game** | [`kern/modules/g2d/`](../kern/modules/g2d/), [`kern/modules/g3d/`](../kern/modules/g3d/), [`kern/modules/game/`](../kern/modules/game/) | Raylib-backed modules + `game` when `KERN_BUILD_GAME=ON` |
 
 ## Configuration and feature flags
 

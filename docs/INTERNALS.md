@@ -16,7 +16,7 @@ Kern aims for **predictable behavior** and **actionable diagnostics**, not infor
 
 - **Language & stdlib surface** evolve under semver ([`KERN_VERSION.txt`](../KERN_VERSION.txt)); breaking changes should be called out in `CHANGELOG.md`.
 - **Bytecode layout** is an **implementation detail** between `kernc`/codegen and the VM. Treat serialized bytecode as **not** a stable cross-version file format unless you explicitly version and pin a toolchain.
-- **Builtin indices** in [`src/vm/builtins.hpp`](../src/vm/builtins.hpp) are **append-only** by policy; new builtins extend the table rather than reshuffling indices used by existing scripts.
+- **Builtin indices** in [`kern/runtime/vm/builtins.hpp`](../kern/runtime/vm/builtins.hpp) are **append-only** by policy; new builtins extend the table rather than reshuffling indices used by existing scripts.
 - **Diagnostics** use stable string **codes** (e.g. `VM-DIV-ZERO`, `LEX-TOKENIZE`) for automation; see [ERROR_CODES.md](ERROR_CODES.md).
 
 ## Verification you can rely on

@@ -120,6 +120,25 @@ if (Test-Path $libSpl) {
     Get-ChildItem -Path $libSpl -File -Filter "*.kn" | ForEach-Object { Copy-Item $_.FullName $modDir -Force }
     Write-Host "  OK: modules\ (*.kn)" -ForegroundColor Green
 }
+
+$kargoSrc = Join-Path $Root "kargo"
+$kargoDest = Join-Path $BuildOut "lib\kargo"
+if (Test-Path $kargoSrc) {
+    Write-Host "  Staging kargo for installer..." -ForegroundColor Gray
+    New-Item -ItemType Directory -Force -Path (Join-Path $BuildOut "lib") | Out-Null
+    if (Test-Path $kargoDest) { Remove-Item $kargoDest -Recurse -Force }
+    Copy-Item $kargoSrc $kargoDest -Recurse -Force
+    Push-Location $kargoDest
+    try {
+        npm install --omit=dev 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { Write-Host "  WARN: npm install in BUILD\lib\kargo failed (exit $LASTEXITCODE); run manually before shipping" -ForegroundColor Yellow }
+    } finally {
+        Pop-Location
+    }
+    $kargoCmd = "@echo off`r`nnode `"%~dp0..\lib\kargo\cli\entry.js`" %*`r`n"
+    Set-Content -Path (Join-Path $binDir "kargo.cmd") -Value $kargoCmd -Encoding ASCII -Force
+    Write-Host "  OK: lib\kargo\, bin\kargo.cmd (NSIS / portable BUILD layout)" -ForegroundColor Green
+}
 Write-Host ""
 
 # step 4: Copy examples and docs ----------

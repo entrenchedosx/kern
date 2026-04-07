@@ -49,7 +49,7 @@ The executable you ran does not implement `--scan` (stale install, or a `kern` o
 | `src/scanner/scan_driver.cpp` | CLI parsing, directory walk, per-file compile + bytecode + semantic pass |
 | `src/scanner/builtin_registry_check.cpp` | `getBuiltinNames()` duplicates / empty names; VM slot coverage via `VM::builtinSlotFilled` |
 | `src/scanner/stdlib_export_check.cpp` | `stdV1NamedExports()` targets vs registered builtins |
-| `src/vm/vm.hpp` | `builtinSlotFilled` for registration checks |
+| `kern/runtime/vm/vm.hpp` | `builtinSlotFilled` for registration checks |
 
 Future work can split `scan_driver` into smaller translation units (e.g. per-rule analyzers) without changing the CLI.
 

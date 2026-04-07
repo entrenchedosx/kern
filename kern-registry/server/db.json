@@ -1,4 +1,63 @@
 {
-  "registryVersion": 1,
-  "packages": {}
+  "registryVersion": 2,
+  "packages": {
+    "sys.config": {
+      "name": "sys.config",
+      "description": "Layered configuration helpers (defaults, file, env) for Kern apps.",
+      "trusted": false,
+      "latest": "1.0.2",
+      "versions": {
+        "1.0.2": {
+          "name": "sys.config",
+          "version": "1.0.2",
+          "main": "src/index.kn",
+          "dependencies": {},
+          "trusted": false,
+          "dist": {
+            "tarball": "http://127.0.0.1:4873/api/v1/files/sys.config/1.0.2/sys.config-1.0.2.tgz",
+            "shasum": "sha256-af34a03122e8526f25842e33fdbf955bbedcac953c5f946dc04237daa1b1f396"
+          }
+        }
+      }
+    },
+    "sys.log": {
+      "name": "sys.log",
+      "description": "Structured logging with levels, redaction, and JSON/text output for Kern apps.",
+      "trusted": false,
+      "latest": "1.0.1",
+      "versions": {
+        "1.0.1": {
+          "name": "sys.log",
+          "version": "1.0.1",
+          "main": "src/index.kn",
+          "dependencies": {},
+          "trusted": false,
+          "dist": {
+            "tarball": "http://127.0.0.1:4874/api/v1/files/sys.log/1.0.1/sys.log-1.0.1.tgz",
+            "shasum": "sha256-75896cab93a21a95cb5f659d413699b49b0758f0b129fa3eea8da3b0ecbc0597"
+          }
+        }
+      }
+    },
+    "ursina": {
+      "name": "ursina",
+      "description": "Production-grade game framework foundation for Kern (Phase 1).",
+      "trusted": false,
+      "latest": "0.1.0",
+      "versions": {
+        "0.1.0": {
+          "name": "ursina",
+          "version": "0.1.0",
+          "main": "src/index.kn",
+          "dependencies": {},
+          "trusted": false,
+          "dist": {
+            "tarball": "http://127.0.0.1:4873/api/v1/files/ursina/0.1.0/ursina-0.1.0.tgz",
+            "shasum": "sha256-85ea2c62f90e4d201de6886c64d11ee043fba4585e4555ac18a0789dc5d4f66a"
+          }
+        }
+      }
+    }
+  },
+  "generatedAt": "2026-04-06T13:01:26.721Z"
 }

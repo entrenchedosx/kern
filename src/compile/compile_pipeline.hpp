@@ -76,7 +76,7 @@ bool optionsToSplConfig(const Options& opts, SplConfig& cfg, std::string& error)
 /**
  * Full native Windows .exe pipeline: resolve imports → semantic scan → IR + passes → backend → link.
  * @param cfg entry/output must be absolute/canonical paths; other fields as for kernc.
- * @param kernRepoRoot KERN source tree (contains src/compiler/lexer.cpp); use KERN_REPO_ROOT detection from kernc.
+ * @param kernRepoRoot KERN source tree (contains kern/core/compiler/lexer.cpp); use KERN_REPO_ROOT detection from kernc.
  * @param backend null = default C++ embedded-source + VM link.
  */
 bool runStandaloneExecutablePipeline(SplConfig& cfg, const std::string& kernRepoRoot, const PipelineParams& params,

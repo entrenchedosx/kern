@@ -1,6 +1,6 @@
 # Language syntax overview
 
-This is a **high-level** overview. Kern evolves; the **compiler** (`src/compiler/`) and **examples** are the ground truth.
+This is a **high-level** overview. Kern evolves; the **compiler** (`kern/core/compiler/`) and **examples** are the ground truth.
 
 ## Basics
 

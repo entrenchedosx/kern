@@ -7,7 +7,7 @@ IMPORTANT DISCLAIMERS
 -------------------
 1) Kern evolves. This file is a snapshot assembled from the repository layout
    (builtins, stdlib maps, modules, CLI strings, docs). For an authoritative
-   machine list of VM builtins, see: src/vm/builtins.hpp → getBuiltinNames().
+   machine list of VM builtins, see: kern/runtime/vm/builtins.hpp → getBuiltinNames().
 2) Some features are conditional on CMake/build flags (e.g. KERN_BUILD_GAME,
    Raylib-linked g2d/g3d). If a symbol is missing at runtime, check how the
    binary was built.
@@ -22,14 +22,14 @@ IMPORTANT DISCLAIMERS
 - Source language: .kn scripts (C/JavaScript-like syntax; see §3).
 - Pipeline: Lexer → Parser → AST → Codegen → Bytecode → VM execution.
 - Core entrypoints:
-  • `kern`     — interpret/compile-check/format/test/REPL (src/main.cpp).
+  • `kern`     — interpret/compile-check/format/test/REPL (kern/tools/main.cpp).
   • `kernc`    — standalone / AOT-oriented compiler + project tooling
-                 (src/kernc_main.cpp).
+                 (kern/tools/kernc_main.cpp).
   • `kern-scan` — cross-layer scanner (registry + static analysis).
   • LSP server — diagnostics/hover aligned with compiler + builtin registry
-                 (src/lsp/lsp_main.cpp).
+                 (kern/tools/lsp_main.cpp).
 - Optional: `kern` / `kern-game` style builds with Raylib + game builtins
-  (src/game/) and native 2D/3D modules (src/modules/g2d/, g3d/).
+  (kern/modules/game/) and native 2D/3D modules (kern/modules/g2d/, g3d/).
 
 ================================================================================
 2. LANGUAGE SYNTAX & SEMANTICS (HIGH LEVEL)
@@ -50,7 +50,7 @@ Statements and control flow
 - Generators: functions can be generator-marked; yield suspends execution
   (Opcode YIELD, SET_FUNC_GENERATOR).
 - Unsafe regions: unsafe { ... } or unsafe: block — required by semantic pass
-  for certain low-level builtins and FFI calls (see src/compiler/semantic.cpp).
+  for certain low-level builtins and FFI calls (see kern/core/compiler/semantic.cpp).
 - Decorators: @Name(...) before declarations desugar to calls to the runtime
   hook __apply_decorator (and related __runtime_apply_decorators).
 
@@ -78,7 +78,7 @@ Modules and imports
   • Filesystem paths under project / KERN_LIB (see docs/TROUBLESHOOTING.md).
 - `from "x" import y` style imports (see main.cpp help text).
 - Duplicate-load caching and cycle detection; import errors use VM error codes
-  IMPORT_* (src/vm/vm_error_codes.hpp).
+  IMPORT_* (kern/core/errors/vm_error_codes.hpp).
 
 Foreign functions (FFI)
 -----------------------
@@ -91,7 +91,7 @@ Foreign functions (FFI)
 ================================================================================
 3. BYTECODE / VM MODEL
 ================================================================================
-Schema: kBytecodeSchemaVersion = 1 (src/vm/bytecode.hpp). Bumped when serialized
+Schema: kBytecodeSchemaVersion = 1 (kern/core/bytecode/bytecode.hpp). Bumped when serialized
 bytecode or opcode semantics change incompatibly.
 
 Opcode categories (Opcode enum)
@@ -129,7 +129,7 @@ Bytecode verification
 ================================================================================
 4. PERMISSIONS & CAPABILITY PROFILES
 ================================================================================
-Core permission IDs (src/vm/permissions.hpp, namespace Perm)
+Core permission IDs (kern/runtime/vm/permissions.hpp, namespace Perm)
 ------------------------------------------------------------
 - filesystem.read
 - filesystem.write
@@ -170,7 +170,7 @@ Introspection
 ================================================================================
 5. CORE VM BUILTINS (GLOBAL FUNCTIONS)
 ================================================================================
-Listed in registration order in getBuiltinNames() (src/vm/builtins.hpp).
+Listed in registration order in getBuiltinNames() (kern/runtime/vm/builtins.hpp).
 Alternate spellings / extra globals: PI, E, readFile, writeFile, appendFile,
 file_exists, list_dir (getBuiltinExtraGlobalNames).
 
@@ -370,7 +370,7 @@ source MODULES table for exact per-module exports.)
 ================================================================================
 8. OPTIONAL GAME BUILTINS (KERN_BUILD_GAME)
 ================================================================================
-Registered when game mode is compiled in (src/game/game_builtins.cpp).
+Registered when game mode is compiled in (kern/modules/game/game_builtins.cpp).
 Names from getGameBuiltinNames():
 
 window_create, window_close, window_should_close, window_open,
@@ -422,7 +422,7 @@ Collision helpers: rectsOverlap, pointInRect, circlesOverlap
 ================================================================================
 10. NATIVE 3D MODULE — import("g3d")  (Raylib-backed when enabled)
 ================================================================================
-API surface (src/modules/g3d/g3d.cpp) — representative groups:
+API surface (kern/modules/g3d/g3d.cpp) — representative groups:
 
 Window / frame: createWindow, closeWindow, clear, width, height, run, status
 
@@ -454,7 +454,7 @@ Drawing uses setColor for tint/state where applicable.
 ================================================================================
 11. CLI — `kern` (INTERPRETER / TOOLING)
 ================================================================================
-(See printUsage in src/main.cpp.)
+(See printUsage in kern/tools/main.cpp.)
 
 Execution
 ---------
@@ -505,7 +505,7 @@ Windows-only: --repair-association — .kn file association repair
 ================================================================================
 12. CLI — `kernc` (STANDALONE COMPILER)
 ================================================================================
-(See printUsage in src/kernc_main.cpp.)
+(See printUsage in kern/tools/kernc_main.cpp.)
 
 - kern input.kn -o out.exe [--release|--debug] [--opt 0..3] [--console|--no-console]
 - kern --config kernconfig.json
@@ -541,7 +541,7 @@ Windows-only: --repair-association — .kn file association repair
 ================================================================================
 15. VM ERROR CODES (SELECTED)
 ================================================================================
-See src/vm/vm_error_codes.hpp and --vm-error-codes-json for full catalog.
+See kern/core/errors/vm_error_codes.hpp and --vm-error-codes-json for full catalog.
 
 Examples: STACK_UNDERFLOW, STEP_LIMIT_EXCEEDED, INVALID_BYTECODE, DIVISION_BY_ZERO,
 PERMISSION_DENIED, BYTECODE_VERIFY_STACK, IMPORT_* codes, BrowserKit_* reserved
@@ -562,13 +562,13 @@ range for embedded browser tooling if present.
 ================================================================================
 17. HOW TO VERIFY THIS LIST LATER
 ================================================================================
-1) Builtin names: src/vm/builtins.hpp → getBuiltinNames(), getBuiltinExtraGlobalNames()
+1) Builtin names: kern/runtime/vm/builtins.hpp → getBuiltinNames(), getBuiltinExtraGlobalNames()
 2) std.v1 exports: src/stdlib_stdv1_exports.hpp → stdV1NamedExports()
 3) Legacy modules: src/stdlib_modules.cpp → MODULES
-4) Opcodes: src/vm/bytecode.hpp → enum Opcode
-5) Game: src/game/game_builtins.cpp → getGameBuiltinNames()
-6) g2d/g3d: src/modules/g2d/g2d.cpp, g3d/g3d.cpp → add("...")
-7) CLI strings: src/main.cpp, src/kernc_main.cpp → printUsage
+4) Opcodes: kern/core/bytecode/bytecode.hpp → enum Opcode
+5) Game: kern/modules/game/game_builtins.cpp → getGameBuiltinNames()
+6) g2d/g3d: kern/modules/g2d/g2d.cpp, g3d/g3d.cpp → add("...")
+7) CLI strings: kern/tools/main.cpp, kern/tools/kernc_main.cpp → printUsage
 
 ================================================================================
 END OF TEMPORARY REFERENCE (safe to delete from tree when no longer needed)

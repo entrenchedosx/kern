@@ -21,9 +21,9 @@ This document maps a **long-horizon** goal (“production-ready language with st
 
 Before opening large new subsystems, use what exists:
 
-- **Diagnostics:** `src/errors.*`, JSON output for tooling, [ERROR_CODES.md](ERROR_CODES.md) (stable categories like `LEX-*`, `VM-*`; not necessarily `KERN001`—extending the catalog is a documentation + emitter task).
+- **Diagnostics:** `kern/core/errors/*`, JSON output for tooling, [ERROR_CODES.md](ERROR_CODES.md) (stable categories like `LEX-*`, `VM-*`; not necessarily `KERN001`—extending the catalog is a documentation + emitter task).
 - **Strict typing (preview):** `--strict-types`, `typed_builtins.hpp`, semantic paths behind feature flags—**extend** rather than fork.
-- **Builtins:** **Hundreds** of natives; registry in `getBuiltinNames()` in [`src/vm/builtins.hpp`](../src/vm/builtins.hpp)—**append-only** indices. See [BUILTIN_REFERENCE.md](BUILTIN_REFERENCE.md).
+- **Builtins:** **Hundreds** of natives; registry in `getBuiltinNames()` in [`kern/runtime/vm/builtins.hpp`](../kern/runtime/vm/builtins.hpp)—**append-only** indices. See [BUILTIN_REFERENCE.md](BUILTIN_REFERENCE.md).
 - **Versioned stdlib:** `std.v1.*` via [stdlib_stdv1_exports.hpp](../src/stdlib_stdv1_exports.hpp) and [stdlib_modules.cpp](../src/stdlib_modules.cpp).
 - **Validation:** `kern --scan`, `kern --check`, `kern test`—expand coverage rather than inventing a second harness.
 - **IDE:** Kern-IDE (Tk and Electron tracks); improvements should share diagnostics with the compiler where possible.

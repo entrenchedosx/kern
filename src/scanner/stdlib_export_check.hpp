@@ -1,7 +1,7 @@
 #ifndef KERN_SCANNER_STDLIB_EXPORT_CHECK_HPP
 #define KERN_SCANNER_STDLIB_EXPORT_CHECK_HPP
 
-#include "errors.hpp"
+#include "errors/errors.hpp"
 
 namespace kern {
 

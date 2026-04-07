@@ -10,11 +10,11 @@ For a **production-oriented ordering** of the same themes (stability → diagnos
 
 | Area | Current state (repo) |
 |------|------------------------|
-| **Execution** | Bytecode VM (`src/vm/`), compile-run path in `src/main.cpp` (`runSource`). |
+| **Execution** | Bytecode VM (`kern/runtime/vm/`), compile-run path in `kern/tools/main.cpp` (`runSource`). |
 | **Modules** | Runtime `import("...")` via `__import` (`src/import_resolution.*`); `kern.json` / lockfile for deps; `KERN_LIB` for stdlib roots. Not a full static graph with sealed namespaces at compile time. |
-| **Diagnostics** | Structured reporter (`src/errors.*`), categories, JSON mode for `--check`, runtime errors with **call stack slice** (`VMError` + `getCallStackSlice()`). |
+| **Diagnostics** | Structured reporter (`kern/core/errors/*`), categories, JSON mode for `--check`, runtime errors with **call stack slice** (`VMError` + `getCallStackSlice()`). |
 | **Types** | Dynamic core; **preview** semantic / strict paths (`--check --strict-types`, `semantic_engine_v1`, `typed_ir_pipeline` in feature flags). |
-| **Tooling** | `kern --check`, `--fmt`, `--ast`, `--bytecode`, `--scan`, `kern test` (with filter/list/fail-fast), REPL in `main.cpp`, separate `repl/repl_main.cpp`, `kern doctor`. |
+| **Tooling** | `kern --check`, `--fmt`, `--ast`, `--bytecode`, `--scan`, `kern test` (with filter/list/fail-fast), REPL in `kern/tools/main.cpp`, separate `kern/tools/repl_main.cpp`, `kern doctor`. |
 | **Memory** | VM-managed values; no user-facing GC API documented as a language feature (implementation detail today). |
 | **Concurrency** | No first-class async/await or threads in the core language (FFI/OS may exist for platform glue). |
 

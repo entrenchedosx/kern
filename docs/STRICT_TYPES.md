@@ -6,7 +6,7 @@ Phase 2 of the language roadmap wires **optional static checks** into `kern --ch
 
 1. **Typed `let` / `const` / `var`** — `let x: T = rhs` where `rhs` is either:
    - a **literal** (`bool`, `int`, `float`, `string`), or
-   - a **single top-level builtin call** whose callee appears in `src/compiler/typed_builtins.hpp` (return type is taken from that table).
+   - a **single top-level builtin call** whose callee appears in `kern/core/compiler/typed_builtins.hpp` (return type is taken from that table).
 
 2. **Assignments** — `name = rhs` when `name` was previously given a type via the regex pre-scan on `let name: Type = ...`.
 

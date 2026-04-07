@@ -5,7 +5,7 @@
 #define KERN_STDLIB_MODULES_HPP
 
 #include "vm/vm.hpp"
-#include "vm/value.hpp"
+#include "bytecode/value.hpp"
 #include <string>
 
 namespace kern {

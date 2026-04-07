@@ -112,7 +112,13 @@ ACTIVE_LIB_DIR="$PREFIX/lib/kern"
 VERSION_BIN_DIR="$VERSION_ROOT/bin"
 VERSION_LIB_DIR="$VERSION_ROOT/lib/kern"
 
-mkdir -p "$ACTIVE_BIN_DIR" "$ACTIVE_LIB_DIR" "$VERSION_BIN_DIR" "$VERSION_LIB_DIR" "$PREFIX/packages" "$PREFIX/config" "$PREFIX/cache"
+case "$MODE" in
+  user) PATH_BIN="$HOME/.local/bin" ;;
+  global) PATH_BIN="/usr/local/bin" ;;
+  portable) PATH_BIN="$ACTIVE_BIN_DIR" ;;
+esac
+
+mkdir -p "$ACTIVE_BIN_DIR" "$ACTIVE_LIB_DIR" "$VERSION_BIN_DIR" "$VERSION_LIB_DIR" "$PREFIX/packages" "$PREFIX/config" "$PREFIX/cache" "$PATH_BIN"
 
 if [ -f "$ACTIVE_BIN_DIR/kern" ] && [ "$FORCE" -ne 1 ]; then
   printf "Active binary exists at %s. Overwrite? [y/N] " "$ACTIVE_BIN_DIR/kern"
@@ -132,6 +138,47 @@ if [ -d "$ROOT/lib/kern" ]; then
   cp -R "$ROOT/lib/kern/." "$VERSION_LIB_DIR/"
 fi
 
+KARGO_SRC="$ROOT/kargo"
+KARGO_DEST="$PREFIX/lib/kargo"
+if [ -d "$KARGO_SRC" ]; then
+  echo "==> Installing kargo (GitHub package CLI)..."
+  if ! command -v node >/dev/null 2>&1; then
+    echo "    error: Node.js is not on PATH; kargo requires Node >= 18.17 (https://nodejs.org/)."
+    exit 1
+  fi
+  if ! node -e '
+    const p = process.versions.node.split(".").map(Number);
+    const ok = p[0] > 18 || (p[0] === 18 && (p[1] > 17 || (p[1] === 17 && p[2] >= 0)));
+    process.exit(ok ? 0 : 1);
+  ' 2>/dev/null; then
+    echo "    error: Node $(node -p process.versions.node) is too old for kargo (need >= 18.17.0)."
+    exit 1
+  fi
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "    error: npm is not on PATH; kargo install needs npm (normally bundled with Node.js)."
+    exit 1
+  fi
+  if ! npm --version >/dev/null 2>&1; then
+    echo "    error: npm failed (npm --version). Repair your Node.js installation and retry."
+    exit 1
+  fi
+  rm -rf "$KARGO_DEST"
+  cp -R "$KARGO_SRC" "$KARGO_DEST"
+  if ! (cd "$KARGO_DEST" && npm install --omit=dev); then
+    echo "    error: npm install --omit=dev failed in $KARGO_DEST — fix and re-run install.sh."
+    exit 1
+  fi
+  cat > "$ACTIVE_BIN_DIR/kargo" << EOF
+#!/bin/sh
+exec node "$KARGO_DEST/cli/entry.js" "\$@"
+EOF
+  chmod +x "$ACTIVE_BIN_DIR/kargo"
+  cp -f "$ACTIVE_BIN_DIR/kargo" "$PATH_BIN/kargo"
+  chmod +x "$PATH_BIN/kargo"
+  chmod +x "$KARGO_DEST/cli/entry.js" 2>/dev/null || true
+  echo "    kargo -> $PATH_BIN/kargo"
+fi
+
 if command -v sha256sum >/dev/null 2>&1; then
   SHA="$(sha256sum "$ACTIVE_BIN_DIR/kern" | awk '{print $1}')"
 elif command -v shasum >/dev/null 2>&1; then
@@ -140,13 +187,6 @@ else
   SHA="unavailable"
 fi
 
-case "$MODE" in
-  user) PATH_BIN="$HOME/.local/bin" ;;
-  global) PATH_BIN="/usr/local/bin" ;;
-  portable) PATH_BIN="$ACTIVE_BIN_DIR" ;;
-esac
-
-mkdir -p "$PATH_BIN"
 cp -f "$ACTIVE_BIN_DIR/kern" "$PATH_BIN/kern"
 chmod +x "$PATH_BIN/kern"
 
@@ -185,5 +225,6 @@ echo "SHA256: $SHA"
 echo "Kern $TARGET_VERSION installed successfully."
 echo "Next steps:"
 echo "  - Open a new terminal and run: kern --version"
+echo "  - Package manager: kargo install owner/repo@v1.0.0 (see kargo/README.md)"
 echo "  - Upgrade: rerun install.sh with new sources/version"
 echo "  - Uninstall: remove '$PREFIX' and '$PATH_BIN/kern'"

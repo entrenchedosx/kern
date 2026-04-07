@@ -33,7 +33,7 @@ If the current working directory has **`kern.json`**, **`kern test`** and **`ker
 
 ## Version output
 
-**`kern --version`** prints the release string, a **`bytecode-schema:`** integer (`kBytecodeSchemaVersion` in `src/vm/bytecode.hpp`), and **`build:`** (git short hash) when the binary was configured from a **`.git`** checkout.
+**`kern --version`** prints the release string, a **`bytecode-schema:`** integer (`kBytecodeSchemaVersion` in `kern/core/bytecode/bytecode.hpp`), and **`build:`** (git short hash) when the binary was configured from a **`.git`** checkout.
 
 ## Watch mode
 

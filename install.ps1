@@ -141,6 +141,50 @@ if (Test-Path -LiteralPath $StdSrc) {
     Copy-Item -Path (Join-Path $StdSrc "*") -Destination $VersionLibDir -Recurse -Force
 }
 
+$KargoSrc = Join-Path $Root "kargo"
+$KargoDest = Join-Path $Prefix "lib\kargo"
+if (Test-Path -LiteralPath $KargoSrc) {
+    Write-Host "==> Installing kargo (GitHub package CLI)..."
+    $nodeCmd = Get-Command node -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -eq $nodeCmd) {
+        throw "Node.js is not on PATH; kargo requires Node >= 18.17 (https://nodejs.org/)."
+    }
+    $nv = (& node -p "process.versions.node" 2>$null)
+    $np = $nv.Split(".")
+    $nmaj = [int]$np[0]
+    $nmin = if ($np.Length -gt 1) { [int]$np[1] } else { 0 }
+    $npat = if ($np.Length -gt 2) { [int]$np[2] } else { 0 }
+    $nok = ($nmaj -gt 18) -or (($nmaj -eq 18) -and (($nmin -gt 17) -or (($nmin -eq 17) -and ($npat -ge 0))))
+    if (-not $nok) {
+        throw "Node $nv is too old for kargo (need >= 18.17.0)."
+    }
+    $npmCmd = Get-Command npm -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -eq $npmCmd) {
+        throw "npm is not on PATH; kargo install needs npm (normally bundled with Node.js)."
+    }
+    & npm --version | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "npm failed (npm --version). Repair your Node.js installation and retry."
+    }
+    if (Test-Path -LiteralPath $KargoDest) { Remove-Item -LiteralPath $KargoDest -Recurse -Force }
+    Copy-Item -LiteralPath $KargoSrc -Destination $KargoDest -Recurse -Force
+    Push-Location $KargoDest
+    try {
+        & npm install --omit=dev
+        if ($LASTEXITCODE -ne 0) {
+            throw "npm install --omit=dev failed in $KargoDest — fix and re-run install.ps1."
+        }
+    } finally {
+        Pop-Location
+    }
+    # Active bin: ..\lib\kargo ; versioned bin: ..\..\..\lib\kargo (under versions\<ver>\bin)
+    $kargoCmdActive = "@echo off`r`nnode `"%~dp0..\lib\kargo\cli\entry.js`" %*`r`n"
+    $kargoCmdVersioned = "@echo off`r`nnode `"%~dp0..\..\..\lib\kargo\cli\entry.js`" %*`r`n"
+    Set-Content -Path (Join-Path $BinDir "kargo.cmd") -Value $kargoCmdActive -Encoding ASCII -Force
+    Set-Content -Path (Join-Path $VersionBinDir "kargo.cmd") -Value $kargoCmdVersioned -Encoding ASCII -Force
+    Write-Host "    kargo -> $(Join-Path $BinDir 'kargo.cmd')"
+}
+
 $sha = (Get-FileHash -Algorithm SHA256 -LiteralPath $ActiveExe).Hash.ToLower()
 Write-Host ("Installed binary: " + $ActiveExe)
 Write-Host ("SHA256: " + $sha)
@@ -175,5 +219,6 @@ Write-Host ""
 Write-Host ("Kern " + $TargetVersion + " installed successfully.")
 Write-Host "Next steps:"
 Write-Host "  - Open a new terminal and run: kern --version"
+Write-Host "  - Package manager: kargo install owner/repo@v1.0.0 (GitHub tags; see kargo/README.md)"
 Write-Host ("  - Upgrade later: re-run install.ps1 (or choose another version once available)")
 Write-Host ("  - Uninstall: remove '" + $Prefix + "' and remove '" + $BinDir + "' from PATH")

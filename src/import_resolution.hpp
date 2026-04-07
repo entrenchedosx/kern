@@ -6,7 +6,7 @@
 #define KERN_IMPORT_RESOLUTION_HPP
 
 #include "vm/vm.hpp"
-#include "vm/value.hpp"
+#include "bytecode/value.hpp"
 #include <functional>
 #include <string>
 

@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`kargo/`** — standalone Node CLI for **GitHub-only** packages: `install` / `remove` / `update` / `list` / `search` / `publish` / `login` / `build` / `run`. Caches under `~/.kargo/packages`, writes **`kargo.lock`** (tag + **commit SHA**, **`resolved_constraints`** / **`resolved_from`** / **`resolved_version_range`** / optional **`resolved_version_range_normalized`**, v2), **deterministic JSON** (sorted `packages`, fixed per-entry key order), merges **`.kern/package-paths.json`**. **Resolver:** `[dependencies]` **semver ranges**, **deterministic** ordering (sorted package ids / constraints / edges), **per-run `ls-remote` cache**, **prerelease fallback** when no stable tag matches (toggle via **`[kargo] allow_prerelease`**), structured **resolution failure** messages with sampled versions; **`--resolve-debug`** prints an expanded **decision trace** (`why_selected`, rejections + selection reason, `resolution_mode`) + tree on stderr; **`--verbose`** prints a short **why this version** for the root on **`install` / `update <spec>`**. **Conflict errors** include a **minimal unsatisfiable core** when smaller than the full constraint list. **`[kargo] resolution_mode = "locked"`** uses **kargo.lock** only for versions (CI-style); **`latest`** resolves from remote tags. **`kargo graph`** (`--json` optional) draws the dependency tree from **kargo.toml** + on-disk manifests + lock. **`kargo update`** (no args) resolves the full graph from **`kargo.toml`**. **`install.ps1`** / **`install.sh`** copy `kargo` to `<prefix>/lib/kargo`, run `npm install --omit=dev`, and add **`kargo`** beside **`kern`**. **`kern`** import resolution accepts **`owner/repo`** and **`github.com/owner/repo`** when listed in `package-paths.json`. **`build.ps1`** stages **`BUILD/lib/kargo`** and **`BUILD/bin/kargo.cmd`** for **NSIS**. **`install.sh`** sets **`PATH_BIN`** before the kargo shim copy.
+
+### Changed
+
+- **Build layout (Phase 11):** Remaining heavy **`src/`** trees moved into **`kern/`**: **`src/game/`** → **`kern/modules/game/`**, **`src/backend/`** → **`kern/pipeline/backend/`**, **`src/utils/`** → **`kern/core/utils/`**. CMake: **`KERN_GAME_MODULE_DIR`**, **`KERN_BACKEND_DIR`**, **`KERN_UTILS_DIR`**; **`KERN_LEGACY_SRC_INCLUDES`** replaced by **`KERN_SRC_GLUE_INCLUDES`** (only transitional **`src/`** glue). Includes unchanged at the source level (**`game/...`**, **`backend/...`**, **`utils/...`**) via layer include roots.
+
+- **Build layout (Phase 10):** Native VM modules moved from **`src/modules/`** to **`kern/modules/`** (`g2d/`, `g3d/`, `system/`). CMake: **`KERN_MODULES_DIR`**, **`KERN_MODULES_SRC_DIR`**, **`KERN_MODULES_INCLUDES`**; **`KERN_TOOLCHAIN_PRIVATE_INCLUDES`** lists modules before legacy **`src/`**. Added **`kern/modules/builtin_module_registry.*`** with **`get_builtin_modules()`** (placeholder `init` pointers for future plugins). Standalone / graphics CMake and **`cpp_backend`** emitted project lists updated for the new paths.
+
+- **Build layout (Phase 7):** C++ CLI entrypoints moved to **`kern/tools/`** (`main.cpp`, `kernc_main.cpp`, `repl_main.cpp`, `lsp_main.cpp`, `scan_main.cpp`, **`version_info.rc.in`**). Shared toolchain objects compile into static **`kern_core`**; Raylib/game surface is **`kern_gfx`** linked only by binaries that need graphics (not **`kern_lsp`**). CMake: **`KERN_TOOLS_DIR`** / **`KERN_CLI_DIR`** → **`kern/tools/`**; repo-root launchers use **`KERN_REPO_TOOLS_DIR`** (`tools/`).
+
 ---
 
 ## [1.0.10] - 2026-04-05
@@ -45,18 +57,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 #### TCP/UDP networking builtins (permission-gated)
 
 - **Purpose:** First-class **TCP** and **UDP** socket access from `.kn` scripts for custom protocols, small servers, and multiplayer experiments — **not** a full netcode stack. All entry points are **builtins** registered alongside `std.v1.*` and guarded by **`network.tcp`** / **`network.udp`** (via `require("network.tcp")` or `kern --allow=network.tcp`, etc.).
-- **Core implementation files:** [`src/vm/kern_socket.hpp`](src/vm/kern_socket.hpp), [`src/vm/kern_socket.cpp`](src/vm/kern_socket.cpp) (Windows **Winsock** + **`ws2_32`**, Unix **BSD sockets**); [`src/vm/std_builtins_socket.inl`](src/vm/std_builtins_socket.inl); [`src/vm/permissions.hpp`](src/vm/permissions.hpp) (`Perm::kNetworkTcp`, `Perm::kNetworkUdp`).
+- **Core implementation files:** [`kern/runtime/vm/kern_socket.hpp`](kern/runtime/vm/kern_socket.hpp), [`kern/runtime/vm/kern_socket.cpp`](kern/runtime/vm/kern_socket.cpp) (Windows **Winsock** + **`ws2_32`**, Unix **BSD sockets**); [`kern/runtime/vm/std_builtins_socket.inl`](kern/runtime/vm/std_builtins_socket.inl); [`kern/runtime/vm/permissions.hpp`](kern/runtime/vm/permissions.hpp) (`Perm::kNetworkTcp`, `Perm::kNetworkUdp`).
 - **CMake / linkage:** [`CMakeLists.txt`](CMakeLists.txt) adds **`kern_socket.cpp`** to **`kern`**, **`kern_repl`**, **`kernc`**, **`kern-scan`**, **`kern_lsp`**, etc.; on **`_WIN32`**, links **`ws2_32`** with **`winhttp` / `wininet` / `psapi`** as needed.
 - **TCP surface:** **`tcp_connect`**, **`tcp_listen`**, **`tcp_accept`**, **`tcp_send`**, **`tcp_recv`**, **`tcp_close`**; **`tcp_connect_start`** / **`tcp_connect_check`** for non-blocking handshake (internal **`TcpConnecting`** state, stored **`sockaddr_storage`**, second **`connect()`** probe + **`select` write** + **`getsockopt(SO_ERROR)`**, including **`SO_ERROR` poll when `select` returns 0**); prefer **`"0.0.0.0"`** listen when clients use **`127.0.0.1`** on Windows (IPv4/IPv6 bind pitfalls).
 - **UDP surface:** **`udp_open`**, **`udp_bind`**, **`udp_send`**, **`udp_recv`**, **`udp_close`** with **`would_block`** where applicable.
 - **Polling:** **`socket_set_nonblocking`**, **`socket_select_read`**, **`socket_select_write`** ( **`FD_SETSIZE`** cap; **`timeout_ms`** **`-1`** = block, **`0`** = poll ).
-- **Registration:** [`src/vm/builtins.hpp`](src/vm/builtins.hpp) — **`kSocketBuiltinCount`**, **`getBuiltinNames()`** order, include **`std_builtins_socket.inl`** after **`std_builtins_v1.inl`**.
+- **Registration:** [`kern/runtime/vm/builtins.hpp`](kern/runtime/vm/builtins.hpp) — **`kSocketBuiltinCount`**, **`getBuiltinNames()`** order, include **`std_builtins_socket.inl`** after **`std_builtins_v1.inl`**.
 - **Examples:** [`examples/network/`](examples/network/) — echo server/client, **`tcp_select_accept.kn`**, **`tcp_async_client.kn`**; [`examples/network/README.md`](examples/network/README.md) documents **`cli_args()`** layout.
 
 #### Bytecode pipeline
 
-- [`src/vm/bytecode_peephole.hpp`](src/vm/bytecode_peephole.hpp) / [`.cpp`](src/vm/bytecode_peephole.cpp) — safe peephole pass (NOP / label remap) wired through VM / codegen paths.
-- [`src/vm/bytecode_verifier.hpp`](src/vm/bytecode_verifier.hpp) / [`.cpp`](src/vm/bytecode_verifier.cpp) — bytecode structural verification before execution where enabled.
+- [`kern/core/bytecode/bytecode_peephole.hpp`](kern/core/bytecode/bytecode_peephole.hpp) / [`.cpp`](kern/core/bytecode/bytecode_peephole.cpp) — safe peephole pass (NOP / label remap) wired through VM / codegen paths.
+- [`kern/runtime/vm/bytecode_verifier.hpp`](kern/runtime/vm/bytecode_verifier.hpp) / [`.cpp`](kern/runtime/vm/bytecode_verifier.cpp) — bytecode structural verification before execution where enabled.
 
 #### LSP
 
@@ -73,7 +85,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
-- VM / errors / compiler / CLI / modules / stdlib / examples / docs / tests / CI / [`.vscode/tasks.json`](.vscode/tasks.json) — see git history for this tag; highlights include [`src/vm/vm.cpp`](src/vm/vm.cpp), [`vm_error_registry.hpp`](src/vm/vm_error_registry.hpp), [`src/main.cpp`](src/main.cpp), [`src/lsp/lsp_main.cpp`](src/lsp/lsp_main.cpp), workflow YAML under [`.github/workflows/`](.github/workflows/).
+- VM / errors / compiler / CLI / modules / stdlib / examples / docs / tests / CI / [`.vscode/tasks.json`](.vscode/tasks.json) — see git history for this tag; highlights include [`kern/runtime/vm/vm.cpp`](kern/runtime/vm/vm.cpp), [`vm_error_registry.hpp`](kern/core/errors/vm_error_registry.hpp), [`src/main.cpp`](src/main.cpp), [`src/lsp/lsp_main.cpp`](src/lsp/lsp_main.cpp), workflow YAML under [`.github/workflows/`](.github/workflows/).
 
 ### Notes for script authors
 
@@ -141,7 +153,7 @@ Cross-platform **CI**, **macOS** **`#include <version>`** / case-insensitive **`
 
 ### Added (detailed)
 
-- **[`src/vm/std_builtins_v1.inl`](src/vm/std_builtins_v1.inl)**, **[`src/stdlib_stdv1_exports.hpp`](src/stdlib_stdv1_exports.hpp)**; **`kern-scan`**; **`lib/kern/stdlib/`** catalog; **IDE** sources; **CI** **`kern --scan --registry-only`**.
+- **[`kern/runtime/vm/std_builtins_v1.inl`](kern/runtime/vm/std_builtins_v1.inl)**, **[`src/stdlib_stdv1_exports.hpp`](src/stdlib_stdv1_exports.hpp)**; **`kern-scan`**; **`lib/kern/stdlib/`** catalog; **IDE** sources; **CI** **`kern --scan --registry-only`**.
 
 ### Changed (detailed)
 

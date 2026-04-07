@@ -30,6 +30,7 @@ Kern is a **solo-built project by a 15-year-old developer**. That does not mean 
 - [Usage](#usage)
 - [Build from source](#build-from-source)
 - [Project layout](#project-layout)
+- [Repository architecture](#repository-architecture)
 - [Documentation](#documentation)
 - [Testing](#testing)
 - [Releases & versioning](#releases--versioning)
@@ -180,17 +181,39 @@ cmake --build build --config Release --target kern kernc kern-scan
 
 | Path | Purpose |
 |------|---------|
-| `src/` | Compiler, VM, CLI entrypoints (`main.cpp`, …) |
+| `kern/tools/` | C++ CLI entrypoints: `kern`, `kernc`, REPL, LSP, `kern-scan` (Phase 7) |
+| `kern/modules/` | Native VM modules: `g2d/`, `g3d/`, `system/`, `game/` (+ builtin registry) |
+| `kern/pipeline/backend/` | C++ backend / standalone emission (`kernc`, `kern-to-exe`) |
+| `kern/core/utils/` | `kernconfig`, build cache |
+| `src/` | Transitional glue: import/stdlib, process, system, scanner, packager, compile |
+| `kern/core/compiler/` | Lexer, parser, semantic, codegen (Phase 3) |
+| `kern/core/bytecode/` | Opcode/value model shared by compiler + VM |
+| `kern/core/diagnostics/` | Shared diagnostic headers (Phase 4) |
+| `kern/core/errors/` | Error reporter, VM error codes/registry contract, `errors.cpp` (Phase 5) |
+| `kern/core/platform/` | `env_compat`, Windows `.kn` association (Phase 5) |
+| `kern/pipeline/ir/` | Typed IR builders and optimization passes (Phase 6) |
+| `kern/pipeline/analyzer/` | Project-wide / `kern.json` analysis (Phase 6) |
+| `kern/runtime/vm/` | Interpreter, builtins implementation, verifier (Phase 2) |
 | `lib/kern/` | Standard library (`.kn` and related assets) |
 | `examples/` | Sample programs |
 | `tests/` | Automated and regression tests |
 | `docs/` | Guides, references, troubleshooting |
-| `kern-registry/` | Package registry monorepo (static registry, Node API, CLI) |
+| `scripts/` | Maintainer automation (releases, checks, sync) |
+| `tools/` | Small utilities, Windows launchers, site helpers (optional local `vcpkg` — see `.gitignore`) |
+| `kargo/` | **GitHub-first** package CLI (`kargo install owner/repo@v…`); bundled by `install.ps1` / `install.sh` next to `kern` |
+| `kern-registry/` | Optional **hosted** registry (Node API + `kern-pkg`); distinct from `kargo` |
 | `kern-to-exe/` | Packager: `.kn` → standalone executable |
 | `Kern-IDE/` | **Editor bundle** (Python/Qt/VS Code) — not required to build `kern` |
 | `framework/` | Optional document-runtime demo (CMake-gated) |
+| `ursina-kern/` | Optional engine / ECS experiments (separate from core VM) when present |
 
 The canonical version string is the root **`KERN_VERSION.txt`** file (used by `kern --version` and `kern_version()`).
+
+---
+
+## Repository architecture
+
+High-level layout, dependency direction between compiler / VM / native modules, and a **phased plan** for migrating toward a `kern/{core,runtime,modules,...}` tree are documented in **[docs/architecture.md](docs/architecture.md)**. Root **`kern.toml`** holds a small path map for the same layout (metadata only; **CMake remains the build source of truth**).
 
 ---
 
@@ -198,6 +221,7 @@ The canonical version string is the root **`KERN_VERSION.txt`** file (used by `k
 
 | Doc | Contents |
 |-----|----------|
+| [architecture.md](docs/architecture.md) | Repository layers, current vs target paths, migration phases |
 | [GETTING_STARTED.md](docs/GETTING_STARTED.md) | Build, run, portable drops |
 | [TESTING.md](docs/TESTING.md) | Test scripts and stress suites |
 | [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common failures and fixes |

@@ -47,10 +47,10 @@
     }
   },
   "features": {
-    "typed_ir_pipeline": { "tier": "preview", "owner": "src/ir/*" },
-    "semantic_engine_v1": { "tier": "preview", "owner": "src/compiler/semantic.*" },
-    "kernel_target_v1": { "tier": "preview", "owner": "src/backend/cpp_backend.cpp" },
-    "wasm_backend_preview": { "tier": "experimental", "owner": "src/backend/*" },
-    "macro_attributes_v1": { "tier": "experimental", "owner": "src/compiler/parser.cpp" }
+    "typed_ir_pipeline": { "tier": "preview", "owner": "kern/pipeline/ir/*" },
+    "semantic_engine_v1": { "tier": "preview", "owner": "kern/core/compiler/semantic.*" },
+    "kernel_target_v1": { "tier": "preview", "owner": "kern/pipeline/backend/cpp_backend.cpp" },
+    "wasm_backend_preview": { "tier": "experimental", "owner": "kern/pipeline/backend/*" },
+    "macro_attributes_v1": { "tier": "experimental", "owner": "kern/core/compiler/parser.cpp" }
   }
 }

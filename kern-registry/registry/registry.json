@@ -1,10 +1,62 @@
 {
   "registryVersion": 1,
-  "generatedAt": "2026-04-05T00:00:00Z",
+  "generatedAt": "2026-04-05T16:40:11.895Z",
   "packages": {
     "example-http": {
       "latest": "1.0.0",
       "metadata": "packages/example-http/metadata.json"
+    },
+    "sec.crypto": {
+      "latest": "1.0.0",
+      "metadata": "packages/sec.crypto/metadata.json"
+    },
+    "sec.perm": {
+      "latest": "1.0.0",
+      "metadata": "packages/sec.perm/metadata.json"
+    },
+    "sec.auth": {
+      "latest": "1.0.0",
+      "metadata": "packages/sec.auth/metadata.json"
+    },
+    "sys.config": {
+      "latest": "1.0.2",
+      "metadata": "packages/sys.config/metadata.json"
+    },
+    "sys.log": {
+      "latest": "1.0.1",
+      "metadata": "packages/sys.log/metadata.json"
+    },
+    "sec.secrets": {
+      "latest": "1.0.1",
+      "metadata": "packages/sec.secrets/metadata.json"
+    },
+    "sec.audit": {
+      "latest": "1.0.1",
+      "metadata": "packages/sec.audit/metadata.json"
+    },
+    "web.httpplus": {
+      "latest": "1.0.1",
+      "metadata": "packages/web.httpplus/metadata.json"
+    },
+    "sys.tasks": {
+      "latest": "1.0.1",
+      "metadata": "packages/sys.tasks/metadata.json"
+    },
+    "web.rest": {
+      "latest": "1.0.1",
+      "metadata": "packages/web.rest/metadata.json"
+    },
+    "web.webhooks": {
+      "latest": "1.0.1",
+      "metadata": "packages/web.webhooks/metadata.json"
+    },
+    "ai.client": {
+      "latest": "1.0.1",
+      "metadata": "packages/ai.client/metadata.json"
+    },
+    "ai.prompts": {
+      "latest": "1.0.1",
+      "metadata": "packages/ai.prompts/metadata.json"
     }
   }
 }

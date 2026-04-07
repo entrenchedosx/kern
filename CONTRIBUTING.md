@@ -28,7 +28,7 @@ For real-time chat, use the **official Kern Discord**: [discord.gg/JBa4RfT2tE](h
 - **C++17** unless a file already uses a newer standard for a specific target.
 - Match **surrounding style** in the file you edit (naming, brace placement, error handling).
 - **Do not** reorder `getBuiltinNames()` entries or builtin registration indices — additions are **append-only** (see [BUILTIN_REFERENCE.md](docs/BUILTIN_REFERENCE.md)).
-- **Strict types:** if a builtin should participate in `kern --check --strict-types` for patterns like `let x: float = sqrt(1.0)`, add an **append-only** row to [`src/compiler/typed_builtins.hpp`](src/compiler/typed_builtins.hpp) (return type name: `int`, `float`, `string`, `bool`). See [docs/STRICT_TYPES.md](docs/STRICT_TYPES.md).
+- **Strict types:** if a builtin should participate in `kern --check --strict-types` for patterns like `let x: float = sqrt(1.0)`, add an **append-only** row to [`kern/core/compiler/typed_builtins.hpp`](kern/core/compiler/typed_builtins.hpp) (return type name: `int`, `float`, `string`, `bool`). See [docs/STRICT_TYPES.md](docs/STRICT_TYPES.md).
 - Avoid drive-by refactors unrelated to the bug or feature.
 
 ## Documentation

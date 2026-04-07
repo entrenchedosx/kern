@@ -7,6 +7,10 @@ if(NOT DEFINED KERN_STANDALONE_REPO)
 endif()
 
 set(_KERN_REPO "${KERN_STANDALONE_REPO}")
+# Must match KERN_SRC_DIR in cmake/kern_paths.cmake (legacy: <repo>/src). Do not include kern_paths.cmake here:
+# CMAKE_SOURCE_DIR may be the embedding project, not the Kern repo.
+set(_KERN_SRC_DIR "${_KERN_REPO}/src")
+set(_KERN_MODULES_DIR "${_KERN_REPO}/kern/modules")
 set(KERN_RAYLIB_TARGET "")
 
 find_package(raylib CONFIG QUIET)
@@ -66,7 +70,7 @@ if(KERN_RAYLIB_TARGET STREQUAL "")
   set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
   FetchContent_Declare(
     raylib_kern_standalone_fc
-    GIT_REPOSITORY https:// github.com/raysan5/raylib.git
+    GIT_REPOSITORY https://github.com/raysan5/raylib.git
     GIT_TAG 5.5
   )
   FetchContent_MakeAvailable(raylib_kern_standalone_fc)
@@ -84,17 +88,17 @@ if(KERN_RAYLIB_TARGET STREQUAL "")
 endif()
 
 set(_KERN_G2D_SRCS
-  "${_KERN_REPO}/src/modules/g2d/g2d.cpp"
-  "${_KERN_REPO}/src/modules/g2d/window.cpp"
-  "${_KERN_REPO}/src/modules/g2d/renderer.cpp"
-  "${_KERN_REPO}/src/modules/g2d/shapes.cpp"
-  "${_KERN_REPO}/src/modules/g2d/text.cpp"
-  "${_KERN_REPO}/src/modules/g2d/colors.cpp"
-  "${_KERN_REPO}/src/modules/g3d/g3d.cpp"
+  "${_KERN_MODULES_DIR}/g2d/g2d.cpp"
+  "${_KERN_MODULES_DIR}/g2d/window.cpp"
+  "${_KERN_MODULES_DIR}/g2d/renderer.cpp"
+  "${_KERN_MODULES_DIR}/g2d/shapes.cpp"
+  "${_KERN_MODULES_DIR}/g2d/text.cpp"
+  "${_KERN_MODULES_DIR}/g2d/colors.cpp"
+  "${_KERN_MODULES_DIR}/g3d/g3d.cpp"
 )
 
 target_sources(kernc_standalone PRIVATE
-  "${_KERN_REPO}/src/game/game_builtins.cpp"
+  "${_KERN_MODULES_DIR}/game/game_builtins.cpp"
   ${_KERN_G2D_SRCS}
 )
 target_compile_definitions(kernc_standalone PRIVATE KERN_BUILD_GAME=1)

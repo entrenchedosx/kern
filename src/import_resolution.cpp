@@ -13,21 +13,23 @@
 #include "vm/builtins.hpp"
 #include "stdlib_modules.hpp"
 #include "process/process_module.hpp"
-#include "modules/system/input_module.hpp"
-#include "modules/system/vision_module.hpp"
-#include "modules/system/render_module.hpp"
+#include "system/input_module.hpp"
+#include "system/vision_module.hpp"
+#include "system/render_module.hpp"
+#include "builtin_module_registry.hpp"
 #include "system/runtime_services.hpp"
-#include "errors.hpp"
+#include "errors/errors.hpp"
 #ifdef KERN_BUILD_GAME
 #include "game/game_builtins.hpp"
-#include "modules/g2d/g2d.h"
-#include "modules/g3d/g3d.h"
+#include "g2d/g2d.h"
+#include "g3d/g3d.h"
 #endif
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <string>
 #include <cstdlib>
+#include <cctype>
 #include <filesystem>
 #include <unordered_map>
 #include <unordered_set>
@@ -76,6 +78,7 @@ struct ImportState {
 };
 
 static ImportState g_importState;
+[[maybe_unused]] static const auto& g_builtinModuleCatalog = get_builtin_modules();
 static VM* g_importCacheOwner = nullptr;
 static std::shared_ptr<RuntimeServices> g_runtimeServices = std::make_shared<RuntimeServices>();
 static EmbeddedModuleProvider g_embeddedProvider = nullptr;
@@ -131,6 +134,37 @@ static std::string regexEscape(const std::string& s) {
         }
     }
     return out;
+}
+
+/** GitHub-style package keys for kargo: owner/repo or github.com/owner/repo (lowercase). */
+static std::string kargoPackagePathKey(const std::string& path) {
+    std::string p;
+    p.reserve(path.size());
+    for (char c : path) {
+        if (c >= 'A' && c <= 'Z')
+            p.push_back(static_cast<char>(c + 32));
+        else
+            p.push_back(c);
+    }
+    static const char pref[] = "github.com/";
+    const size_t plen = sizeof(pref) - 1;
+    if (p.size() > plen && p.compare(0, plen, pref) == 0) p = p.substr(plen);
+    if (p.empty() || p.find("..") != std::string::npos) return "";
+    const std::size_t slash = p.find('/');
+    if (slash == std::string::npos || slash == 0 || slash + 1 >= p.size()) return "";
+    if (p.find('/', slash + 1) != std::string::npos) return "";
+    auto okSeg = [](const std::string& s) {
+        if (s.empty()) return false;
+        for (char ch : s) {
+            const auto u = static_cast<unsigned char>(ch);
+            if (!(std::isalnum(u) || ch == '-' || ch == '_' || ch == '.')) return false;
+        }
+        return true;
+    };
+    const std::string a = p.substr(0, slash);
+    const std::string b = p.substr(slash + 1);
+    if (!okSeg(a) || !okSeg(b)) return "";
+    return p;
 }
 
 static std::string resolveInstalledPackageMain(const std::string& packageName, std::string* errOut = nullptr) {
@@ -397,8 +431,19 @@ static Value runImportBuiltin(VM* v, std::vector<ValuePtr> args) {
         } else {
             path += ".kn";
         }
-    } else if (path.find('.') == std::string::npos) {
-        path += ".kn";
+    } else {
+        const std::string kargoKey = kargoPackagePathKey(path);
+        if (!kargoKey.empty()) {
+            std::string pkgErr;
+            const std::string pkgMain = resolveInstalledPackageMain(kargoKey, &pkgErr);
+            if (!pkgMain.empty()) {
+                path = pkgMain;
+            } else if (path.find('.') == std::string::npos) {
+                path += ".kn";
+            }
+        } else if (path.find('.') == std::string::npos) {
+            path += ".kn";
+        }
     }
 
     // embedded module path resolution (used by standalone bundled executables).

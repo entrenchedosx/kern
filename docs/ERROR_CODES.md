@@ -12,9 +12,9 @@ Diagnostics use stable string **codes** (e.g. `LEX-TOKENIZE`, `VM-DIV-ZERO`) for
 | `FILE-OPEN` | Could not read a source file |
 | `ANAL-LOAD-GLOBAL` | Heuristic: possible undefined global (warning) |
 
-Additional codes appear in `src/errors.hpp` / `src/main.cpp` for import scopes, internal failures, etc.
+Additional codes appear in `kern/core/errors/errors.hpp` / `kern/tools/main.cpp` for import scopes, internal failures, etc.
 
-## VM registry (`src/vm/vm_error_registry.hpp`)
+## VM registry (`kern/core/errors/vm_error_registry.hpp`)
 
 Registered VM failures include stable codes such as:
 

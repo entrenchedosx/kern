@@ -1,7 +1,7 @@
 #include "stdlib_modules.hpp"
 #include "stdlib_stdv1_exports.hpp"
 #include "vm/builtins.hpp"
-#include "vm/value.hpp"
+#include "bytecode/value.hpp"
 #include <unordered_map>
 #include <vector>
 #include <string>

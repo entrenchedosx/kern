@@ -5,8 +5,8 @@ This log records a **static** hardening pass over Kern’s C++ sources. Full bui
 ## Pass 1 — Environment access (MSVC C4996)
 
 - **Finding:** Multiple TUs called `std::getenv`, triggering MSVC **C4996** (deprecated `getenv`).
-- **Fix:** Added `src/platform/env_compat.hpp` with `kern::kernGetEnv()` (pragma-isolated `getenv` on MSVC).
-- **Call sites updated:** `main.cpp`, `lsp_main.cpp`, `import_resolution.cpp`, `scan_driver.cpp`, `input_module.cpp` (non-Win branch), `vm.cpp` (non-Win branch), `errors.cpp`, `kernc_main.cpp` (non-Win branch), `vm/builtins.hpp`.
+- **Fix:** Added `kern/core/platform/env_compat.hpp` with `kern::kernGetEnv()` (pragma-isolated `getenv` on MSVC).
+- **Call sites updated:** `kern/tools/main.cpp`, `kern/tools/lsp_main.cpp`, `import_resolution.cpp`, `scan_driver.cpp`, `input_module.cpp` (non-Win branch), `vm.cpp` (non-Win branch), `errors.cpp`, `kern/tools/kernc_main.cpp` (non-Win branch), `vm/builtins.hpp`.
 
 ## Pass 2 — Generated standalone host
 

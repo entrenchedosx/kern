@@ -4,7 +4,7 @@
 #ifndef KERN_PROCESS_MODULE_HPP
 #define KERN_PROCESS_MODULE_HPP
 
-#include "vm/value.hpp"
+#include "bytecode/value.hpp"
 #include <memory>
 
 namespace kern {

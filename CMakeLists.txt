@@ -12,6 +12,8 @@ endif()
 project(Kern LANGUAGES CXX)
 enable_language(C)
 
+include(cmake/kern_paths.cmake)
+
 set(CMAKE_CXX_STANDARD 17)
 if(MSVC)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:10485760")
@@ -64,7 +66,7 @@ endif()
 set(KERN_WIN32_RESOURCES "")
 if(WIN32)
   configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/version_info.rc.in"
+    "${KERN_CLI_DIR}/version_info.rc.in"
     "${CMAKE_BINARY_DIR}/version_info.rc"
     @ONLY
   )
@@ -122,89 +124,119 @@ if(KERN_BUILD_DOC_FRAMEWORK_DEMO)
   endif()
 endif()
 
-# Compiler sources
+# Compiler sources (Phase 3: kern/core/compiler/)
 set(COMPILER_SOURCES
-    src/compiler/lexer.cpp
-    src/compiler/parser.cpp
-    src/compiler/codegen.cpp
-    src/compiler/semantic.cpp
+    "${KERN_COMPILER_DIR}/lexer.cpp"
+    "${KERN_COMPILER_DIR}/parser.cpp"
+    "${KERN_COMPILER_DIR}/codegen.cpp"
+    "${KERN_COMPILER_DIR}/semantic.cpp"
 )
 
-# VM sources
+# Bytecode / Value model (core layer; shared by compiler + VM)
+set(KERN_CORE_BYTECODE_SOURCES
+    "${KERN_CORE_BYTECODE_DIR}/value.cpp"
+    "${KERN_CORE_BYTECODE_DIR}/bytecode_peephole.cpp"
+)
+
+# VM runtime sources (kern/runtime/vm/; excludes bytecode contract — see KERN_CORE_BYTECODE_SOURCES)
 set(VM_SOURCES
-    src/vm/value.cpp
-    src/vm/vm.cpp
-    src/vm/bytecode_verifier.cpp
-    src/vm/bytecode_peephole.cpp
-    src/vm/kern_socket.cpp
+    ${KERN_CORE_BYTECODE_SOURCES}
+    "${KERN_VM_DIR}/vm.cpp"
+    "${KERN_VM_DIR}/bytecode_verifier.cpp"
+    "${KERN_VM_DIR}/kern_socket.cpp"
 )
 if(WIN32)
-  list(APPEND VM_SOURCES src/vm/http_get_winhttp.cpp)
+  list(APPEND VM_SOURCES "${KERN_VM_DIR}/http_get_winhttp.cpp")
 endif()
 
 # Error reporting
-set(ERROR_SOURCES src/errors.cpp)
-set(STDLIB_SOURCES src/stdlib_modules.cpp)
-set(IMPORT_SOURCES src/import_resolution.cpp)
+set(ERROR_SOURCES "${KERN_ERRORS_DIR}/errors.cpp")
+set(STDLIB_SOURCES "${KERN_SRC_DIR}/stdlib_modules.cpp")
+set(IMPORT_SOURCES "${KERN_SRC_DIR}/import_resolution.cpp")
 set(SYSTEM_MODULE_SOURCES
-    src/process/process_module.cpp
-    src/system/event_bus.cpp
-    src/modules/system/input_module.cpp
-    src/modules/system/vision_module.cpp
-    src/modules/system/render_module.cpp
+    "${KERN_SRC_DIR}/process/process_module.cpp"
+    "${KERN_SRC_DIR}/system/event_bus.cpp"
+    "${KERN_MODULES_SRC_DIR}/system/input_module.cpp"
+    "${KERN_MODULES_SRC_DIR}/system/vision_module.cpp"
+    "${KERN_MODULES_SRC_DIR}/system/render_module.cpp"
+    "${KERN_MODULES_DIR}/builtin_module_registry.cpp"
 )
 set(SCANNER_SOURCES
-    src/scanner/scan_driver.cpp
-    src/scanner/builtin_registry_check.cpp
-    src/scanner/stdlib_export_check.cpp
+    "${KERN_SRC_DIR}/scanner/scan_driver.cpp"
+    "${KERN_SRC_DIR}/scanner/builtin_registry_check.cpp"
+    "${KERN_SRC_DIR}/scanner/stdlib_export_check.cpp"
 )
 
 set(KERNC_SUPPORT_SOURCES
-    src/compiler/import_aliases.cpp
-    src/compiler/project_resolver.cpp
-    src/analyzer/project_analyzer.cpp
-    src/ir/ir_builder.cpp
-    src/ir/typed_ir_builder.cpp
-    src/ir/passes/constant_folding.cpp
-    src/ir/passes/dead_code_elim.cpp
-    src/ir/passes/inline_basic.cpp
-    src/ir/passes/typed_ir_passes.cpp
-    src/backend/cpp_backend.cpp
-    src/packager/bundle_writer.cpp
-    src/compile/compile_pipeline.cpp
-    src/utils/kernconfig.cpp
-    src/utils/build_cache.cpp
+    "${KERN_COMPILER_DIR}/import_aliases.cpp"
+    "${KERN_COMPILER_DIR}/project_resolver.cpp"
+    "${KERN_ANALYZER_DIR}/project_analyzer.cpp"
+    "${KERN_IR_DIR}/ir_builder.cpp"
+    "${KERN_IR_DIR}/typed_ir_builder.cpp"
+    "${KERN_IR_DIR}/passes/constant_folding.cpp"
+    "${KERN_IR_DIR}/passes/dead_code_elim.cpp"
+    "${KERN_IR_DIR}/passes/inline_basic.cpp"
+    "${KERN_IR_DIR}/passes/typed_ir_passes.cpp"
+    "${KERN_BACKEND_DIR}/cpp_backend.cpp"
+    "${KERN_SRC_DIR}/packager/bundle_writer.cpp"
+    "${KERN_SRC_DIR}/compile/compile_pipeline.cpp"
+    "${KERN_UTILS_DIR}/kernconfig.cpp"
+    "${KERN_UTILS_DIR}/build_cache.cpp"
 )
 
-set(KERN_MAIN_SOURCES src/main.cpp)
-if(WIN32)
-  list(APPEND KERN_MAIN_SOURCES src/platform/win32_associate_kn.cpp)
+# Shared engine (compiler, VM, diagnostics, pipeline glue, scanner drivers — not CLI mains).
+set(KERN_ENGINE_SOURCES
+    ${COMPILER_SOURCES}
+    ${VM_SOURCES}
+    ${ERROR_SOURCES}
+    ${STDLIB_SOURCES}
+    ${IMPORT_SOURCES}
+    ${SYSTEM_MODULE_SOURCES}
+    ${SCANNER_SOURCES}
+    ${KERNC_SUPPORT_SOURCES}
+)
+add_library(kern_core STATIC ${KERN_ENGINE_SOURCES})
+target_include_directories(kern_core PUBLIC ${KERN_TOOLCHAIN_PRIVATE_INCLUDES})
+target_compile_definitions(kern_core PRIVATE KERN_VERSION="${KERN_VERSION}")
+if(KERN_BUILD_ID)
+  target_compile_definitions(kern_core PRIVATE KERN_BUILD_ID="${KERN_BUILD_ID}")
 endif()
-# project_resolver + import_aliases: `kern graph` static import graph (same resolver as kernc packaging).
-add_executable(kern ${KERN_MAIN_SOURCES} ${KERN_WIN32_RESOURCES} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES} ${SCANNER_SOURCES}
-    src/compiler/project_resolver.cpp
-    src/compiler/import_aliases.cpp)
-target_include_directories(kern PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
+kern_apply_strict_warnings(kern_core)
+
+set(KERN_MAIN_SOURCES "${KERN_CLI_DIR}/main.cpp")
+if(WIN32)
+  list(APPEND KERN_MAIN_SOURCES "${KERN_PLATFORM_DIR}/win32_associate_kn.cpp")
+endif()
+add_executable(kern ${KERN_MAIN_SOURCES} ${KERN_WIN32_RESOURCES})
+target_link_libraries(kern PRIVATE kern_core)
 target_compile_definitions(kern PRIVATE KERN_VERSION="${KERN_VERSION}")
 if(KERN_BUILD_ID)
   target_compile_definitions(kern PRIVATE KERN_BUILD_ID="${KERN_BUILD_ID}")
 endif()
 
-# REPL (same binary with repl mode; we use one binary that does both)
-add_executable(kern_repl src/repl/repl_main.cpp ${KERN_WIN32_RESOURCES} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES})
-target_include_directories(kern_repl PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
+add_executable(kern_repl "${KERN_CLI_DIR}/repl_main.cpp" ${KERN_WIN32_RESOURCES})
+target_link_libraries(kern_repl PRIVATE kern_core)
 target_compile_definitions(kern_repl PRIVATE KERN_VERSION="${KERN_VERSION}")
+if(KERN_BUILD_ID)
+  target_compile_definitions(kern_repl PRIVATE KERN_BUILD_ID="${KERN_BUILD_ID}")
+endif()
 
-add_executable(kernc src/kernc_main.cpp ${KERN_WIN32_RESOURCES} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES} ${KERNC_SUPPORT_SOURCES})
-target_include_directories(kernc PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
+add_executable(kernc "${KERN_CLI_DIR}/kernc_main.cpp" ${KERN_WIN32_RESOURCES})
+target_link_libraries(kernc PRIVATE kern_core)
 target_compile_definitions(kernc PRIVATE KERN_VERSION="${KERN_VERSION}")
+if(KERN_BUILD_ID)
+  target_compile_definitions(kernc PRIVATE KERN_BUILD_ID="${KERN_BUILD_ID}")
+endif()
 
-add_executable(kern_lsp src/lsp/lsp_main.cpp ${KERN_WIN32_RESOURCES} ${COMPILER_SOURCES} src/vm/bytecode_peephole.cpp ${ERROR_SOURCES})
-target_include_directories(kern_lsp PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
+add_executable(kern_lsp "${KERN_CLI_DIR}/lsp_main.cpp" ${KERN_WIN32_RESOURCES})
+target_link_libraries(kern_lsp PRIVATE kern_core)
 target_compile_definitions(kern_lsp PRIVATE KERN_VERSION="${KERN_VERSION}")
+if(KERN_BUILD_ID)
+  target_compile_definitions(kern_lsp PRIVATE KERN_BUILD_ID="${KERN_BUILD_ID}")
+endif()
 
-add_executable(kern_contract_humanize src/tests/humanize_path_contract_test.cpp ${ERROR_SOURCES})
-target_include_directories(kern_contract_humanize PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
+add_executable(kern_contract_humanize "${KERN_SRC_DIR}/tests/humanize_path_contract_test.cpp" ${ERROR_SOURCES})
+target_include_directories(kern_contract_humanize PRIVATE ${KERN_TOOLCHAIN_PRIVATE_INCLUDES})
 kern_apply_strict_warnings(kern_contract_humanize)
 
 kern_apply_strict_warnings(kern)
@@ -212,16 +244,17 @@ kern_apply_strict_warnings(kern_repl)
 kern_apply_strict_warnings(kernc)
 kern_apply_strict_warnings(kern_lsp)
 
-add_executable(kern-scan src/scanner/scan_main.cpp ${KERN_WIN32_RESOURCES} ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES} ${STDLIB_SOURCES} ${IMPORT_SOURCES} ${SYSTEM_MODULE_SOURCES} ${SCANNER_SOURCES})
-target_include_directories(kern-scan PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
+add_executable(kern-scan "${KERN_CLI_DIR}/scan_main.cpp" ${KERN_WIN32_RESOURCES})
+target_link_libraries(kern-scan PRIVATE kern_core)
 target_compile_definitions(kern-scan PRIVATE KERN_VERSION="${KERN_VERSION}")
+if(KERN_BUILD_ID)
+  target_compile_definitions(kern-scan PRIVATE KERN_BUILD_ID="${KERN_BUILD_ID}")
+endif()
 kern_apply_strict_warnings(kern-scan)
 
 if(WIN32)
-  target_link_libraries(kernc PRIVATE psapi winhttp wininet ws2_32)
-  target_link_libraries(kern_repl PRIVATE psapi winhttp wininet ws2_32)
-  target_link_libraries(kern PRIVATE psapi winhttp wininet advapi32 shell32 ws2_32)
-  target_link_libraries(kern-scan PRIVATE psapi winhttp wininet ws2_32)
+  target_link_libraries(kern_core PUBLIC psapi winhttp wininet ws2_32)
+  target_link_libraries(kern PRIVATE advapi32 shell32)
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/kern_logo.ico")
     add_custom_command(
       TARGET kern
@@ -234,7 +267,7 @@ if(WIN32)
   # Compiler binary is kern-impl.exe; kern.exe is a tiny launcher (tools/kernc_launcher.c) that runs
   # cmake --build ... --target kern then execs kern-impl.exe (stale-compiler issue when only kern.exe was run).
   set_target_properties(kernc PROPERTIES OUTPUT_NAME "kern-impl")
-  add_executable(kern_launcher tools/kernc_launcher.c ${KERN_WIN32_RESOURCES})
+  add_executable(kern_launcher "${KERN_REPO_TOOLS_DIR}/kernc_launcher.c" ${KERN_WIN32_RESOURCES})
   set_target_properties(kern_launcher PROPERTIES OUTPUT_NAME "kernc")
   # Do NOT add_dependencies(kern_launcher kernc): kernc POST_BUILD runs nested build for launcher.
   add_custom_command(TARGET kernc POST_BUILD
@@ -242,7 +275,7 @@ if(WIN32)
     COMMENT "Refresh kern.exe launcher beside kern-impl.exe")
   add_custom_command(TARGET kern_launcher POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${CMAKE_CURRENT_SOURCE_DIR}/tools/kern-release-dev.cmd"
+      "${KERN_REPO_TOOLS_DIR}/kern-release-dev.cmd"
       "$<TARGET_FILE_DIR:kern_launcher>/kern-release-dev.cmd")
   kern_apply_strict_warnings(kern_launcher)
 endif()
@@ -336,32 +369,32 @@ if(KERN_BUILD_GAME)
       get_target_property(_raylib_loc ${KERN_RAYLIB_TARGET} IMPORTED_LOCATION)
     endif()
     set(G2D_SOURCES
-      src/modules/g2d/g2d.cpp
-      src/modules/g2d/window.cpp
-      src/modules/g2d/renderer.cpp
-      src/modules/g2d/shapes.cpp
-      src/modules/g2d/text.cpp
-      src/modules/g2d/colors.cpp
-      src/modules/g3d/g3d.cpp
+      "${KERN_MODULES_SRC_DIR}/g2d/g2d.cpp"
+      "${KERN_MODULES_SRC_DIR}/g2d/window.cpp"
+      "${KERN_MODULES_SRC_DIR}/g2d/renderer.cpp"
+      "${KERN_MODULES_SRC_DIR}/g2d/shapes.cpp"
+      "${KERN_MODULES_SRC_DIR}/g2d/text.cpp"
+      "${KERN_MODULES_SRC_DIR}/g2d/colors.cpp"
+      "${KERN_MODULES_SRC_DIR}/g3d/g3d.cpp"
     )
-    target_sources(kernc PRIVATE src/game/game_builtins.cpp ${G2D_SOURCES})
-    target_compile_definitions(kernc PRIVATE KERN_BUILD_GAME=1)
-    target_link_libraries(kernc PRIVATE ${KERN_RAYLIB_TARGET})
-    target_sources(kern_repl PRIVATE src/game/game_builtins.cpp ${G2D_SOURCES})
-    target_compile_definitions(kern_repl PRIVATE KERN_BUILD_GAME=1)
-    target_link_libraries(kern_repl PRIVATE ${KERN_RAYLIB_TARGET})
-    target_sources(kern PRIVATE src/game/game_builtins.cpp ${G2D_SOURCES})
+    add_library(kern_gfx STATIC "${KERN_GAME_MODULE_DIR}/game_builtins.cpp" ${G2D_SOURCES})
+    target_include_directories(kern_gfx PUBLIC ${KERN_TOOLCHAIN_PRIVATE_INCLUDES})
+    target_compile_definitions(kern_gfx PRIVATE KERN_BUILD_GAME=1)
+    target_link_libraries(kern_gfx PUBLIC ${KERN_RAYLIB_TARGET})
+    kern_apply_strict_warnings(kern_gfx)
+    target_link_libraries(kern PRIVATE kern_gfx)
+    target_link_libraries(kern_repl PRIVATE kern_gfx)
+    target_link_libraries(kernc PRIVATE kern_gfx)
+    target_link_libraries(kern-scan PRIVATE kern_gfx)
     target_compile_definitions(kern PRIVATE KERN_BUILD_GAME=1)
-    target_link_libraries(kern PRIVATE ${KERN_RAYLIB_TARGET})
-    target_sources(kern-scan PRIVATE src/game/game_builtins.cpp ${G2D_SOURCES})
+    target_compile_definitions(kern_repl PRIVATE KERN_BUILD_GAME=1)
+    target_compile_definitions(kernc PRIVATE KERN_BUILD_GAME=1)
     target_compile_definitions(kern-scan PRIVATE KERN_BUILD_GAME=1)
-    target_link_libraries(kern-scan PRIVATE ${KERN_RAYLIB_TARGET})
-    add_executable(kern_game src/game/game_main.cpp ${KERN_WIN32_RESOURCES} src/game/game_builtins.cpp ${COMPILER_SOURCES} ${VM_SOURCES} ${ERROR_SOURCES})
-    target_include_directories(kern_game PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
-    target_compile_definitions(kern_game PRIVATE KERN_BUILD_GAME=1)
-    target_link_libraries(kern_game PRIVATE ${KERN_RAYLIB_TARGET})
-    if(WIN32)
-      target_link_libraries(kern_game PRIVATE winhttp wininet ws2_32)
+    add_executable(kern_game "${KERN_GAME_MODULE_DIR}/game_main.cpp" ${KERN_WIN32_RESOURCES})
+    target_link_libraries(kern_game PRIVATE kern_core kern_gfx)
+    target_compile_definitions(kern_game PRIVATE KERN_BUILD_GAME=1 KERN_VERSION="${KERN_VERSION}")
+    if(KERN_BUILD_ID)
+      target_compile_definitions(kern_game PRIVATE KERN_BUILD_ID="${KERN_BUILD_ID}")
     endif()
     kern_apply_strict_warnings(kern_game)
 
@@ -377,11 +410,7 @@ if(KERN_BUILD_GAME)
           list(APPEND _kern_raylib_extra "${KERN_GLFW_LIBRARY}")
         endif()
       endif()
-      target_link_libraries(kernc PRIVATE ${_kern_raylib_extra})
-      target_link_libraries(kern_repl PRIVATE ${_kern_raylib_extra})
-      target_link_libraries(kern PRIVATE ${_kern_raylib_extra})
-      target_link_libraries(kern-scan PRIVATE ${_kern_raylib_extra})
-      target_link_libraries(kern_game PRIVATE ${_kern_raylib_extra})
+      target_link_libraries(kern_gfx PUBLIC ${_kern_raylib_extra})
     endif()
     if(KERN_PREFER_STATIC_RAYLIB)
       message(STATUS "Kern: graphics integrated - static Raylib preferred (no external raylib.dll when available)")

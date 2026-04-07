@@ -59,7 +59,7 @@ def main() -> int:
         for op in missing:
             print(f"  - {op}", file=sys.stderr)
         print("", file=sys.stderr)
-        print("Fix: implement the opcode in src/vm/vm.cpp or reject it explicitly.", file=sys.stderr)
+        print("Fix: implement the opcode in kern/runtime/vm/vm.cpp or reject it explicitly.", file=sys.stderr)
         return 1
 
     print(f"OK: {len(opcodes)} opcodes handled")

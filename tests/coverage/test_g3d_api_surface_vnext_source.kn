@@ -1,6 +1,6 @@
 // Build-agnostic surface test: validates g3d API names by source registration strings.
 require("filesystem.read")
-let src = read_file("src/modules/g3d/g3d.cpp")
+let src = read_file("kern/modules/g3d/g3d.cpp")
 
 assert_eq(regex_match(src, "add\\(\"setCameraPath\""), true)
 assert_eq(regex_match(src, "add\\(\"sampleCameraPath\""), true)

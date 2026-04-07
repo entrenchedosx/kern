@@ -1,5 +1,5 @@
 // Curated patterns for `kern --check --strict-types` (Phase 2). Safe to import; no side effects.
-// Uses only builtins listed in src/compiler/typed_builtins.hpp for typed initializers.
+// Uses only builtins listed in kern/core/compiler/typed_builtins.hpp for typed initializers.
 
 let _st_sqrt: float = sqrt(1.0)
 let _st_len: int = len("ok")

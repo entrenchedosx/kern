@@ -100,7 +100,7 @@ Verifies selective import from stdlib `math` and expected numeric results.
 | Language core | `token.hpp`, `lexer.cpp`, `parser.hpp`, `parser.cpp`, `ast.hpp`, `codegen.cpp`, `semantic.cpp` |
 | Project system | `project_resolver.cpp`, `project_analyzer.cpp` |
 | VM / runtime | `vm.hpp`, `builtins.hpp` |
-| CLI / REPL | `main.cpp` |
+| CLI / REPL | `kern/tools/main.cpp`, `kern/tools/repl_main.cpp` |
 | Diagnostics | `errors.cpp` (JSON stack `filename`) |
 | Docs / tests | `docs/MEMORY_MODEL.md`, `docs/ERROR_CODES.md`, `docs/LANGUAGE_ROADMAP.md` (status §8), `tests/from_import_smoke.kn`, `tests/coverage/kern_verify_fixture/` |
 

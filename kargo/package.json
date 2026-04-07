@@ -1,0 +1,19 @@
+{
+  "name": "kargo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GitHub-first package manager for Kern (no central registry)",
+  "type": "module",
+  "bin": {
+    "kargo": "./cli/entry.js"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "scripts": {
+    "test": "node --test ./cli/tests/*.test.js"
+  },
+  "dependencies": {
+    "semver": "^7.6.3"
+  }
+}

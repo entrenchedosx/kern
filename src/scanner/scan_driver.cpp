@@ -6,9 +6,9 @@
 #include "compiler/lexer.hpp"
 #include "compiler/parser.hpp"
 #include "compiler/semantic.hpp"
-#include "errors.hpp"
+#include "errors/errors.hpp"
 #include "vm/builtins.hpp"
-#include "vm/bytecode.hpp"
+#include "bytecode/bytecode.hpp"
 #include "platform/env_compat.hpp"
 #ifdef KERN_BUILD_GAME
 #include "game/game_builtins.hpp"

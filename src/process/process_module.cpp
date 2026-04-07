@@ -2,7 +2,7 @@
 
 #include "system/runtime_services.hpp"
 #include "vm/vm.hpp"
-#include "vm/value.hpp"
+#include "bytecode/value.hpp"
 
 #include <cstdint>
 #include <memory>

@@ -2,9 +2,9 @@
 
 Hand-written `.kn` files plus **`run_stress_suite.ps1`**, which generates pathological sources (long `??` chains, long unary prefixes, oversized files) and runs **`kern --check`**.
 
-Every run also checks **encoding behavior** the lexer enforces: a **UTF-8 with BOM** sample must **`--check`** successfully, and a **UTF-16 BOM** stub must fail **`--check`** (see [`src/compiler/lexer.cpp`](../../src/compiler/lexer.cpp) and [`source_encoding.hpp`](../../src/compiler/source_encoding.hpp)).
+Every run also checks **encoding behavior** the lexer enforces: a **UTF-8 with BOM** sample must **`--check`** successfully, and a **UTF-16 BOM** stub must fail **`--check`** (see [`src/compiler/lexer.cpp`](../../kern/core/compiler/lexer.cpp) and [`source_encoding.hpp`](../../kern/core/compiler/source_encoding.hpp)).
 
-The suite runs **`stress_vm_call_depth_overflow.kn`** with **`kern`** (not `--check`) and expects a **non-zero exit**: the VM must report max call depth exceeded instead of crashing. That script calls **`set_max_call_depth(1024)`** so the test does not depend on CLI defaults: the `kern` executable sets **`2048`** in debug mode (default) and **`8192`** in **`--release`** mode ([`src/main.cpp`](../../src/main.cpp)), which is higher than the **`VM`** class default **`1024`** in [`src/vm/vm.hpp`](../../src/vm/vm.hpp). The internal **`kern test`** harness uses a plain `VM` without that override, so it still uses **1024**. When `maxCallDepth_` is non-zero, the VM **disables tail-call frame reuse** so depth limits also apply to tail recursion.
+The suite runs **`stress_vm_call_depth_overflow.kn`** with **`kern`** (not `--check`) and expects a **non-zero exit**: the VM must report max call depth exceeded instead of crashing. That script calls **`set_max_call_depth(1024)`** so the test does not depend on CLI defaults: the `kern` executable sets **`2048`** in debug mode (default) and **`8192`** in **`--release`** mode ([`kern/tools/main.cpp`](../../kern/tools/main.cpp)), which is higher than the **`VM`** class default **`1024`** in [`kern/runtime/vm/vm.hpp`](../../kern/runtime/vm/vm.hpp). The internal **`kern test`** harness uses a plain `VM` without that override, so it still uses **1024**. When `maxCallDepth_` is non-zero, the VM **disables tail-call frame reuse** so depth limits also apply to tail recursion.
 
 ### Modes
 

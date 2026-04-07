@@ -4,7 +4,7 @@ Kern exposes **hundreds** of native builtins. A single flat list in docs would g
 
 ## Canonical registry (C++)
 
-- **Ordered names:** `getBuiltinNames()` in [`src/vm/builtins.hpp`](../src/vm/builtins.hpp) — this list defines **stable indices**. New builtins are appended; **never reorder** existing entries.
+- **Ordered names:** `getBuiltinNames()` in [`kern/runtime/vm/builtins.hpp`](../kern/runtime/vm/builtins.hpp) — this list defines **stable indices**. New builtins are appended; **never reorder** existing entries.
 - **Implementations:** `registerAllBuiltins()` in the same file registers each index with a handler. Many builtins also get a **global** name via `setGlobalFn()`; newer `std_*` builtins may be **module-only** (no global).
 - **Extra global aliases** (not in the main list order): `getBuiltinExtraGlobalNames()` in `builtins.hpp` (e.g. `readFile`, `PI`).
 

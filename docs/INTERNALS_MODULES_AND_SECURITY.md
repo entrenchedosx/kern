@@ -17,14 +17,14 @@ Sensitive capabilities (filesystem, subprocess, environment, network) are gated 
 - `network.tcp` — `tcp_connect`, `tcp_connect_start`, `tcp_connect_check`, `tcp_listen`, `tcp_accept`, `tcp_send`, `tcp_recv`, `tcp_close`, `socket_set_nonblocking`, `socket_select_read`, `socket_select_write` (see [NETWORKING_MULTIPLAYER.md](NETWORKING_MULTIPLAYER.md))
 - `network.udp` — `udp_open`, `udp_bind`, `udp_send`, `udp_recv`, `udp_close`
 
-Implementation: [`src/vm/permissions.hpp`](../src/vm/permissions.hpp) with `vmRequirePermission` / `vmPermissionAllowed`.
+Implementation: [`kern/runtime/vm/permissions.hpp`](../kern/runtime/vm/permissions.hpp) with `vmRequirePermission` / `vmPermissionAllowed`.
 
 **Ways to grant** (pick one policy per deployment):
 
 1. **Explicit in script** — `require("filesystem.read")` (and similar) where needed.
 2. **CLI** — `kern --allow=filesystem.read` (repeatable) or `kern --unsafe` for full unlock (avoid in production for untrusted code).
 3. **Unsafe regions** — `unsafe { ... }` for bounded blocks (when enforcement is on).
-4. **Embedder** — Pre-fill `RuntimeGuardPolicy::grantedPermissions` (see [`registerAllStandardPermissions`](../src/vm/permissions.hpp) for the “grant everything” test/REPL pattern—**not** a production default).
+4. **Embedder** — Pre-fill `RuntimeGuardPolicy::grantedPermissions` (see [`registerAllStandardPermissions`](../kern/runtime/vm/permissions.hpp) for the “grant everything” test/REPL pattern—**not** a production default).
 
 **Environment:** `KERN_ENFORCE_PERMISSIONS=0` disables enforcement (development/CI only; documented in permission errors).
 
