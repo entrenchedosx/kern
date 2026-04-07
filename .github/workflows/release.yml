@@ -69,6 +69,9 @@ jobs:
 
       - name: Verify
         shell: cmd
+        env:
+          # Trusted release CI: smoke tests touch std/process/fs paths that need broad caps.
+          KERN_ENFORCE_PERMISSIONS: "0"
         run: |
           build\Release\kern.exe --version
           build\Release\kern.exe --scan --registry-only
@@ -80,6 +83,7 @@ jobs:
         shell: pwsh
         env:
           KERN_COVERAGE_SKIP_GRAPHICS: "1"
+          KERN_ENFORCE_PERMISSIONS: "0"
         run: pwsh -NoProfile -File ./tests/run_stable.ps1
 
       - name: Install registry CLI deps for portable bundle
@@ -148,6 +152,8 @@ jobs:
           cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_contract_humanize
 
       - name: Verify
+        env:
+          KERN_ENFORCE_PERMISSIONS: "0"
         run: |
           ./build/kern --version
           ./build/kern --scan --registry-only
@@ -158,6 +164,7 @@ jobs:
       - name: Stable suite (contract, golden, coverage)
         env:
           KERN_COVERAGE_SKIP_GRAPHICS: "1"
+          KERN_ENFORCE_PERMISSIONS: "0"
         run: pwsh -NoProfile -File ./tests/run_stable.ps1
 
       - name: Package tarball
@@ -213,6 +220,8 @@ jobs:
           cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_contract_humanize
 
       - name: Verify
+        env:
+          KERN_ENFORCE_PERMISSIONS: "0"
         run: |
           ./build/kern --version
           ./build/kern --scan --registry-only
@@ -222,6 +231,7 @@ jobs:
       - name: Stable suite (contract, golden, coverage)
         env:
           KERN_COVERAGE_SKIP_GRAPHICS: "1"
+          KERN_ENFORCE_PERMISSIONS: "0"
         run: pwsh -NoProfile -File ./tests/run_stable.ps1
 
       - name: Package tarball
