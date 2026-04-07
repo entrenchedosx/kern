@@ -22,6 +22,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.11] - 2026-04-07
+
+### Fixed
+
+- **g2d:** `strokeRoundedRect` targets the 4-parameter `DrawRectangleRoundedLines` API and approximates line thickness when Raylib does not provide the thickness overload, restoring Release CI builds (Windows, Linux, macOS).
+
+---
+
 ## [1.0.10] - 2026-04-05
 
 ### Added
@@ -239,7 +247,8 @@ Initial **Kern** release: **language** + **VM** + **builtins** + **`import`** mo
 
 - **CMake 3.14+**, **C++17**, optional **Raylib**; version from **`KERN_VERSION.txt`** (in post-1.0.0 trees; **`VERSION`** renamed in **1.0.6**).
 
-[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.10...HEAD
+[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.11...HEAD
+[1.0.11]: https://github.com/entrenchedosx/kern/compare/v1.0.10...v1.0.11
 [1.0.10]: https://github.com/entrenchedosx/kern/compare/v1.0.9...v1.0.10
 [1.0.7]: https://github.com/entrenchedosx/kern/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/entrenchedosx/kern/compare/v1.0.5...v1.0.6
