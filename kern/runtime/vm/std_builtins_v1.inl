@@ -506,11 +506,16 @@
         std::string path = std::get<std::string>(args[0]->data);
         std::string content = args[1] && args[1]->type == Value::Type::STRING ? std::get<std::string>(args[1]->data)
                                                                               : (args[1] ? args[1]->toString() : "");
-        // Use app|binary; avoid out|app — libc++ (macOS) can reject open for some paths with out|app.
-        std::ofstream f(path, std::ios::app | std::ios::binary);
-        if (!f.is_open()) return Value::fromBool(false);
-        f << content;
-        return Value::fromBool(static_cast<bool>(f));
+        // C stdio append is more reliable across libstdc++/libc++/MSVC than ofstream app modes in CI.
+        std::FILE* fp = std::fopen(path.c_str(), "ab");
+        if (!fp) return Value::fromBool(false);
+        if (!content.empty()) {
+            const size_t n = content.size();
+            const size_t w = std::fwrite(content.data(), 1, n, fp);
+            const int cl = std::fclose(fp);
+            return Value::fromBool(w == n && cl == 0);
+        }
+        return Value::fromBool(std::fclose(fp) == 0);
     });
 
     // require("filesystem.write") — grant a permission for the rest of the VM run (no-op if enforcement off)
