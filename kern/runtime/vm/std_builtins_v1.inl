@@ -506,10 +506,11 @@
         std::string path = std::get<std::string>(args[0]->data);
         std::string content = args[1] && args[1]->type == Value::Type::STRING ? std::get<std::string>(args[1]->data)
                                                                               : (args[1] ? args[1]->toString() : "");
-        std::ofstream f(path, std::ios::out | std::ios::app);
-        if (!f) return Value::fromBool(false);
+        // Use app|binary; avoid out|app — libc++ (macOS) can reject open for some paths with out|app.
+        std::ofstream f(path, std::ios::app | std::ios::binary);
+        if (!f.is_open()) return Value::fromBool(false);
         f << content;
-        return Value::fromBool(true);
+        return Value::fromBool(static_cast<bool>(f));
     });
 
     // require("filesystem.write") — grant a permission for the rest of the VM run (no-op if enforcement off)
