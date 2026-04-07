@@ -21,7 +21,7 @@ Use this before tagging a public release. Pair with [RELEASE.md](../RELEASE.md) 
 
 - [ ] **Tag:** `git tag -a vX.Y.Z -m "Release vX.Y.Z"` and push `vX.Y.Z`
 - [ ] **Release notes:** copy the new **CHANGELOG** section into the GitHub Release description
-- [ ] **Artifacts:** confirm [release workflow](../.github/workflows/release.yml) attached **Windows** zip (`kern-windows-x64-v*.zip`), **Linux** tarball (`kern-linux-x64-v*.tar.gz`), and **macOS** tarball (`kern-macos-v*.tar.gz`)
+- [ ] **Artifacts:** confirm [release workflow](../.github/workflows/release.yml) attached **Windows** zip (`kern-windows-x64-v*.zip`), **Windows NSIS installer** (`kern-windows-x64-v*-installer.exe`), **Linux** tarball (`kern-linux-x64-v*.tar.gz`), **macOS** tarball (`kern-macos-v*.tar.gz`), and **Kargo** bundle (`kargo-v*.tar.gz` + checksums + manifest)
 
 ## Post-release
 

@@ -22,6 +22,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.12] - 2026-04-08
+
+### Added
+
+- **Windows NSIS on releases:** The [Release workflow](.github/workflows/release.yml) now produces **`kern-windows-x64-v*-installer.exe`** (installs under Program Files with PATH shortcuts — same payload as **`build.ps1`** + **`installer.nsi`**) using **`scripts/package-windows-nsis-release.ps1`**, from the same fresh **`build/Release`** binaries as the portable zip.
+
+---
+
 ## [1.0.11] - 2026-04-07
 
 ### Fixed
@@ -249,7 +257,8 @@ Initial **Kern** release: **language** + **VM** + **builtins** + **`import`** mo
 
 - **CMake 3.14+**, **C++17**, optional **Raylib**; version from **`KERN_VERSION.txt`** (in post-1.0.0 trees; **`VERSION`** renamed in **1.0.6**).
 
-[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.11...HEAD
+[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.12...HEAD
+[1.0.12]: https://github.com/entrenchedosx/kern/compare/v1.0.11...v1.0.12
 [1.0.11]: https://github.com/entrenchedosx/kern/compare/v1.0.10...v1.0.11
 [1.0.10]: https://github.com/entrenchedosx/kern/compare/v1.0.9...v1.0.10
 [1.0.7]: https://github.com/entrenchedosx/kern/compare/v1.0.6...v1.0.7

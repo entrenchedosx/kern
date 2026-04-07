@@ -1,4 +1,5 @@
 # On version tag (v*): build Windows + Linux + macOS with Raylib (g2d/g3d); attach archives to GitHub Release.
+# Windows also builds an NSIS installer (kern-windows-x64-v*-installer.exe) from the same fresh Release binaries as the zip.
 # Also ships a Node-based Kargo bundle (tar.gz + SHA256SUMS + kargo-release.json). See kargo/scripts/package-release.sh.
 # workflow_dispatch: build + artifacts only (no release unless ref is a tag).
 name: Release
@@ -113,11 +114,21 @@ jobs:
           Compress-Archive -Path pkg/kern-${ver}-win64 -DestinationPath $out -Force
           Add-Content -Path $env:GITHUB_OUTPUT -Value "zip_path=$out"
 
+      - name: Install NSIS
+        run: choco install nsis -y
+
+      - name: Build Windows NSIS installer (fresh binaries, same layout as build.ps1 + installer.nsi)
+        id: nsis
+        shell: pwsh
+        run: pwsh -NoProfile -File ./scripts/package-windows-nsis-release.ps1
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: kern-release-windows
-          path: ${{ steps.zip.outputs.zip_path }}
+          path: |
+            ${{ steps.zip.outputs.zip_path }}
+            ${{ steps.nsis.outputs.installer_path }}
 
   linux:
     runs-on: ubuntu-latest
