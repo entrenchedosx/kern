@@ -80,6 +80,9 @@ public:
     void setGlobal(const std::string& name, ValuePtr value);
     /* * get global by name (for building stdlib modules). Returns nullptr if not set.*/
     ValuePtr getGlobal(const std::string& name) const;
+    /* * Pending @command/@event registrations (not part of user globals — survives import namespace pollution).*/
+    ValuePtr getDecoratorRegistry() const { return decoratorRegistry_; }
+    void setDecoratorRegistry(ValuePtr v) { decoratorRegistry_ = std::move(v); }
     /* * snapshot all globals (used by import/export capture).*/
     std::unordered_map<std::string, ValuePtr> getGlobalsSnapshot() const;
     ValuePtr popStack();
@@ -148,6 +151,7 @@ private:
     std::vector<ValuePtr> stack_;
     std::vector<ValuePtr> locals_;
     std::unordered_map<std::string, ValuePtr> globals_;
+    ValuePtr decoratorRegistry_;
     size_t ip_;
     std::vector<size_t> callFrames_;
     std::vector<std::vector<ValuePtr>> frameLocals_;

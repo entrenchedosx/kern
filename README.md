@@ -1,7 +1,7 @@
 # Kern
 
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.13-blue.svg)](KERN_VERSION.txt)
+[![Version](https://img.shields.io/badge/version-1.0.14-blue.svg)](KERN_VERSION.txt)
 [![Discord](https://img.shields.io/badge/discord-Kern-5865F2?logo=discord&logoColor=white)](https://discord.gg/JBa4RfT2tE)
 
 **Kern** is a practical **Python-like + C++-level system access** language: readable scripts, compiled to bytecode, executed by a fast VM, with explicit tooling for diagnostics, scanning, packaging, and deployment.

@@ -85,7 +85,7 @@ jobs:
         env:
           KERN_COVERAGE_SKIP_GRAPHICS: "1"
           KERN_ENFORCE_PERMISSIONS: "0"
-        run: pwsh -NoProfile -File ./tests/run_stable.ps1 -Quick
+        run: pwsh -NoProfile -File ./tests/run_stable.ps1
 
       - name: Install registry CLI deps for portable bundle
         shell: pwsh
@@ -188,7 +188,7 @@ jobs:
         env:
           KERN_COVERAGE_SKIP_GRAPHICS: "1"
           KERN_ENFORCE_PERMISSIONS: "0"
-        run: pwsh -NoProfile -File ./tests/run_stable.ps1 -Quick
+        run: pwsh -NoProfile -File ./tests/run_stable.ps1
 
       - name: Package tarball
         id: tgz
@@ -264,7 +264,7 @@ jobs:
         env:
           KERN_COVERAGE_SKIP_GRAPHICS: "1"
           KERN_ENFORCE_PERMISSIONS: "0"
-        run: pwsh -NoProfile -File ./tests/run_stable.ps1 -Quick
+        run: pwsh -NoProfile -File ./tests/run_stable.ps1
 
       - name: Package tarball
         id: tgz

@@ -733,31 +733,31 @@ inline void registerAllBuiltins(VM& vm) {
         std::cout << std::endl;
         return Value::nil();
     });
-    setGlobalFn("print", 0);
+    setGlobalFn("print", i - 1);
 
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromFloat(0);
         return Value::fromFloat(std::sqrt(toDouble(args[0])));
     });
-    setGlobalFn("sqrt", 1);
+    setGlobalFn("sqrt", i - 1);
 
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::fromFloat(1);
         return Value::fromFloat(std::pow(toDouble(args[0]), toDouble(args[1])));
     });
-    setGlobalFn("pow", 2);
+    setGlobalFn("pow", i - 1);
 
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromFloat(0);
         return Value::fromFloat(std::sin(toDouble(args[0])));
     });
-    setGlobalFn("sin", 3);
+    setGlobalFn("sin", i - 1);
 
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromFloat(1);
         return Value::fromFloat(std::cos(toDouble(args[0])));
     });
-    setGlobalFn("cos", 4);
+    setGlobalFn("cos", i - 1);
 
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() >= 2) {
@@ -769,45 +769,45 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromFloat(static_cast<double>(std::rand()) / RAND_MAX);
     });
-    setGlobalFn("random", 5);
+    setGlobalFn("random", i - 1);
 
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromInt(0);
         return Value::fromInt(static_cast<int64_t>(std::floor(toDouble(args[0]))));
     });
-    setGlobalFn("floor", 6);
+    setGlobalFn("floor", i - 1);
 
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromInt(0);
         return Value::fromInt(static_cast<int64_t>(std::ceil(toDouble(args[0]))));
     });
-    setGlobalFn("ceil", 7);
+    setGlobalFn("ceil", i - 1);
 
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         std::string s;
         for (const auto& a : args) s += a ? a->toString() : "null";
         return Value::fromString(s);
     });
-    setGlobalFn("str", 8);
+    setGlobalFn("str", i - 1);
 
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromInt(0);
         return Value::fromInt(toInt(args[0]));
     });
-    setGlobalFn("int", 9);
+    setGlobalFn("int", i - 1);
 
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromFloat(0);
         return Value::fromFloat(toDouble(args[0]));
     });
-    setGlobalFn("float", 10);
+    setGlobalFn("float", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::vector<ValuePtr> arr;
         for (const auto& a : args) arr.push_back(a ? a : std::make_shared<Value>(Value::nil()));
         return Value::fromArray(std::move(arr));
     });
-    setGlobalFn("array", 11);
+    setGlobalFn("array", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0]) return Value::fromInt(0);
@@ -817,7 +817,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromInt(static_cast<int64_t>(std::get<std::string>(args[0]->data).size()));
         return Value::fromInt(0);
     });
-    setGlobalFn("len", 12);
+    setGlobalFn("len", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         vmRequirePermission(vm, Perm::kFilesystemRead, "read_file");
@@ -829,7 +829,8 @@ inline void registerAllBuiltins(VM& vm) {
         buf << f.rdbuf();
         return Value::fromString(buf.str());
     });
-    setGlobalFn("read_file", 13);
+    setGlobalFn("read_file", i - 1);
+    setGlobalFn("readFile", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         vmRequirePermission(vm, Perm::kFilesystemWrite, "write_file");
@@ -841,18 +842,19 @@ inline void registerAllBuiltins(VM& vm) {
         f << content;
         return Value::fromBool(true);
     });
-    setGlobalFn("write_file", 14);
+    setGlobalFn("write_file", i - 1);
+    setGlobalFn("writeFile", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr>) {
         return Value::fromFloat(static_cast<double>(std::time(nullptr)));
     });
-    setGlobalFn("time", 15);
+    setGlobalFn("time", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         return Value::fromString(args[0] ? args[0]->toString() : "null");
     });
-    setGlobalFn("inspect", 16);
+    setGlobalFn("inspect", i - 1);
 
     makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
         if (vm && !vm->getRuntimeGuards().allowUnsafe && !vm->isInUnsafeContext())
@@ -866,7 +868,7 @@ inline void registerAllBuiltins(VM& vm) {
         void* p = std::malloc(n);
         return Value::fromPtr(p);
     });
-    setGlobalFn("alloc", 17);
+    setGlobalFn("alloc", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         if (vm && !vm->getRuntimeGuards().allowUnsafe && !vm->isInUnsafeContext())
@@ -881,7 +883,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::nil();
     });
-    setGlobalFn("free", 18);
+    setGlobalFn("free", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0]) return Value::fromString("nil");
@@ -900,7 +902,7 @@ inline void registerAllBuiltins(VM& vm) {
             default: return Value::fromString("unknown");
         }
     });
-    setGlobalFn("type", 19);
+    setGlobalFn("type", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::vector<ValuePtr> out;
@@ -915,7 +917,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("dir", 20);
+    setGlobalFn("dir", i - 1);
 
     makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
         if (!vm) return Value::fromInt(0);
@@ -923,7 +925,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (!args.empty() && args[0] && args[0]->isTruthy()) vm->resetCycleCount();
         return Value::fromInt(static_cast<int64_t>(n));
     });
-    setGlobalFn("profile_cycles", 21);
+    setGlobalFn("profile_cycles", i - 1);
 
     vm.setGlobal("PI", std::make_shared<Value>(Value::fromFloat(M_PI)));
     vm.setGlobal("E", std::make_shared<Value>(Value::fromFloat(M_E)));
@@ -937,7 +939,7 @@ inline void registerAllBuiltins(VM& vm) {
         arr.push_back(args[1] ? args[1] : std::make_shared<Value>(Value::nil()));
         return Value(*args[0]);
     });
-    setGlobalFn("push", 22);
+    setGlobalFn("push", i - 1);
 
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0]) return Value::fromArray({});
@@ -968,7 +970,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("slice", 23);
+    setGlobalFn("slice", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::vector<ValuePtr> out;
@@ -977,7 +979,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (const auto& kv : m) out.push_back(std::make_shared<Value>(Value::fromString(kv.first)));
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("keys", 24);
+    setGlobalFn("keys", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::vector<ValuePtr> out;
@@ -986,7 +988,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (const auto& kv : m) out.push_back(kv.second);
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("values", 25);
+    setGlobalFn("values", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || !args[1] || args[0]->type != Value::Type::MAP) return Value::fromBool(false);
@@ -1002,7 +1004,7 @@ inline void registerAllBuiltins(VM& vm) {
         auto& m = std::get<std::unordered_map<std::string, ValuePtr>>(args[0]->data);
         return Value::fromBool(m.find(key) != m.end());
     });
-    setGlobalFn("has", 26);
+    setGlobalFn("has", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::nil();
@@ -1010,7 +1012,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (auto& c : s) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
         return Value::fromString(s);
     });
-    setGlobalFn("upper", 27);
+    setGlobalFn("upper", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::nil();
@@ -1018,7 +1020,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         return Value::fromString(s);
     });
-    setGlobalFn("lower", 28);
+    setGlobalFn("lower", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 3 || !args[0] || !args[1] || !args[2] || args[0]->type != Value::Type::STRING || args[1]->type != Value::Type::STRING ||
@@ -1031,7 +1033,7 @@ inline void registerAllBuiltins(VM& vm) {
         while ((pos = s.find(from, pos)) != std::string::npos) { s.replace(pos, from.size(), to); pos += to.size(); }
         return Value::fromString(s);
     });
-    setGlobalFn("replace", 29);
+    setGlobalFn("replace", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || !args[1]) return Value::nil();
@@ -1042,7 +1044,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (size_t i = 0; i < arr.size(); ++i) { if (i) out += sep; out += arr[i] ? arr[i]->toString() : "null"; }
         return Value::fromString(out);
     });
-    setGlobalFn("join", 30);
+    setGlobalFn("join", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromArray({});
@@ -1057,33 +1059,33 @@ inline void registerAllBuiltins(VM& vm) {
         out.push_back(std::make_shared<Value>(Value::fromString(s.substr(start))));
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("split", 31);
+    setGlobalFn("split", i - 1);
 
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromInt(0);
         return Value::fromInt(static_cast<int64_t>(std::round(toDouble(args[0]))));
     });
-    setGlobalFn("round", 32);
+    setGlobalFn("round", i - 1);
 
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromFloat(0);
         return Value::fromFloat(std::fabs(toDouble(args[0])));
     });
-    setGlobalFn("abs", 33);
+    setGlobalFn("abs", i - 1);
 
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromFloat(0);
         return Value::fromFloat(std::log(toDouble(args[0])));
     });
-    setGlobalFn("log", 34);
+    setGlobalFn("log", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         vmRequirePermission(vm, Perm::kFilesystemRead, "fileExists");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromBool(false);
         return Value::fromBool(std::filesystem::exists(std::get<std::string>(args[0]->data)));
     });
-    setGlobalFn("fileExists", 35);
-    setGlobalFn("file_exists", 35);
+    setGlobalFn("fileExists", i - 1);
+    setGlobalFn("file_exists", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         vmRequirePermission(vm, Perm::kFilesystemRead, "listDir");
@@ -1095,8 +1097,8 @@ inline void registerAllBuiltins(VM& vm) {
         } catch (...) {}
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("listDir", 36);
-    setGlobalFn("list_dir", 36);
+    setGlobalFn("listDir", i - 1);
+    setGlobalFn("list_dir", i - 1);
 
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (!args.empty() && args[0]) {
@@ -1105,10 +1107,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::nil();
     });
-    setGlobalFn("sleep", 37);
-
-    setGlobalFn("readFile", 13);
-    setGlobalFn("writeFile", 14);
+    setGlobalFn("sleep", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::MAP) return Value::nil();
@@ -1118,7 +1117,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (size_t i = 1; i < args.size(); ++i) m["__arg" + std::to_string(i)] = args[i];
         return inst;
     });
-    setGlobalFn("Instance", 38);
+    setGlobalFn("Instance", i - 1);
 
     // jSON support
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -1127,7 +1126,7 @@ inline void registerAllBuiltins(VM& vm) {
         ValuePtr v = p.parseValue();
         return v ? Value(*v) : Value::nil();
     });
-    setGlobalFn("json_parse", 39);
+    setGlobalFn("json_parse", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string indentStr;
@@ -1196,14 +1195,14 @@ inline void registerAllBuiltins(VM& vm) {
         if (!args.empty()) toJson(args[0], out, 0);
         return Value::fromString(std::move(out));
     });
-    setGlobalFn("json_stringify", 40);
+    setGlobalFn("json_stringify", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
         std::vector<ValuePtr> arr;
         if (vm) for (const auto& a : vm->getCliArgs()) arr.push_back(std::make_shared<Value>(Value::fromString(a)));
         return Value::fromArray(std::move(arr));
     });
-    setGlobalFn("cli_args", 41);
+    setGlobalFn("cli_args", i - 1);
 
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::fromArray({});
@@ -1225,7 +1224,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("range", 42);
+    setGlobalFn("range", i - 1);
 
     static std::function<ValuePtr(const ValuePtr&)> deepCopy;
     deepCopy = [](const ValuePtr& v) -> ValuePtr {
@@ -1257,12 +1256,12 @@ inline void registerAllBuiltins(VM& vm) {
         if (args.empty()) return Value::nil();
         return *deepCopy(args[0]);
     });
-    setGlobalFn("copy", 43);
+    setGlobalFn("copy", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         return *deepCopy(args[0]);
     });
-    setGlobalFn("freeze", 44);
+    setGlobalFn("freeze", i - 1);
 
     static std::function<bool(const ValuePtr&, const ValuePtr&)> deepEqual;
     deepEqual = [](const ValuePtr& a, const ValuePtr& b) -> bool {
@@ -1299,7 +1298,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (args.size() < 2) return Value::fromBool(false);
         return Value::fromBool(deepEqual(args[0], args[1]));
     });
-    setGlobalFn("deep_equal", 45);
+    setGlobalFn("deep_equal", i - 1);
     g_assertEqDeepEqual = deepEqual;
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -1309,7 +1308,7 @@ inline void registerAllBuiltins(VM& vm) {
         size_t i = static_cast<size_t>(std::rand()) % arr.size();
         return arr[i] ? *arr[i] : Value::nil();
     });
-    setGlobalFn("random_choice", 46);
+    setGlobalFn("random_choice", i - 1);
 
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::fromInt(0);
@@ -1319,7 +1318,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (range <= 0) return Value::fromInt(lo);
         return Value::fromInt(lo + (std::rand() % static_cast<unsigned>(range)));
     });
-    setGlobalFn("random_int", 47);
+    setGlobalFn("random_int", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::nil();
@@ -1330,7 +1329,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(arr));
     });
-    setGlobalFn("random_shuffle", 48);
+    setGlobalFn("random_shuffle", i - 1);
 
     makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::fromArray({});
@@ -1343,7 +1342,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("map", 49);
+    setGlobalFn("map", i - 1);
 
     makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::fromArray({});
@@ -1357,7 +1356,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("filter", 50);
+    setGlobalFn("filter", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::nil();
@@ -1372,7 +1371,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return acc ? *acc : Value::nil();
     });
-    setGlobalFn("reduce", 51);
+    setGlobalFn("reduce", i - 1);
 
     // advanced error handling: Error(message [, code [, cause]]), panic(msg), error_message(err), error_name(e), error_cause(e), ValueError, TypeError, ...
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
@@ -1387,13 +1386,13 @@ inline void registerAllBuiltins(VM& vm) {
         if (cause) m["cause"] = cause;
         return Value::fromMap(std::move(m));
     });
-    setGlobalFn("Error", 52);
+    setGlobalFn("Error", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) -> Value {
         std::string msg = args.empty() || !args[0] ? "panic" : args[0]->toString();
         throw VMError(msg, 0, 0, 1);
         return Value::nil();
     });
-    setGlobalFn("panic", 53);
+    setGlobalFn("panic", i - 1);
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0]) return Value::fromString("null");
         if (args[0]->type == Value::Type::MAP) {
@@ -1404,7 +1403,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString(args[0]->toString());
     });
-    setGlobalFn("error_message", 54);
+    setGlobalFn("error_message", i - 1);
 
     // math helpers
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
@@ -1414,27 +1413,27 @@ inline void registerAllBuiltins(VM& vm) {
         if (x > hi) return Value::fromFloat(hi);
         return Value::fromFloat(x);
     });
-    setGlobalFn("clamp", 55);
+    setGlobalFn("clamp", i - 1);
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 3) return Value::fromFloat(0);
         double a = toDouble(args[0]), b = toDouble(args[1]), t = toDouble(args[2]);
         return Value::fromFloat(a + t * (b - a));
     });
-    setGlobalFn("lerp", 56);
+    setGlobalFn("lerp", i - 1);
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         double m = toDouble(args[0]);
         for (size_t j = 1; j < args.size(); ++j) { double v = toDouble(args[j]); if (v < m) m = v; }
         return Value::fromFloat(m);
     });
-    setGlobalFn("min", 57);
+    setGlobalFn("min", i - 1);
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         double m = toDouble(args[0]);
         for (size_t j = 1; j < args.size(); ++j) { double v = toDouble(args[j]); if (v > m) m = v; }
         return Value::fromFloat(m);
     });
-    setGlobalFn("max", 58);
+    setGlobalFn("max", i - 1);
 
     // file system
     makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
@@ -1448,7 +1447,7 @@ inline void registerAllBuiltins(VM& vm) {
         } catch (...) {}
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("listDirRecursive", 59);
+    setGlobalFn("listDirRecursive", i - 1);
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         vmRequirePermission(vm, Perm::kFilesystemWrite, "copy_file");
         if (args.size() < 2 || !args[0] || !args[1] || args[0]->type != Value::Type::STRING || args[1]->type != Value::Type::STRING) return Value::fromBool(false);
@@ -1457,7 +1456,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromBool(true);
         } catch (...) { return Value::fromBool(false); }
     });
-    setGlobalFn("copy_file", 60);
+    setGlobalFn("copy_file", i - 1);
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         vmRequirePermission(vm, Perm::kFilesystemWrite, "delete_file");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromBool(false);
@@ -1465,7 +1464,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromBool(std::filesystem::remove(std::get<std::string>(args[0]->data)));
         } catch (...) { return Value::fromBool(false); }
     });
-    setGlobalFn("delete_file", 61);
+    setGlobalFn("delete_file", i - 1);
 
     // string helpers
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -1476,21 +1475,21 @@ inline void registerAllBuiltins(VM& vm) {
         size_t end = s.find_last_not_of(" \t\r\n");
         return Value::fromString(s.substr(start, end - start + 1));
     });
-    setGlobalFn("trim", 62);
+    setGlobalFn("trim", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || !args[1] || args[0]->type != Value::Type::STRING || args[1]->type != Value::Type::STRING) return Value::fromBool(false);
         const std::string& s = std::get<std::string>(args[0]->data);
         const std::string& p = std::get<std::string>(args[1]->data);
         return Value::fromBool(s.size() >= p.size() && s.compare(0, p.size(), p) == 0);
     });
-    setGlobalFn("starts_with", 63);
+    setGlobalFn("starts_with", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || !args[1] || args[0]->type != Value::Type::STRING || args[1]->type != Value::Type::STRING) return Value::fromBool(false);
         const std::string& s = std::get<std::string>(args[0]->data);
         const std::string& p = std::get<std::string>(args[1]->data);
         return Value::fromBool(s.size() >= p.size() && s.compare(s.size() - p.size(), p.size(), p) == 0);
     });
-    setGlobalFn("ends_with", 64);
+    setGlobalFn("ends_with", i - 1);
 
     // array combinators
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
@@ -1506,7 +1505,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("flat_map", 65);
+    setGlobalFn("flat_map", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || !args[1] || args[0]->type != Value::Type::ARRAY || args[1]->type != Value::Type::ARRAY) return Value::fromArray({});
         auto& a = std::get<std::vector<ValuePtr>>(args[0]->data);
@@ -1518,7 +1517,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("zip", 66);
+    setGlobalFn("zip", i - 1);
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::fromArray({});
         auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
@@ -1531,7 +1530,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("chunk", 67);
+    setGlobalFn("chunk", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::fromArray({});
         auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
@@ -1543,7 +1542,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("unique", 68);
+    setGlobalFn("unique", i - 1);
 
     // logging
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -1552,21 +1551,21 @@ inline void registerAllBuiltins(VM& vm) {
         std::cout << std::endl;
         return Value::nil();
     });
-    setGlobalFn("log_info", 69);
+    setGlobalFn("log_info", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::cout << "[WARN] ";
         for (size_t j = 0; j < args.size(); ++j) { if (j) std::cout << " "; std::cout << (args[j] ? args[j]->toString() : "null"); }
         std::cout << std::endl;
         return Value::nil();
     });
-    setGlobalFn("log_warn", 70);
+    setGlobalFn("log_warn", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::cerr << "[ERROR] ";
         for (size_t j = 0; j < args.size(); ++j) { if (j) std::cerr << " "; std::cerr << (args[j] ? args[j]->toString() : "null"); }
         std::cerr << std::endl;
         return Value::nil();
     });
-    setGlobalFn("log_error", 71);
+    setGlobalFn("log_error", i - 1);
 
     // more file system
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
@@ -1583,7 +1582,7 @@ inline void registerAllBuiltins(VM& vm) {
             } catch (...) { return Value::fromBool(false); }
         }
     });
-    setGlobalFn("move_file", 72);
+    setGlobalFn("move_file", i - 1);
 
     // format string: format("%s %d %f", s, i, f) - %s str, %d int, %f float, %% literal %
     makeBuiltin(i++, [toInt, toDouble](VM*, std::vector<ValuePtr> args) {
@@ -1604,18 +1603,18 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString(std::move(out));
     });
-    setGlobalFn("format", 73);
+    setGlobalFn("format", i - 1);
 
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromFloat(0);
         return Value::fromFloat(std::tan(toDouble(args[0])));
     });
-    setGlobalFn("tan", 74);
+    setGlobalFn("tan", i - 1);
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::fromFloat(0);
         return Value::fromFloat(std::atan2(toDouble(args[0]), toDouble(args[1])));
     });
-    setGlobalFn("atan2", 75);
+    setGlobalFn("atan2", i - 1);
 
     // array: reverse (new array), find (index or -1), sort (in-place by toString), flatten (one level)
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -1624,7 +1623,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::vector<ValuePtr> out(arr.rbegin(), arr.rend());
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("reverse", 76);
+    setGlobalFn("reverse", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::fromInt(-1);
         auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
@@ -1637,7 +1636,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromInt(-1);
     });
-    setGlobalFn("find", 77);
+    setGlobalFn("find", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::nil();
         auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
@@ -1646,7 +1645,7 @@ inline void registerAllBuiltins(VM& vm) {
         });
         return args[0] ? Value(*args[0]) : Value::nil();
     });
-    setGlobalFn("sort", 78);
+    setGlobalFn("sort", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::fromArray({});
         auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
@@ -1660,7 +1659,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("flatten", 79);
+    setGlobalFn("flatten", i - 1);
 
     // string: repeat(s, n), pad_left(s, width, char?), pad_right(s, width, char?)
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
@@ -1671,7 +1670,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (int64_t i = 0; i < n; ++i) out += s;
         return Value::fromString(std::move(out));
     });
-    setGlobalFn("repeat", 80);
+    setGlobalFn("repeat", i - 1);
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::nil();
         std::string s = std::get<std::string>(args[0]->data);
@@ -1684,7 +1683,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (static_cast<int64_t>(s.size()) >= w) return Value::fromString(s);
         return Value::fromString(std::string(static_cast<size_t>(w - s.size()), pad) + s);
     });
-    setGlobalFn("pad_left", 81);
+    setGlobalFn("pad_left", i - 1);
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::nil();
         std::string s = std::get<std::string>(args[0]->data);
@@ -1697,7 +1696,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (static_cast<int64_t>(s.size()) >= w) return Value::fromString(s);
         return Value::fromString(s + std::string(static_cast<size_t>(w - s.size()), pad));
     });
-    setGlobalFn("pad_right", 82);
+    setGlobalFn("pad_right", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         vmRequirePermission(vm, Perm::kEnvAccess, "env_get");
@@ -1715,21 +1714,21 @@ inline void registerAllBuiltins(VM& vm) {
         return Value::fromString(v ? v : "");
 #endif
     });
-    setGlobalFn("env_get", 83);
+    setGlobalFn("env_get", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::fromBool(true);
         auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
         for (const auto& v : arr) { if (!v || !v->isTruthy()) return Value::fromBool(false); }
         return Value::fromBool(true);
     });
-    setGlobalFn("all", 84);
+    setGlobalFn("all", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::fromBool(false);
         auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
         for (const auto& v : arr) { if (v && v->isTruthy()) return Value::fromBool(true); }
         return Value::fromBool(false);
     });
-    setGlobalFn("any", 85);
+    setGlobalFn("any", i - 1);
 
     // directory & path type
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
@@ -1739,7 +1738,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromBool(std::filesystem::create_directories(std::get<std::string>(args[0]->data)));
         } catch (...) { return Value::fromBool(false); }
     });
-    setGlobalFn("create_dir", 86);
+    setGlobalFn("create_dir", i - 1);
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         vmRequirePermission(vm, Perm::kFilesystemRead, "is_file");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromBool(false);
@@ -1748,7 +1747,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromBool(std::filesystem::is_regular_file(p));
         } catch (...) { return Value::fromBool(false); }
     });
-    setGlobalFn("is_file", 87);
+    setGlobalFn("is_file", i - 1);
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         vmRequirePermission(vm, Perm::kFilesystemRead, "is_dir");
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromBool(false);
@@ -1757,7 +1756,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromBool(std::filesystem::is_directory(p));
         } catch (...) { return Value::fromBool(false); }
     });
-    setGlobalFn("is_dir", 88);
+    setGlobalFn("is_dir", i - 1);
 
     // sort_by(arr, fn) - fn(a,b) returns truthy if a should come before b
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
@@ -1770,19 +1769,19 @@ inline void registerAllBuiltins(VM& vm) {
         });
         return args[0] ? Value(*args[0]) : Value::nil();
     });
-    setGlobalFn("sort_by", 89);
+    setGlobalFn("sort_by", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::nil();
         auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
         return arr.empty() ? Value::nil() : (arr[0] ? *arr[0] : Value::nil());
     });
-    setGlobalFn("first", 90);
+    setGlobalFn("first", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::nil();
         auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
         return arr.empty() ? Value::nil() : (arr.back() ? *arr.back() : Value::nil());
     });
-    setGlobalFn("last", 91);
+    setGlobalFn("last", i - 1);
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::fromArray({});
         auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
@@ -1791,7 +1790,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (int64_t i = 0; i < n && static_cast<size_t>(i) < arr.size(); ++i) out.push_back(arr[static_cast<size_t>(i)]);
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("take", 92);
+    setGlobalFn("take", i - 1);
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::fromArray({});
         auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
@@ -1800,7 +1799,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::vector<ValuePtr> out(arr.begin() + n, arr.end());
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("drop", 93);
+    setGlobalFn("drop", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromArray({});
@@ -1815,23 +1814,23 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("split_lines", 94);
+    setGlobalFn("split_lines", i - 1);
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromInt(0);
         double x = toDouble(args[0]);
         return Value::fromInt(x > 0 ? 1 : (x < 0 ? -1 : 0));
     });
-    setGlobalFn("sign", 95);
+    setGlobalFn("sign", i - 1);
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromFloat(0);
         return Value::fromFloat(toDouble(args[0]) * M_PI / 180.0);
     });
-    setGlobalFn("deg_to_rad", 96);
+    setGlobalFn("deg_to_rad", i - 1);
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromFloat(0);
         return Value::fromFloat(toDouble(args[0]) * 180.0 / M_PI);
     });
-    setGlobalFn("rad_to_deg", 97);
+    setGlobalFn("rad_to_deg", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::nil();
@@ -1839,20 +1838,20 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromInt(std::stoll(std::get<std::string>(args[0]->data)));
         } catch (...) { return Value::nil(); }
     });
-    setGlobalFn("parse_int", 98);
+    setGlobalFn("parse_int", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::nil();
         try {
             return Value::fromFloat(std::stod(std::get<std::string>(args[0]->data)));
         } catch (...) { return Value::nil(); }
     });
-    setGlobalFn("parse_float", 99);
+    setGlobalFn("parse_float", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         ValuePtr a = args[0], b = args[1];
         return (a && a->isTruthy()) ? (a ? *a : Value::nil()) : (b ? *b : Value::nil());
     });
-    setGlobalFn("default", 100);
+    setGlobalFn("default", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::unordered_map<std::string, ValuePtr> out;
         for (const auto& arg : args) {
@@ -1862,7 +1861,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromMap(std::move(out));
     });
-    setGlobalFn("merge", 101);
+    setGlobalFn("merge", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::cout << "[DEBUG] ";
@@ -1870,7 +1869,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::cout << std::endl;
         return Value::nil();
     });
-    setGlobalFn("log_debug", 102);
+    setGlobalFn("log_debug", i - 1);
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
         std::string out;
         if (!vm) return Value::fromString("");
@@ -1890,7 +1889,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString(out);
     });
-    setGlobalFn("stack_trace", 103);
+    setGlobalFn("stack_trace", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || !args[1] || args[1]->type != Value::Type::STRING) return Value::nil();
         std::string want = std::get<std::string>(args[1]->data);
@@ -1910,7 +1909,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (actual != want) throw VMError("assertType failed: expected " + want + ", got " + actual, 0, 0, 2);
         return args[0] ? *args[0] : Value::nil();
     });
-    setGlobalFn("assertType", 104);
+    setGlobalFn("assertType", i - 1);
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || args[0]->type != Value::Type::FUNCTION) return Value::nil();
         int64_t n = 1;
@@ -1921,7 +1920,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (int64_t k = 0; k < n; ++k) vm->callValue(args[0], {});
         return vm ? Value::fromInt(static_cast<int64_t>(vm->getCycleCount())) : Value::fromInt(0);
     });
-    setGlobalFn("profile_fn", 105);
+    setGlobalFn("profile_fn", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || !args[1] || args[0]->type != Value::Type::ARRAY || args[1]->type != Value::Type::ARRAY) return Value::fromArray({});
         auto& a = std::get<std::vector<ValuePtr>>(args[0]->data);
@@ -1933,7 +1932,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("cartesian", 106);
+    setGlobalFn("cartesian", i - 1);
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::fromArray({});
         auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
@@ -1946,7 +1945,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("window", 107);
+    setGlobalFn("window", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::nil();
@@ -1956,19 +1955,19 @@ inline void registerAllBuiltins(VM& vm) {
         arr.insert(arr.begin(), args[1] ? args[1] : std::make_shared<Value>(Value::nil()));
         return Value(*args[0]);
     });
-    setGlobalFn("push_front", 108);
+    setGlobalFn("push_front", i - 1);
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         double x = args.size() >= 1 ? toDouble(args[0]) : 0, y = args.size() >= 2 ? toDouble(args[1]) : 0;
         std::vector<ValuePtr> v = { std::make_shared<Value>(Value::fromFloat(x)), std::make_shared<Value>(Value::fromFloat(y)) };
         return Value::fromArray(std::move(v));
     });
-    setGlobalFn("vec2", 109);
+    setGlobalFn("vec2", i - 1);
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         double x = args.size() >= 1 ? toDouble(args[0]) : 0, y = args.size() >= 2 ? toDouble(args[1]) : 0, z = args.size() >= 3 ? toDouble(args[2]) : 0;
         std::vector<ValuePtr> v = { std::make_shared<Value>(Value::fromFloat(x)), std::make_shared<Value>(Value::fromFloat(y)), std::make_shared<Value>(Value::fromFloat(z)) };
         return Value::fromArray(std::move(v));
     });
-    setGlobalFn("vec3", 110);
+    setGlobalFn("vec3", i - 1);
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         double x = static_cast<double>(std::rand()) / RAND_MAX, y = static_cast<double>(std::rand()) / RAND_MAX;
         if (args.size() >= 2) {
@@ -1979,7 +1978,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::vector<ValuePtr> v = { std::make_shared<Value>(Value::fromFloat(x)), std::make_shared<Value>(Value::fromFloat(y)) };
         return Value::fromArray(std::move(v));
     });
-    setGlobalFn("rand_vec2", 111);
+    setGlobalFn("rand_vec2", i - 1);
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         double x = static_cast<double>(std::rand()) / RAND_MAX, y = static_cast<double>(std::rand()) / RAND_MAX, z = static_cast<double>(std::rand()) / RAND_MAX;
         if (args.size() >= 2) {
@@ -1990,7 +1989,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::vector<ValuePtr> v = { std::make_shared<Value>(Value::fromFloat(x)), std::make_shared<Value>(Value::fromFloat(y)), std::make_shared<Value>(Value::fromFloat(z)) };
         return Value::fromArray(std::move(v));
     });
-    setGlobalFn("rand_vec3", 112);
+    setGlobalFn("rand_vec3", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || !args[1] || args[0]->type != Value::Type::STRING || args[1]->type != Value::Type::STRING)
             return Value::fromBool(false);
@@ -1999,7 +1998,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromBool(std::regex_search(std::get<std::string>(args[0]->data), re));
         } catch (...) { return Value::fromBool(false); }
     });
-    setGlobalFn("regex_match", 113);
+    setGlobalFn("regex_match", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 3 || !args[0] || !args[1] || !args[2] || args[0]->type != Value::Type::STRING || args[1]->type != Value::Type::STRING ||
             args[2]->type != Value::Type::STRING)
@@ -2011,7 +2010,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromString(std::regex_replace(s, re, repl));
         } catch (...) { return Value::nil(); }
     });
-    setGlobalFn("regex_replace", 114);
+    setGlobalFn("regex_replace", i - 1);
 
     // direct memory access (low-level / OS building) ---
     auto toPtr = [](ValuePtr v) -> void* {
@@ -2030,7 +2029,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::memcpy(dest, src, n);
         return Value::nil();
     });
-    setGlobalFn("mem_copy", 115);
+    setGlobalFn("mem_copy", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM* vm, std::vector<ValuePtr> args) {
         if (vm && !vm->getRuntimeGuards().allowUnsafe && !vm->isInUnsafeContext())
             throw VMError("mem_set requires unsafe context", 0, 0, 5);
@@ -2043,7 +2042,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::memset(p, static_cast<int>(byteVal), n);
         return Value::nil();
     });
-    setGlobalFn("mem_set", 116);
+    setGlobalFn("mem_set", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM* vm, std::vector<ValuePtr> args) {
         if (vm && !vm->getRuntimeGuards().allowUnsafe && !vm->isInUnsafeContext())
             throw VMError("poke8 requires unsafe context", 0, 0, 5);
@@ -2052,47 +2051,47 @@ inline void registerAllBuiltins(VM& vm) {
         int64_t delta = toInt(args[1]);
         return Value::fromPtr(static_cast<char*>(p) + delta);
     });
-    setGlobalFn("ptr_offset", 117);
+    setGlobalFn("ptr_offset", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]);
         return Value::fromInt(reinterpret_cast<intptr_t>(p));
     });
-    setGlobalFn("ptr_address", 118);
+    setGlobalFn("ptr_address", i - 1);
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         int64_t addr = toInt(args[0]);
         return Value::fromPtr(reinterpret_cast<void*>(static_cast<intptr_t>(addr)));
     });
-    setGlobalFn("ptr_from_address", 119);
+    setGlobalFn("ptr_from_address", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
         uint8_t v; std::memcpy(&v, p, 1);
         return Value::fromInt(static_cast<int64_t>(v));
     });
-    setGlobalFn("peek8", 120);
+    setGlobalFn("peek8", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
         uint16_t v; std::memcpy(&v, p, 2);
         return Value::fromInt(static_cast<int64_t>(v));
     });
-    setGlobalFn("peek16", 121);
+    setGlobalFn("peek16", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
         uint32_t v; std::memcpy(&v, p, 4);
         return Value::fromInt(static_cast<int64_t>(v));
     });
-    setGlobalFn("peek32", 122);
+    setGlobalFn("peek32", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
         uint64_t v; std::memcpy(&v, p, 8);
         return Value::fromInt(static_cast<int64_t>(v));
     });
-    setGlobalFn("peek64", 123);
+    setGlobalFn("peek64", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM* vm, std::vector<ValuePtr> args) {
         if (vm && !vm->getRuntimeGuards().allowUnsafe && !vm->isInUnsafeContext())
             throw VMError("poke16 requires unsafe context", 0, 0, 5);
@@ -2102,7 +2101,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::memcpy(p, &v, 1);
         return Value::nil();
     });
-    setGlobalFn("poke8", 124);
+    setGlobalFn("poke8", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM* vm, std::vector<ValuePtr> args) {
         if (vm && !vm->getRuntimeGuards().allowUnsafe && !vm->isInUnsafeContext())
             throw VMError("poke32 requires unsafe context", 0, 0, 5);
@@ -2112,7 +2111,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::memcpy(p, &v, 2);
         return Value::nil();
     });
-    setGlobalFn("poke16", 125);
+    setGlobalFn("poke16", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM* vm, std::vector<ValuePtr> args) {
         if (vm && !vm->getRuntimeGuards().allowUnsafe && !vm->isInUnsafeContext())
             throw VMError("poke64 requires unsafe context", 0, 0, 5);
@@ -2122,7 +2121,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::memcpy(p, &v, 4);
         return Value::nil();
     });
-    setGlobalFn("poke32", 126);
+    setGlobalFn("poke32", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2130,7 +2129,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::memcpy(p, &v, 8);
         return Value::nil();
     });
-    setGlobalFn("poke64", 127);
+    setGlobalFn("poke64", i - 1);
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         int64_t value = toInt(args[0]);
@@ -2140,7 +2139,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (r == 0) return Value::fromInt(value);
         return Value::fromInt(value + (value >= 0 ? (align - r) : (-r)));
     });
-    setGlobalFn("align_up", 128);
+    setGlobalFn("align_up", i - 1);
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         int64_t value = toInt(args[0]);
@@ -2150,13 +2149,13 @@ inline void registerAllBuiltins(VM& vm) {
         if (r == 0) return Value::fromInt(value);
         return Value::fromInt(value - (value >= 0 ? r : (r + align)));
     });
-    setGlobalFn("align_down", 129);
+    setGlobalFn("align_down", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         (void)args;
         builtinAtomicFence();
         return Value::nil();
     });
-    setGlobalFn("memory_barrier", 130);
+    setGlobalFn("memory_barrier", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2166,7 +2165,7 @@ inline void registerAllBuiltins(VM& vm) {
         builtinAtomicFence();
         return Value::fromInt(static_cast<int64_t>(v));
     });
-    setGlobalFn("volatile_load8", 131);
+    setGlobalFn("volatile_load8", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2176,7 +2175,7 @@ inline void registerAllBuiltins(VM& vm) {
         builtinAtomicFence();
         return Value::nil();
     });
-    setGlobalFn("volatile_store8", 132);
+    setGlobalFn("volatile_store8", i - 1);
 
     // more low-level memory access ---
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
@@ -2189,7 +2188,7 @@ inline void registerAllBuiltins(VM& vm) {
         int r = std::memcmp(a, b, n);
         return Value::fromInt(r < 0 ? -1 : (r > 0 ? 1 : 0));
     });
-    setGlobalFn("mem_cmp", 133);
+    setGlobalFn("mem_cmp", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 3) return Value::nil();
         void* dest = toPtr(args[0]); void* src = toPtr(args[1]);
@@ -2200,7 +2199,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::memmove(dest, src, n);
         return Value::nil();
     });
-    setGlobalFn("mem_move", 134);
+    setGlobalFn("mem_move", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]);
@@ -2212,7 +2211,7 @@ inline void registerAllBuiltins(VM& vm) {
         void* q = std::realloc(p, n);
         return Value::fromPtr(q);
     });
-    setGlobalFn("realloc", 135);
+    setGlobalFn("realloc", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2223,7 +2222,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (r == 0) return args[0] ? *args[0] : Value::nil();
         return Value::fromPtr(reinterpret_cast<void*>(addr + (static_cast<uintptr_t>(align) - r)));
     });
-    setGlobalFn("ptr_align_up", 136);
+    setGlobalFn("ptr_align_up", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2234,14 +2233,14 @@ inline void registerAllBuiltins(VM& vm) {
         if (r == 0) return args[0] ? *args[0] : Value::nil();
         return Value::fromPtr(reinterpret_cast<void*>(addr - r));
     });
-    setGlobalFn("ptr_align_down", 137);
+    setGlobalFn("ptr_align_down", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
         float v; std::memcpy(&v, p, 4);
         return Value::fromFloat(static_cast<double>(v));
     });
-    setGlobalFn("peek_float", 138);
+    setGlobalFn("peek_float", i - 1);
     makeBuiltin(i++, [toPtr, toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2249,14 +2248,14 @@ inline void registerAllBuiltins(VM& vm) {
         std::memcpy(p, &v, 4);
         return Value::nil();
     });
-    setGlobalFn("poke_float", 139);
+    setGlobalFn("poke_float", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
         double v; std::memcpy(&v, p, 8);
         return Value::fromFloat(v);
     });
-    setGlobalFn("peek_double", 140);
+    setGlobalFn("peek_double", i - 1);
     makeBuiltin(i++, [toPtr, toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2264,7 +2263,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::memcpy(p, &v, 8);
         return Value::nil();
     });
-    setGlobalFn("poke_double", 141);
+    setGlobalFn("poke_double", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2274,7 +2273,7 @@ inline void registerAllBuiltins(VM& vm) {
         builtinAtomicFence();
         return Value::fromInt(static_cast<int64_t>(v));
     });
-    setGlobalFn("volatile_load16", 142);
+    setGlobalFn("volatile_load16", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2284,7 +2283,7 @@ inline void registerAllBuiltins(VM& vm) {
         builtinAtomicFence();
         return Value::nil();
     });
-    setGlobalFn("volatile_store16", 143);
+    setGlobalFn("volatile_store16", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2294,7 +2293,7 @@ inline void registerAllBuiltins(VM& vm) {
         builtinAtomicFence();
         return Value::fromInt(static_cast<int64_t>(v));
     });
-    setGlobalFn("volatile_load32", 144);
+    setGlobalFn("volatile_load32", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2304,7 +2303,7 @@ inline void registerAllBuiltins(VM& vm) {
         builtinAtomicFence();
         return Value::nil();
     });
-    setGlobalFn("volatile_store32", 145);
+    setGlobalFn("volatile_store32", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2314,7 +2313,7 @@ inline void registerAllBuiltins(VM& vm) {
         builtinAtomicFence();
         return Value::fromInt(static_cast<int64_t>(v));
     });
-    setGlobalFn("volatile_load64", 146);
+    setGlobalFn("volatile_load64", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2324,7 +2323,7 @@ inline void registerAllBuiltins(VM& vm) {
         builtinAtomicFence();
         return Value::nil();
     });
-    setGlobalFn("volatile_store64", 147);
+    setGlobalFn("volatile_store64", i - 1);
     // signed reads (C++-style; sign-extended)
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
@@ -2332,28 +2331,28 @@ inline void registerAllBuiltins(VM& vm) {
         int8_t v; std::memcpy(&v, p, 1);
         return Value::fromInt(static_cast<int64_t>(v));
     });
-    setGlobalFn("peek8s", 148);
+    setGlobalFn("peek8s", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
         int16_t v; std::memcpy(&v, p, 2);
         return Value::fromInt(static_cast<int64_t>(v));
     });
-    setGlobalFn("peek16s", 149);
+    setGlobalFn("peek16s", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
         int32_t v; std::memcpy(&v, p, 4);
         return Value::fromInt(static_cast<int64_t>(v));
     });
-    setGlobalFn("peek32s", 150);
+    setGlobalFn("peek32s", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
         int64_t v; std::memcpy(&v, p, 8);
         return Value::fromInt(v);
     });
-    setGlobalFn("peek64s", 151);
+    setGlobalFn("peek64s", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 3) return Value::nil();
         void* dest = toPtr(args[0]); void* src = toPtr(args[1]);
@@ -2368,7 +2367,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::memcpy(src, tmp.data(), nu);
         return Value::nil();
     });
-    setGlobalFn("mem_swap", 152);
+    setGlobalFn("mem_swap", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2383,7 +2382,7 @@ inline void registerAllBuiltins(VM& vm) {
             arr.push_back(std::make_shared<Value>(Value::fromInt(static_cast<int64_t>(bytes[i]))));
         return Value::fromArray(std::move(arr));
     });
-    setGlobalFn("bytes_read", 153);
+    setGlobalFn("bytes_read", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[1]) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2396,17 +2395,17 @@ inline void registerAllBuiltins(VM& vm) {
             dst[i] = static_cast<unsigned char>(toInt(arr[i]) & 0xFF);
         return Value::nil();
     });
-    setGlobalFn("bytes_write", 154);
+    setGlobalFn("bytes_write", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromBool(true);
         return Value::fromBool(toPtr(args[0]) == nullptr);
     });
-    setGlobalFn("ptr_is_null", 155);
+    setGlobalFn("ptr_is_null", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         (void)args;
         return Value::fromInt(static_cast<int64_t>(sizeof(void*)));
     });
-    setGlobalFn("size_of_ptr", 156);
+    setGlobalFn("size_of_ptr", i - 1);
 
     // ptr_add, ptr_sub, is_aligned, mem_set_zero, ptr_tag/untag/get_tag ---
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
@@ -2415,14 +2414,14 @@ inline void registerAllBuiltins(VM& vm) {
         int64_t n = toInt(args[1]);
         return Value::fromPtr(static_cast<char*>(p) + n);
     });
-    setGlobalFn("ptr_add", 157);
+    setGlobalFn("ptr_add", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
         int64_t n = toInt(args[1]);
         return Value::fromPtr(static_cast<char*>(p) - n);
     });
-    setGlobalFn("ptr_sub", 158);
+    setGlobalFn("ptr_sub", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::fromBool(false);
@@ -2430,7 +2429,7 @@ inline void registerAllBuiltins(VM& vm) {
         uintptr_t addr = reinterpret_cast<uintptr_t>(p);
         return Value::fromBool((addr % static_cast<uintptr_t>(boundary)) == 0);
     });
-    setGlobalFn("is_aligned", 159);
+    setGlobalFn("is_aligned", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 3) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2441,7 +2440,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::memset(p, 0, nu);
         return Value::nil();
     });
-    setGlobalFn("mem_set_zero", 160);
+    setGlobalFn("mem_set_zero", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2450,21 +2449,21 @@ inline void registerAllBuiltins(VM& vm) {
         addr = (addr & ~uintptr_t(7)) | static_cast<uintptr_t>(tag);
         return Value::fromPtr(reinterpret_cast<void*>(addr));
     });
-    setGlobalFn("ptr_tag", 161);
+    setGlobalFn("ptr_tag", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
         uintptr_t addr = reinterpret_cast<uintptr_t>(p) & ~uintptr_t(7);
         return Value::fromPtr(reinterpret_cast<void*>(addr));
     });
-    setGlobalFn("ptr_untag", 162);
+    setGlobalFn("ptr_untag", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::fromInt(0);
         uintptr_t addr = reinterpret_cast<uintptr_t>(p);
         return Value::fromInt(static_cast<int64_t>(addr & 7));
     });
-    setGlobalFn("ptr_get_tag", 163);
+    setGlobalFn("ptr_get_tag", i - 1);
 
     // struct_define, offsetof_struct, sizeof_struct ---
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
@@ -2505,7 +2504,7 @@ inline void registerAllBuiltins(VM& vm) {
         g_structLayouts[name] = std::move(meta);
         return Value::fromInt(1);
     });
-    setGlobalFn("struct_define", 164);
+    setGlobalFn("struct_define", i - 1);
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || !args[1]) return Value::nil();
         std::string name = args[0]->type == Value::Type::STRING ? std::get<std::string>(args[0]->data) : "";
@@ -2517,7 +2516,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::nil();
     });
-    setGlobalFn("offsetof_struct", 165);
+    setGlobalFn("offsetof_struct", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         std::string name = args[0]->type == Value::Type::STRING ? std::get<std::string>(args[0]->data) : "";
@@ -2525,7 +2524,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (it == g_structLayouts.end()) return Value::nil();
         return Value::fromInt(static_cast<int64_t>(it->second.size));
     });
-    setGlobalFn("sizeof_struct", 166);
+    setGlobalFn("sizeof_struct", i - 1);
 
     // pool_create, pool_alloc, pool_free, pool_destroy ---
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
@@ -2544,7 +2543,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (size_t i = 0; i < count; ++i) ps.freeList.push_back(base + i * blockSize);
         return Value::fromInt(id);
     });
-    setGlobalFn("pool_create", 167);
+    setGlobalFn("pool_create", i - 1);
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         int64_t id = toInt(args[0]);
@@ -2554,7 +2553,7 @@ inline void registerAllBuiltins(VM& vm) {
         it->second.freeList.pop_back();
         return Value::fromPtr(p);
     });
-    setGlobalFn("pool_alloc", 168);
+    setGlobalFn("pool_alloc", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2564,7 +2563,7 @@ inline void registerAllBuiltins(VM& vm) {
         it->second.freeList.push_back(p);
         return Value::nil();
     });
-    setGlobalFn("pool_free", 169);
+    setGlobalFn("pool_free", i - 1);
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         auto it = g_pools.find(toInt(args[0]));
@@ -2573,7 +2572,7 @@ inline void registerAllBuiltins(VM& vm) {
         g_pools.erase(it);
         return Value::nil();
     });
-    setGlobalFn("pool_destroy", 170);
+    setGlobalFn("pool_destroy", i - 1);
 
     // read_be16/32/64, write_be16/32/64 ---
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
@@ -2583,7 +2582,7 @@ inline void registerAllBuiltins(VM& vm) {
         uint16_t v = (static_cast<uint16_t>(b[0]) << 8) | b[1];
         return Value::fromInt(static_cast<int64_t>(v));
     });
-    setGlobalFn("read_be16", 171);
+    setGlobalFn("read_be16", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2592,7 +2591,7 @@ inline void registerAllBuiltins(VM& vm) {
             (static_cast<uint32_t>(b[2]) << 8) | b[3];
         return Value::fromInt(static_cast<int64_t>(v));
     });
-    setGlobalFn("read_be32", 172);
+    setGlobalFn("read_be32", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2603,7 +2602,7 @@ inline void registerAllBuiltins(VM& vm) {
             (static_cast<uint64_t>(b[6]) << 8) | b[7];
         return Value::fromInt(static_cast<int64_t>(v));
     });
-    setGlobalFn("read_be64", 173);
+    setGlobalFn("read_be64", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2612,7 +2611,7 @@ inline void registerAllBuiltins(VM& vm) {
         b[0] = static_cast<unsigned char>(v >> 8); b[1] = static_cast<unsigned char>(v);
         return Value::nil();
     });
-    setGlobalFn("write_be16", 174);
+    setGlobalFn("write_be16", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2621,7 +2620,7 @@ inline void registerAllBuiltins(VM& vm) {
         b[0] = (v >> 24) & 0xFF; b[1] = (v >> 16) & 0xFF; b[2] = (v >> 8) & 0xFF; b[3] = v & 0xFF;
         return Value::nil();
     });
-    setGlobalFn("write_be32", 175);
+    setGlobalFn("write_be32", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2630,7 +2629,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (int i = 7; i >= 0; --i) { b[i] = v & 0xFF; v >>= 8; }
         return Value::nil();
     });
-    setGlobalFn("write_be64", 176);
+    setGlobalFn("write_be64", i - 1);
 
     // dump_memory, alloc_tracked, free_tracked, get_tracked_allocations ---
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
@@ -2648,7 +2647,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString(out.str());
     });
-    setGlobalFn("dump_memory", 177);
+    setGlobalFn("dump_memory", i - 1);
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         int64_t req = toInt(args[0]);
@@ -2660,14 +2659,14 @@ inline void registerAllBuiltins(VM& vm) {
         g_trackedAllocs.insert(p);
         return Value::fromPtr(p);
     });
-    setGlobalFn("alloc_tracked", 178);
+    setGlobalFn("alloc_tracked", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]);
         if (p) { g_trackedAllocs.erase(p); std::free(p); }
         return Value::nil();
     });
-    setGlobalFn("free_tracked", 179);
+    setGlobalFn("free_tracked", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         (void)args;
         std::vector<ValuePtr> arr;
@@ -2675,7 +2674,7 @@ inline void registerAllBuiltins(VM& vm) {
             arr.push_back(std::make_shared<Value>(Value::fromInt(reinterpret_cast<intptr_t>(p))));
         return Value::fromArray(std::move(arr));
     });
-    setGlobalFn("get_tracked_allocations", 180);
+    setGlobalFn("get_tracked_allocations", i - 1);
 
     // atomic_load32, atomic_store32, atomic_add32, atomic_cmpxchg32 ---
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
@@ -2683,21 +2682,21 @@ inline void registerAllBuiltins(VM& vm) {
         void* p = toPtr(args[0]); if (!p) return Value::nil();
         return Value::fromInt(static_cast<int64_t>(std::atomic_load(reinterpret_cast<std::atomic<int32_t>*>(p))));
     });
-    setGlobalFn("atomic_load32", 181);
+    setGlobalFn("atomic_load32", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
         std::atomic_store(reinterpret_cast<std::atomic<int32_t>*>(p), static_cast<int32_t>(toInt(args[1])));
         return Value::nil();
     });
-    setGlobalFn("atomic_store32", 182);
+    setGlobalFn("atomic_store32", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
         int32_t delta = static_cast<int32_t>(toInt(args[1]));
         return Value::fromInt(static_cast<int64_t>(std::atomic_fetch_add(reinterpret_cast<std::atomic<int32_t>*>(p), delta)));
     });
-    setGlobalFn("atomic_add32", 183);
+    setGlobalFn("atomic_add32", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 3) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2706,7 +2705,7 @@ inline void registerAllBuiltins(VM& vm) {
         bool ok = std::atomic_compare_exchange_strong(reinterpret_cast<std::atomic<int32_t>*>(p), &expected, desired);
         return Value::fromBool(ok);
     });
-    setGlobalFn("atomic_cmpxchg32", 184);
+    setGlobalFn("atomic_cmpxchg32", i - 1);
 
     // map_file, unmap_file ---
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -2739,7 +2738,7 @@ inline void registerAllBuiltins(VM& vm) {
         return Value::fromPtr(view);
 #endif
     });
-    setGlobalFn("map_file", 185);
+    setGlobalFn("map_file", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]);
@@ -2755,7 +2754,7 @@ inline void registerAllBuiltins(VM& vm) {
         g_mappedFiles.erase(it);
         return Value::fromInt(1);
     });
-    setGlobalFn("unmap_file", 186);
+    setGlobalFn("unmap_file", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 3) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::fromInt(0);
@@ -2771,7 +2770,7 @@ inline void registerAllBuiltins(VM& vm) {
         return Value::fromInt(mprotect(reinterpret_cast<void*>(pageStart), pageLen, prot) == 0 ? 1 : 0);
 #endif
     });
-    setGlobalFn("memory_protect", 187);
+    setGlobalFn("memory_protect", i - 1);
 
     // error_name(e), error_cause(e), is_error_type(e, typeName) — Python/C++ style inspection
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -2784,7 +2783,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString("Error");
     });
-    setGlobalFn("error_name", 188);
+    setGlobalFn("error_name", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::MAP) return Value::nil();
         auto& m = std::get<std::unordered_map<std::string, ValuePtr>>(args[0]->data);
@@ -2792,7 +2791,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (it != m.end()) return it->second ? *it->second : Value::nil();
         return Value::nil();
     });
-    setGlobalFn("error_cause", 189);
+    setGlobalFn("error_cause", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string msg = args.empty() || !args[0] ? "" : args[0]->toString();
         std::unordered_map<std::string, ValuePtr> m;
@@ -2801,7 +2800,7 @@ inline void registerAllBuiltins(VM& vm) {
         m["code"] = std::make_shared<Value>(Value::nil());
         return Value::fromMap(std::move(m));
     });
-    setGlobalFn("ValueError", 190);
+    setGlobalFn("ValueError", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string msg = args.empty() || !args[0] ? "" : args[0]->toString();
         std::unordered_map<std::string, ValuePtr> m;
@@ -2810,7 +2809,7 @@ inline void registerAllBuiltins(VM& vm) {
         m["code"] = std::make_shared<Value>(Value::nil());
         return Value::fromMap(std::move(m));
     });
-    setGlobalFn("TypeError", 191);
+    setGlobalFn("TypeError", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string msg = args.empty() || !args[0] ? "" : args[0]->toString();
         std::unordered_map<std::string, ValuePtr> m;
@@ -2819,7 +2818,7 @@ inline void registerAllBuiltins(VM& vm) {
         m["code"] = std::make_shared<Value>(Value::nil());
         return Value::fromMap(std::move(m));
     });
-    setGlobalFn("RuntimeError", 192);
+    setGlobalFn("RuntimeError", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string msg = args.empty() || !args[0] ? "" : args[0]->toString();
         std::unordered_map<std::string, ValuePtr> m;
@@ -2828,7 +2827,7 @@ inline void registerAllBuiltins(VM& vm) {
         m["code"] = std::make_shared<Value>(Value::nil());
         return Value::fromMap(std::move(m));
     });
-    setGlobalFn("OSError", 193);
+    setGlobalFn("OSError", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string msg = args.empty() || !args[0] ? "" : args[0]->toString();
         std::unordered_map<std::string, ValuePtr> m;
@@ -2837,7 +2836,7 @@ inline void registerAllBuiltins(VM& vm) {
         m["code"] = std::make_shared<Value>(Value::nil());
         return Value::fromMap(std::move(m));
     });
-    setGlobalFn("KeyError", 194);
+    setGlobalFn("KeyError", i - 1);
     makeBuiltin(i++, [](VM* /* vm*/, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || !args[1]) return Value::fromBool(false);
         std::string want = args[1]->toString();
@@ -2848,7 +2847,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromBool(want == "Error");
         return Value::fromBool(std::get<std::string>(it->second->data) == want);
     });
-    setGlobalFn("is_error_type", 195);
+    setGlobalFn("is_error_type", i - 1);
 
     // read_le16/32/64, write_le16/32/64 (explicit little-endian) ---
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
@@ -2858,7 +2857,7 @@ inline void registerAllBuiltins(VM& vm) {
         uint16_t v = b[0] | (static_cast<uint16_t>(b[1]) << 8);
         return Value::fromInt(static_cast<int64_t>(v));
     });
-    setGlobalFn("read_le16", 196);
+    setGlobalFn("read_le16", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2866,7 +2865,7 @@ inline void registerAllBuiltins(VM& vm) {
         uint32_t v = b[0] | (static_cast<uint32_t>(b[1]) << 8) | (static_cast<uint32_t>(b[2]) << 16) | (static_cast<uint32_t>(b[3]) << 24);
         return Value::fromInt(static_cast<int64_t>(v));
     });
-    setGlobalFn("read_le32", 197);
+    setGlobalFn("read_le32", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2875,7 +2874,7 @@ inline void registerAllBuiltins(VM& vm) {
             | (static_cast<uint64_t>(b[4]) << 32) | (static_cast<uint64_t>(b[5]) << 40) | (static_cast<uint64_t>(b[6]) << 48) | (static_cast<uint64_t>(b[7]) << 56);
         return Value::fromInt(static_cast<int64_t>(v));
     });
-    setGlobalFn("read_le64", 198);
+    setGlobalFn("read_le64", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2884,7 +2883,7 @@ inline void registerAllBuiltins(VM& vm) {
         b[0] = v & 0xFF; b[1] = (v >> 8) & 0xFF;
         return Value::nil();
     });
-    setGlobalFn("write_le16", 199);
+    setGlobalFn("write_le16", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2893,7 +2892,7 @@ inline void registerAllBuiltins(VM& vm) {
         b[0] = v & 0xFF; b[1] = (v >> 8) & 0xFF; b[2] = (v >> 16) & 0xFF; b[3] = (v >> 24) & 0xFF;
         return Value::nil();
     });
-    setGlobalFn("write_le32", 200);
+    setGlobalFn("write_le32", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -2902,7 +2901,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (int j = 0; j < 8; ++j) { b[j] = val & 0xFF; val >>= 8; }
         return Value::nil();
     });
-    setGlobalFn("write_le64", 201);
+    setGlobalFn("write_le64", i - 1);
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::nil();
         int64_t req = toInt(args[0]);
@@ -2914,7 +2913,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::memset(p, 0, n);
         return Value::fromPtr(p);
     });
-    setGlobalFn("alloc_zeroed", 202);
+    setGlobalFn("alloc_zeroed", i - 1);
 
     // path utilities ---
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -2923,14 +2922,14 @@ inline void registerAllBuiltins(VM& vm) {
         std::filesystem::path path(p);
         return Value::fromString(path.filename().string());
     });
-    setGlobalFn("basename", 203);
+    setGlobalFn("basename", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromString("");
         std::string p = std::get<std::string>(args[0]->data);
         std::filesystem::path path(p);
         return Value::fromString(path.parent_path().string());
     });
-    setGlobalFn("dirname", 204);
+    setGlobalFn("dirname", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromString("");
         std::filesystem::path result;
@@ -2940,7 +2939,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString(result.string());
     });
-    setGlobalFn("path_join", 205);
+    setGlobalFn("path_join", i - 1);
 
     // ptr_eq, alloc_aligned, string_to_bytes, bytes_to_string ---
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
@@ -2949,7 +2948,7 @@ inline void registerAllBuiltins(VM& vm) {
         void* b = toPtr(args[1]);
         return Value::fromBool(a == b);
     });
-    setGlobalFn("ptr_eq", 206);
+    setGlobalFn("ptr_eq", i - 1);
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         int64_t req = toInt(args[0]);
@@ -2968,7 +2967,7 @@ inline void registerAllBuiltins(VM& vm) {
         g_alignedAllocBases[alignedPtr] = p;
         return Value::fromPtr(alignedPtr);
     });
-    setGlobalFn("alloc_aligned", 207);
+    setGlobalFn("alloc_aligned", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromArray({});
         const std::string& s = std::get<std::string>(args[0]->data);
@@ -2976,7 +2975,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (unsigned char c : s) out.push_back(std::make_shared<Value>(Value::fromInt(static_cast<int64_t>(c))));
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("string_to_bytes", 208);
+    setGlobalFn("string_to_bytes", i - 1);
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::fromString("");
         const auto& arr = std::get<std::vector<ValuePtr>>(args[0]->data);
@@ -2985,13 +2984,13 @@ inline void registerAllBuiltins(VM& vm) {
         for (const auto& v : arr) out += static_cast<char>(static_cast<unsigned char>(toInt(v) & 0xFF));
         return Value::fromString(std::move(out));
     });
-    setGlobalFn("bytes_to_string", 209);
+    setGlobalFn("bytes_to_string", i - 1);
 
     // memory_page_size, mem_find, mem_fill_pattern ---
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr>) {
         return Value::fromInt(4096);
     });
-    setGlobalFn("memory_page_size", 210);
+    setGlobalFn("memory_page_size", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 3) return Value::fromInt(-1);
         void* p = toPtr(args[0]); if (!p) return Value::fromInt(-1);
@@ -3001,7 +3000,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (int64_t i = 0; i < n; ++i) if (base[i] == needle) return Value::fromInt(i);
         return Value::fromInt(-1);
     });
-    setGlobalFn("mem_find", 211);
+    setGlobalFn("mem_find", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 3) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -3016,7 +3015,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::nil();
     });
-    setGlobalFn("mem_fill_pattern", 212);
+    setGlobalFn("mem_fill_pattern", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::fromInt(0);
         void* a = toPtr(args[0]);
@@ -3026,7 +3025,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (!b) return Value::fromInt(1);
         return Value::fromInt(reinterpret_cast<uintptr_t>(a) < reinterpret_cast<uintptr_t>(b) ? -1 : 1);
     });
-    setGlobalFn("ptr_compare", 213);
+    setGlobalFn("ptr_compare", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -3035,7 +3034,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (int64_t i = 0, j = n - 1; i < j; ++i, --j) { unsigned char t = b[i]; b[i] = b[j]; b[j] = t; }
         return Value::nil();
     });
-    setGlobalFn("mem_reverse", 214);
+    setGlobalFn("mem_reverse", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 3) return Value::fromInt(-1);
         void* haystack = toPtr(args[0]); if (!haystack) return Value::fromInt(-1);
@@ -3054,7 +3053,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromInt(-1);
     });
-    setGlobalFn("mem_scan", 215);
+    setGlobalFn("mem_scan", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 4) return Value::fromBool(false);
         void* a = toPtr(args[0]); void* b = toPtr(args[1]);
@@ -3066,7 +3065,7 @@ inline void registerAllBuiltins(VM& vm) {
         uintptr_t end_b = ub + static_cast<uintptr_t>(nb);
         return Value::fromBool(ua < end_b && ub < end_a);
     });
-    setGlobalFn("mem_overlaps", 216);
+    setGlobalFn("mem_overlaps", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr>) {
 #if (defined(_M_IX86) || defined(_M_X64) || defined(__i386__) || defined(__x86_64__) || defined(__aarch64__) || defined(_M_ARM64))
         return Value::fromString("little");
@@ -3074,7 +3073,7 @@ inline void registerAllBuiltins(VM& vm) {
         return Value::fromString("big");
 #endif
     });
-    setGlobalFn("get_endianness", 217);
+    setGlobalFn("get_endianness", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::fromBool(true);
         void* p = toPtr(args[0]); if (!p) return Value::fromBool(true);
@@ -3083,7 +3082,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (int64_t i = 0; i < n; ++i) if (b[i] != 0) return Value::fromBool(false);
         return Value::fromBool(true);
     });
-    setGlobalFn("mem_is_zero", 218);
+    setGlobalFn("mem_is_zero", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromFloat(0.0);
         void* p = toPtr(args[0]); if (!p) return Value::fromFloat(0.0);
@@ -3091,7 +3090,7 @@ inline void registerAllBuiltins(VM& vm) {
         uint32_t u = b[0] | (static_cast<uint32_t>(b[1]) << 8) | (static_cast<uint32_t>(b[2]) << 16) | (static_cast<uint32_t>(b[3]) << 24);
         float f; std::memcpy(&f, &u, 4); return Value::fromFloat(static_cast<double>(f));
     });
-    setGlobalFn("read_le_float", 219);
+    setGlobalFn("read_le_float", i - 1);
     makeBuiltin(i++, [toPtr, toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -3101,7 +3100,7 @@ inline void registerAllBuiltins(VM& vm) {
         b[0] = u & 0xFF; b[1] = (u >> 8) & 0xFF; b[2] = (u >> 16) & 0xFF; b[3] = (u >> 24) & 0xFF;
         return Value::nil();
     });
-    setGlobalFn("write_le_float", 220);
+    setGlobalFn("write_le_float", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromFloat(0.0);
         void* p = toPtr(args[0]); if (!p) return Value::fromFloat(0.0);
@@ -3110,7 +3109,7 @@ inline void registerAllBuiltins(VM& vm) {
             | (static_cast<uint64_t>(b[4]) << 32) | (static_cast<uint64_t>(b[5]) << 40) | (static_cast<uint64_t>(b[6]) << 48) | (static_cast<uint64_t>(b[7]) << 56);
         double d; std::memcpy(&d, &u, 8); return Value::fromFloat(d);
     });
-    setGlobalFn("read_le_double", 221);
+    setGlobalFn("read_le_double", i - 1);
     makeBuiltin(i++, [toPtr, toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -3120,7 +3119,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (int j = 0; j < 8; ++j) { b[j] = u & 0xFF; u >>= 8; }
         return Value::nil();
     });
-    setGlobalFn("write_le_double", 222);
+    setGlobalFn("write_le_double", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 3) return Value::fromInt(0);
         void* p = toPtr(args[0]); if (!p) return Value::fromInt(0);
@@ -3131,7 +3130,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (int64_t i = 0; i < n; ++i) if (b[i] == needle) ++count;
         return Value::fromInt(count);
     });
-    setGlobalFn("mem_count", 223);
+    setGlobalFn("mem_count", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* a = toPtr(args[0]); void* b = toPtr(args[1]);
@@ -3140,7 +3139,7 @@ inline void registerAllBuiltins(VM& vm) {
         void* chosen = reinterpret_cast<uintptr_t>(a) <= reinterpret_cast<uintptr_t>(b) ? a : b;
         return Value::fromPtr(chosen);
     });
-    setGlobalFn("ptr_min", 224);
+    setGlobalFn("ptr_min", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* a = toPtr(args[0]); void* b = toPtr(args[1]);
@@ -3149,7 +3148,7 @@ inline void registerAllBuiltins(VM& vm) {
         void* chosen = reinterpret_cast<uintptr_t>(a) >= reinterpret_cast<uintptr_t>(b) ? a : b;
         return Value::fromPtr(chosen);
     });
-    setGlobalFn("ptr_max", 225);
+    setGlobalFn("ptr_max", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::fromInt(0);
         void* a = toPtr(args[0]); void* b = toPtr(args[1]);
@@ -3159,7 +3158,7 @@ inline void registerAllBuiltins(VM& vm) {
         int64_t diff = static_cast<int64_t>(ua - ub);
         return Value::fromInt(diff);
     });
-    setGlobalFn("ptr_diff", 226);
+    setGlobalFn("ptr_diff", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromFloat(0.0);
         void* p = toPtr(args[0]); if (!p) return Value::fromFloat(0.0);
@@ -3167,7 +3166,7 @@ inline void registerAllBuiltins(VM& vm) {
         uint32_t u = (static_cast<uint32_t>(b[0]) << 24) | (static_cast<uint32_t>(b[1]) << 16) | (static_cast<uint32_t>(b[2]) << 8) | b[3];
         float f; std::memcpy(&f, &u, 4); return Value::fromFloat(static_cast<double>(f));
     });
-    setGlobalFn("read_be_float", 227);
+    setGlobalFn("read_be_float", i - 1);
     makeBuiltin(i++, [toPtr, toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -3177,7 +3176,7 @@ inline void registerAllBuiltins(VM& vm) {
         b[0] = (u >> 24) & 0xFF; b[1] = (u >> 16) & 0xFF; b[2] = (u >> 8) & 0xFF; b[3] = u & 0xFF;
         return Value::nil();
     });
-    setGlobalFn("write_be_float", 228);
+    setGlobalFn("write_be_float", i - 1);
     makeBuiltin(i++, [toPtr](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromFloat(0.0);
         void* p = toPtr(args[0]); if (!p) return Value::fromFloat(0.0);
@@ -3186,7 +3185,7 @@ inline void registerAllBuiltins(VM& vm) {
             | (static_cast<uint64_t>(b[4]) << 24) | (static_cast<uint64_t>(b[5]) << 16) | (static_cast<uint64_t>(b[6]) << 8) | b[7];
         double d; std::memcpy(&d, &u, 8); return Value::fromFloat(d);
     });
-    setGlobalFn("read_be_double", 229);
+    setGlobalFn("read_be_double", i - 1);
     makeBuiltin(i++, [toPtr, toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -3196,7 +3195,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (int j = 7; j >= 0; --j) { b[j] = u & 0xFF; u >>= 8; }
         return Value::nil();
     });
-    setGlobalFn("write_be_double", 230);
+    setGlobalFn("write_be_double", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 3) return Value::fromBool(false);
         void* ptr = toPtr(args[0]); void* base = toPtr(args[1]);
@@ -3206,7 +3205,7 @@ inline void registerAllBuiltins(VM& vm) {
         auto ub = reinterpret_cast<uintptr_t>(base);
         return Value::fromBool(up >= ub && up < ub + static_cast<uintptr_t>(size));
     });
-    setGlobalFn("ptr_in_range", 231);
+    setGlobalFn("ptr_in_range", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 3) return Value::nil();
         void* dest = toPtr(args[0]); void* src = toPtr(args[1]);
@@ -3217,7 +3216,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (int64_t j = 0; j < n; ++j) d[j] ^= s[j];
         return Value::nil();
     });
-    setGlobalFn("mem_xor", 232);
+    setGlobalFn("mem_xor", i - 1);
     makeBuiltin(i++, [toPtr, toInt](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2) return Value::nil();
         void* p = toPtr(args[0]); if (!p) return Value::nil();
@@ -3225,7 +3224,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::memset(p, 0, static_cast<size_t>(n));
         return Value::nil();
     });
-    setGlobalFn("mem_zero", 233);
+    setGlobalFn("mem_zero", i - 1);
 
     // iDE & system (OS-oriented): repr, kern_version, platform, os_name, arch
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -3287,7 +3286,7 @@ inline void registerAllBuiltins(VM& vm) {
         };
         return Value::fromString(reprImpl(v, 0));
     });
-    setGlobalFn("repr", 234);
+    setGlobalFn("repr", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr>) {
 #ifdef KERN_VERSION
         return Value::fromString(KERN_VERSION);
@@ -3295,7 +3294,7 @@ inline void registerAllBuiltins(VM& vm) {
         return Value::fromString("1.0.0");
 #endif
     });
-    setGlobalFn("kern_version", 235);
+    setGlobalFn("kern_version", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr>) {
 #if defined(_WIN32) || defined(_WIN64)
         return Value::fromString("windows");
@@ -3307,7 +3306,7 @@ inline void registerAllBuiltins(VM& vm) {
         return Value::fromString("unknown");
 #endif
     });
-    setGlobalFn("platform", 236);
+    setGlobalFn("platform", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr>) {
 #if defined(_WIN32) || defined(_WIN64)
         return Value::fromString("Windows");
@@ -3319,7 +3318,7 @@ inline void registerAllBuiltins(VM& vm) {
         return Value::fromString("Unknown");
 #endif
     });
-    setGlobalFn("os_name", 237);
+    setGlobalFn("os_name", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr>) {
 #if defined(_WIN32) || defined(_WIN64)
 #ifdef _M_X64
@@ -3337,7 +3336,7 @@ inline void registerAllBuiltins(VM& vm) {
         return Value::fromString("unknown");
 #endif
     });
-    setGlobalFn("arch", 238);
+    setGlobalFn("arch", i - 1);
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         int code = 0;
         if (args.size() >= 1 && args[0]) {
@@ -3347,7 +3346,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (vm) vm->setScriptExitCode(code);
         return Value::nil();
     });
-    setGlobalFn("exit_code", 239);
+    setGlobalFn("exit_code", i - 1);
 
     // readline(prompt?) – read one line from stdin
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -3358,7 +3357,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (std::getline(std::cin, line)) return Value::fromString(line);
         return Value::fromString("");
     });
-    setGlobalFn("readline", 240);
+    setGlobalFn("readline", i - 1);
 
     // chr(n) – integer to single-character string (ASCII/UTF-8 code point)
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
@@ -3372,7 +3371,7 @@ inline void registerAllBuiltins(VM& vm) {
         else { s += static_cast<char>(0xF0 | (n >> 18)); s += static_cast<char>(0x80 | ((n >> 12) & 0x3F)); s += static_cast<char>(0x80 | ((n >> 6) & 0x3F)); s += static_cast<char>(0x80 | (n & 0x3F)); }
         return Value::fromString(s);
     });
-    setGlobalFn("chr", 241);
+    setGlobalFn("chr", i - 1);
 
     // ord(s) – first character of string to integer (code point)
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -3389,7 +3388,7 @@ inline void registerAllBuiltins(VM& vm) {
         unsigned char c1 = static_cast<unsigned char>(s[1]), c2 = static_cast<unsigned char>(s[2]), c3 = static_cast<unsigned char>(s[3]);
         return Value::fromInt(static_cast<int64_t>(((c0 & 0x07) << 18) | ((c1 & 0x3F) << 12) | ((c2 & 0x3F) << 6) | (c3 & 0x3F)));
     });
-    setGlobalFn("ord", 242);
+    setGlobalFn("ord", i - 1);
 
     // hex(n) – integer to hex string (e.g. "ff")
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
@@ -3399,7 +3398,7 @@ inline void registerAllBuiltins(VM& vm) {
         snprintf(buf, sizeof(buf), "%llx", static_cast<unsigned long long>(n & 0xFFFFFFFFFFFFFFFFULL));
         return Value::fromString(std::string(buf));
     });
-    setGlobalFn("hex", 243);
+    setGlobalFn("hex", i - 1);
 
     // bin(n) – integer to binary string (e.g. "1010")
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
@@ -3410,7 +3409,7 @@ inline void registerAllBuiltins(VM& vm) {
         while (n) { s = (n & 1 ? "1" : "0") + s; n >>= 1; }
         return Value::fromString(s);
     });
-    setGlobalFn("bin", 244);
+    setGlobalFn("bin", i - 1);
 
     // assert_eq(a, b, msg?) – assert deep equality; throw with optional message on failure
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -3425,7 +3424,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::nil();
     });
-    setGlobalFn("assert_eq", 245);
+    setGlobalFn("assert_eq", i - 1);
 
     // very advanced builtins ---
 
@@ -3445,7 +3444,7 @@ inline void registerAllBuiltins(VM& vm) {
         while (out.size() % 4) out += '=';
         return Value::fromString(out);
     });
-    setGlobalFn("base64_encode", 246);
+    setGlobalFn("base64_encode", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromString("");
         std::string in = std::get<std::string>(args[0]->data);
@@ -3463,7 +3462,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString(out);
     });
-    setGlobalFn("base64_decode", 247);
+    setGlobalFn("base64_decode", i - 1);
 
     // uuid() – UUID v4-style string (random hex)
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr>) {
@@ -3483,7 +3482,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (int i = 0; i < 12; ++i) s += h[hex(rng)];
         return Value::fromString(s);
     });
-    setGlobalFn("uuid", 248);
+    setGlobalFn("uuid", i - 1);
 
     // hash_fnv(s) – FNV-1a 64-bit hash of string (returns int)
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -3493,7 +3492,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (unsigned char c : str) { h ^= c; h *= 1099511628211ULL; }
         return Value::fromInt(static_cast<int64_t>(h));
     });
-    setGlobalFn("hash_fnv", 249);
+    setGlobalFn("hash_fnv", i - 1);
 
     // csv_parse(s) – parse CSV string to array of rows (array of arrays of strings); simple (no quoted commas)
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -3521,7 +3520,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(rows));
     });
-    setGlobalFn("csv_parse", 250);
+    setGlobalFn("csv_parse", i - 1);
 
     // csv_stringify(rows) – rows = array of arrays; returns CSV string
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -3542,7 +3541,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString(out);
     });
-    setGlobalFn("csv_stringify", 251);
+    setGlobalFn("csv_stringify", i - 1);
 
     // time_format(fmt [, t]) – strftime-like; t = time() or current. fmt: %Y %m %d %H %M %S %A %B etc.
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -3563,7 +3562,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::strftime(buf, sizeof(buf), fmt.c_str(), btp);
         return Value::fromString(std::string(buf));
     });
-    setGlobalFn("time_format", 252);
+    setGlobalFn("time_format", i - 1);
 
     // stack_trace_array() – current call stack as array of {name, file, line, column} (innermost kMaxCallStackSnapshotFrames)
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
@@ -3590,20 +3589,20 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(arr));
     });
-    setGlobalFn("stack_trace_array", 253);
+    setGlobalFn("stack_trace_array", i - 1);
 
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromBool(false);
         double x = toDouble(args[0]);
         return Value::fromBool(std::isnan(x));
     });
-    setGlobalFn("is_nan", 254);
+    setGlobalFn("is_nan", i - 1);
     makeBuiltin(i++, [toDouble](VM*, std::vector<ValuePtr> args) {
         if (args.empty()) return Value::fromBool(false);
         double x = toDouble(args[0]);
         return Value::fromBool(std::isinf(x));
     });
-    setGlobalFn("is_inf", 255);
+    setGlobalFn("is_inf", i - 1);
 
     // env_all() – all environment variables as map
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
@@ -3631,7 +3630,7 @@ inline void registerAllBuiltins(VM& vm) {
 #endif
         return Value::fromMap(std::move(m));
     });
-    setGlobalFn("env_all", 256);
+    setGlobalFn("env_all", i - 1);
 
     // escape_regex(s) – escape regex special characters
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -3641,7 +3640,7 @@ inline void registerAllBuiltins(VM& vm) {
         for (char c : s) { if (c == '\\' || c == '^' || c == '$' || c == '.' || c == '|' || c == '?' || c == '*' || c == '+' || c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}') out += '\\'; out += c; }
         return Value::fromString(out);
     });
-    setGlobalFn("escape_regex", 257);
+    setGlobalFn("escape_regex", i - 1);
 
     // oS / program-building builtins ---
 
@@ -3652,7 +3651,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromString(std::filesystem::current_path().string());
         } catch (...) { return Value::fromString(""); }
     });
-    setGlobalFn("cwd", 258);
+    setGlobalFn("cwd", i - 1);
 
     // chdir(path) – change working directory; returns true on success
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
@@ -3663,7 +3662,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromBool(true);
         } catch (...) { return Value::fromBool(false); }
     });
-    setGlobalFn("chdir", 259);
+    setGlobalFn("chdir", i - 1);
 
     // hostname() – machine hostname
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
@@ -3678,7 +3677,7 @@ inline void registerAllBuiltins(VM& vm) {
         return Value::fromString("");
 #endif
     });
-    setGlobalFn("hostname", 260);
+    setGlobalFn("hostname", i - 1);
 
     // cpu_count() – number of hardware threads (for parallelism)
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
@@ -3686,7 +3685,7 @@ inline void registerAllBuiltins(VM& vm) {
         unsigned n = std::thread::hardware_concurrency();
         return Value::fromInt(n > 0 ? static_cast<int64_t>(n) : 1);
     });
-    setGlobalFn("cpu_count", 261);
+    setGlobalFn("cpu_count", i - 1);
 
     // temp_dir() – system temp directory path
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
@@ -3695,7 +3694,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromString(std::filesystem::temp_directory_path().string());
         } catch (...) { return Value::fromString(""); }
     });
-    setGlobalFn("temp_dir", 262);
+    setGlobalFn("temp_dir", i - 1);
 
     // realpath(path) – resolve to absolute canonical path; nil on error
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
@@ -3707,7 +3706,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromString(std::filesystem::canonical(p).string());
         } catch (...) { return Value::nil(); }
     });
-    setGlobalFn("realpath", 263);
+    setGlobalFn("realpath", i - 1);
 
     // getpid() – current process ID
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
@@ -3718,7 +3717,7 @@ inline void registerAllBuiltins(VM& vm) {
         return Value::fromInt(static_cast<int64_t>(getpid()));
 #endif
     });
-    setGlobalFn("getpid", 264);
+    setGlobalFn("getpid", i - 1);
 
     // monotonic_time() – seconds since arbitrary point (for deltas, not wall clock)
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr>) {
@@ -3726,7 +3725,7 @@ inline void registerAllBuiltins(VM& vm) {
         auto ms = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count();
         return Value::fromFloat(ms / 1000000.0);
     });
-    setGlobalFn("monotonic_time", 265);
+    setGlobalFn("monotonic_time", i - 1);
 
     // file_size(path) – size in bytes; nil if not a file or error
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
@@ -3737,7 +3736,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromInt(static_cast<int64_t>(sz));
         } catch (...) { return Value::nil(); }
     });
-    setGlobalFn("file_size", 266);
+    setGlobalFn("file_size", i - 1);
 
     // env_set(name, value) – set environment variable for current process; value = nil to unset
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
@@ -3753,7 +3752,7 @@ inline void registerAllBuiltins(VM& vm) {
         return Value::fromBool(setenv(name.c_str(), val.c_str(), 1) == 0);
 #endif
     });
-    setGlobalFn("env_set", 267);
+    setGlobalFn("env_set", i - 1);
 
     // glob(pattern [, base_dir]) – list paths matching pattern (* and ?); base_dir defaults to cwd
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
@@ -3799,29 +3798,29 @@ inline void registerAllBuiltins(VM& vm) {
         } catch (...) {}
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("glob", 268);
+    setGlobalFn("glob", i - 1);
 
     // type predicates (fully integrated)
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         return Value::fromBool(args.size() >= 1 && args[0] && args[0]->type == Value::Type::STRING);
     });
-    setGlobalFn("is_string", 269);
+    setGlobalFn("is_string", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         return Value::fromBool(args.size() >= 1 && args[0] && args[0]->type == Value::Type::ARRAY);
     });
-    setGlobalFn("is_array", 270);
+    setGlobalFn("is_array", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         return Value::fromBool(args.size() >= 1 && args[0] && args[0]->type == Value::Type::MAP);
     });
-    setGlobalFn("is_map", 271);
+    setGlobalFn("is_map", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         return Value::fromBool(args.size() >= 1 && args[0] && (args[0]->type == Value::Type::INT || args[0]->type == Value::Type::FLOAT));
     });
-    setGlobalFn("is_number", 272);
+    setGlobalFn("is_number", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         return Value::fromBool(args.size() >= 1 && args[0] && args[0]->type == Value::Type::FUNCTION);
     });
-    setGlobalFn("is_function", 273);
+    setGlobalFn("is_function", i - 1);
 
     // round_to(x, decimals) – round number to N decimal places
     makeBuiltin(i++, [toDouble, toInt](VM*, std::vector<ValuePtr> args) {
@@ -3835,7 +3834,7 @@ inline void registerAllBuiltins(VM& vm) {
         x = std::round(x * m) / m;
         return dec == 0 ? Value::fromInt(static_cast<int64_t>(x)) : Value::fromFloat(x);
     });
-    setGlobalFn("round_to", 274);
+    setGlobalFn("round_to", i - 1);
 
     // insert_at(arr, index, value) – insert value at index; returns array
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -3849,7 +3848,7 @@ inline void registerAllBuiltins(VM& vm) {
         a.insert(a.begin() + u, args[2]);
         return args[0] ? *args[0] : Value::nil();
     });
-    setGlobalFn("insert_at", 275);
+    setGlobalFn("insert_at", i - 1);
 
     // remove_at(arr, index) – remove element at index; returns removed value or nil
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -3864,7 +3863,7 @@ inline void registerAllBuiltins(VM& vm) {
         a.erase(a.begin() + idx);
         return v ? Value(*v) : Value::nil();
     });
-    setGlobalFn("remove_at", 276);
+    setGlobalFn("remove_at", i - 1);
 
     // sleep_ms(ms) – sleep in milliseconds (more convenient for OS loops)
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
@@ -3874,7 +3873,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (ms > 0) std::this_thread::sleep_for(std::chrono::milliseconds(ms));
         return Value::nil();
     });
-    setGlobalFn("sleep_ms", 277);
+    setGlobalFn("sleep_ms", i - 1);
 
     // exec(cmd) – run shell command, return process exit code
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
@@ -3885,7 +3884,7 @@ inline void registerAllBuiltins(VM& vm) {
         int rc = std::system(cmd.c_str());
         return Value::fromInt(static_cast<int64_t>(rc));
     });
-    setGlobalFn("exec", 278);
+    setGlobalFn("exec", i - 1);
 
     // exec_capture(cmd) – run shell command, return {code, out}
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
@@ -3918,7 +3917,7 @@ inline void registerAllBuiltins(VM& vm) {
         m["stderr"] = std::make_shared<Value>(Value::fromString(""));
         return Value::fromMap(std::move(m));
     });
-    setGlobalFn("exec_capture", 279);
+    setGlobalFn("exec_capture", i - 1);
 
     // which(program) – resolve executable in PATH; returns absolute path or nil
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
@@ -3974,7 +3973,7 @@ inline void registerAllBuiltins(VM& vm) {
         } catch (...) {}
         return Value::nil();
     });
-    setGlobalFn("which", 280);
+    setGlobalFn("which", i - 1);
 
     // runtime guard controls for safe execution.
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
@@ -3987,7 +3986,7 @@ inline void registerAllBuiltins(VM& vm) {
         vm->setStepLimit(static_cast<uint64_t>(lim));
         return Value::fromInt(static_cast<int64_t>(vm->getStepLimit()));
     });
-    setGlobalFn("set_step_limit", 281);
+    setGlobalFn("set_step_limit", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         if (!vm || args.empty()) return Value::fromInt(0);
@@ -4000,7 +3999,7 @@ inline void registerAllBuiltins(VM& vm) {
         vm->setMaxCallDepth(static_cast<size_t>(lim));
         return Value::fromInt(static_cast<int64_t>(vm->getMaxCallDepth()));
     });
-    setGlobalFn("set_max_call_depth", 282);
+    setGlobalFn("set_max_call_depth", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         if (!vm || args.empty()) return Value::fromInt(0);
@@ -4012,7 +4011,7 @@ inline void registerAllBuiltins(VM& vm) {
         vm->setCallbackStepGuard(static_cast<uint64_t>(lim));
         return Value::fromInt(static_cast<int64_t>(vm->getCallbackStepGuard()));
     });
-    setGlobalFn("set_callback_guard", 283);
+    setGlobalFn("set_callback_guard", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         bool enabled = true;
@@ -4025,7 +4024,7 @@ inline void registerAllBuiltins(VM& vm) {
         else std::srand(static_cast<unsigned>(std::time(nullptr)));
         return Value::fromBool(enabled);
     });
-    setGlobalFn("deterministic_mode", 284);
+    setGlobalFn("deterministic_mode", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
         std::unordered_map<std::string, ValuePtr> m;
@@ -4049,7 +4048,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromMap(std::move(m));
     });
-    setGlobalFn("runtime_info", 285);
+    setGlobalFn("runtime_info", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         vmRequirePermission(vm, Perm::kFilesystemRead, "path_normalize");
@@ -4058,7 +4057,7 @@ inline void registerAllBuiltins(VM& vm) {
         try { return Value::fromString(p.lexically_normal().string()); }
         catch (...) { return Value::fromString(args[0]->toString()); }
     });
-    setGlobalFn("path_normalize", 286);
+    setGlobalFn("path_normalize", i - 1);
 
     makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
         if (!vm || args.empty() || !args[0]) return Value::nil();
@@ -4075,7 +4074,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::nil();
     });
-    setGlobalFn("retry_call", 287);
+    setGlobalFn("retry_call", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string s = args.empty() || !args[0] ? "" : args[0]->toString();
@@ -4091,7 +4090,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (hex.size() > 40) hex.resize(40);
         return Value::fromString(hex);
     });
-    setGlobalFn("sha1", 288);
+    setGlobalFn("sha1", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string s = args.empty() || !args[0] ? "" : args[0]->toString();
@@ -4107,7 +4106,7 @@ inline void registerAllBuiltins(VM& vm) {
             << std::setw(16) << h4;
         return Value::fromString(out.str());
     });
-    setGlobalFn("sha256", 289);
+    setGlobalFn("sha256", i - 1);
 
     auto quoteArg = [](const std::string& s) {
         if (s.find_first_of(" \t\"") == std::string::npos) return s;
@@ -4137,7 +4136,7 @@ inline void registerAllBuiltins(VM& vm) {
         int rc = std::system(cmd.c_str());
         return Value::fromInt(static_cast<int64_t>(rc));
     });
-    setGlobalFn("exec_args", 290);
+    setGlobalFn("exec_args", i - 1);
 
     makeBuiltin(i++, [argsToCommand](VM* vm, std::vector<ValuePtr> args) {
         vmRequirePermission(vm, Perm::kProcessControl, "spawn");
@@ -4234,7 +4233,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString(out.str());
     });
-    setGlobalFn("url_encode", 294);
+    setGlobalFn("url_encode", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string s = args.empty() || !args[0] ? "" : args[0]->toString();
@@ -4261,7 +4260,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString(out);
     });
-    setGlobalFn("url_decode", 295);
+    setGlobalFn("url_decode", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         vmRequirePermission(vm, Perm::kNetworkHttp, "http_get");
@@ -4351,7 +4350,7 @@ inline void registerAllBuiltins(VM& vm) {
             out.erase(0, 3);
         return Value::fromString(std::move(out));
     });
-    setGlobalFn("http_get", 296);
+    setGlobalFn("http_get", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::unordered_map<std::string, ValuePtr> out;
@@ -4385,7 +4384,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromMap(std::move(out));
     });
-    setGlobalFn("toml_parse", 297);
+    setGlobalFn("toml_parse", i - 1);
 
     auto doHttpRequest = [](VM* vm, std::vector<ValuePtr> args, const char* opName) -> Value {
         vmRequirePermission(vm, Perm::kNetworkHttp, opName ? opName : "http_request");
@@ -4475,7 +4474,7 @@ inline void registerAllBuiltins(VM& vm) {
     makeBuiltin(i++, [doHttpRequest](VM* vm, std::vector<ValuePtr> args) {
         return doHttpRequest(vm, std::move(args), "http_request");
     });
-    setGlobalFn("http_request", 298);
+    setGlobalFn("http_request", i - 1);
     makeBuiltin(i++, [doHttpRequest](VM* vm, std::vector<ValuePtr> args) {
         std::vector<ValuePtr> inner;
         inner.push_back(std::make_shared<Value>(Value::fromString("POST")));
@@ -4490,7 +4489,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return doHttpRequest(vm, std::move(inner), "http_post");
     });
-    setGlobalFn("http_post", 299);
+    setGlobalFn("http_post", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || !args[1] || args[0]->type != Value::Type::STRING || args[1]->type != Value::Type::STRING) return Value::fromArray({});
@@ -4503,7 +4502,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromArray(std::move(parts));
         } catch (...) { return Value::fromArray({}); }
     });
-    setGlobalFn("regex_split", 300);
+    setGlobalFn("regex_split", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || !args[1] || args[0]->type != Value::Type::STRING || args[1]->type != Value::Type::STRING) return Value::fromArray({});
         try {
@@ -4520,7 +4519,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromArray(std::move(out));
         } catch (...) { return Value::fromArray({}); }
     });
-    setGlobalFn("regex_find_all", 301);
+    setGlobalFn("regex_find_all", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::unordered_map<std::string, ValuePtr> m;
@@ -4562,7 +4561,7 @@ inline void registerAllBuiltins(VM& vm) {
         m["query"] = std::make_shared<Value>(Value::fromString(query));
         return Value::fromMap(std::move(m));
     });
-    setGlobalFn("url_parse", 302);
+    setGlobalFn("url_parse", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::unordered_map<std::string, ValuePtr> m;
@@ -4580,7 +4579,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromMap(std::move(m));
     });
-    setGlobalFn("parse_query", 303);
+    setGlobalFn("parse_query", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string s = args.empty() || !args[0] ? "" : args[0]->toString();
@@ -4610,7 +4609,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString(std::move(out));
     });
-    setGlobalFn("html_escape", 304);
+    setGlobalFn("html_escape", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         auto trimStr = [](std::string& s) {
@@ -4697,7 +4696,7 @@ inline void registerAllBuiltins(VM& vm) {
         out["ok"] = std::make_shared<Value>(Value::fromBool(status >= 200 && status < 300));
         return Value::fromMap(std::move(out));
     });
-    setGlobalFn("http_parse_response", 305);
+    setGlobalFn("http_parse_response", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::function<std::string(const ValuePtr&, int)> toToml;
@@ -4743,7 +4742,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (args.empty() || !args[0]) return Value::fromString("");
         return Value::fromString(toToml(args[0], 0));
     });
-    setGlobalFn("toml_stringify", 306);
+    setGlobalFn("toml_stringify", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::fromInt(0);
@@ -4754,7 +4753,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromInt(id);
         } catch (...) { return Value::fromInt(0); }
     });
-    setGlobalFn("regex_compile", 307);
+    setGlobalFn("regex_compile", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || !args[1] || args[1]->type != Value::Type::STRING) return Value::fromBool(false);
         int64_t id = 0;
@@ -4767,7 +4766,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromBool(std::regex_search(std::get<std::string>(args[1]->data), it->second));
         } catch (...) { return Value::fromBool(false); }
     });
-    setGlobalFn("regex_match_pattern", 308);
+    setGlobalFn("regex_match_pattern", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 3 || !args[0] || !args[1] || !args[2] || args[1]->type != Value::Type::STRING || args[2]->type != Value::Type::STRING)
             return Value::nil();
@@ -4783,14 +4782,14 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromString(std::regex_replace(s, it->second, repl));
         } catch (...) { return Value::nil(); }
     });
-    setGlobalFn("regex_replace_pattern", 309);
+    setGlobalFn("regex_replace_pattern", i - 1);
 
     // format_exception(e) — Python-style multi-line report; error_traceback(e) — frames array or nil
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0]) return Value::fromString("");
         return Value::fromString(formatExceptionValue(args[0]));
     });
-    setGlobalFn("format_exception", 310);
+    setGlobalFn("format_exception", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::MAP) return Value::nil();
         auto& m = std::get<std::unordered_map<std::string, ValuePtr>>(args[0]->data);
@@ -4798,7 +4797,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (it == m.end() || !it->second) return Value::nil();
         return *it->second;
     });
-    setGlobalFn("error_traceback", 311);
+    setGlobalFn("error_traceback", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::unordered_map<std::string, ValuePtr> out;
         if (args.empty() || !args[0]) {
@@ -4844,7 +4843,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (!r) return Value::nil();
         return *r;
     });
-    setGlobalFn("invoke", 312);
+    setGlobalFn("invoke", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.size() < 2 || !args[0] || args[0]->type != Value::Type::ARRAY) return Value::nil();
         if (!args[1] || args[1]->type != Value::Type::ARRAY) return Value::nil();
@@ -4859,7 +4858,7 @@ inline void registerAllBuiltins(VM& vm) {
             dest.insert(dest.end(), src.begin(), src.begin() + room);
         return Value(*args[0]);
     });
-    setGlobalFn("extend_array", 313);
+    setGlobalFn("extend_array", i - 1);
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         if (!vm || args.empty() || !args[0] || args[0]->type != Value::Type::MAP) return Value::nil();
         auto& m = std::get<std::unordered_map<std::string, ValuePtr>>(args[0]->data);
@@ -4869,7 +4868,7 @@ inline void registerAllBuiltins(VM& vm) {
         (void)r;
         return Value::nil();
     });
-    setGlobalFn("with_cleanup", 314);
+    setGlobalFn("with_cleanup", i - 1);
 
     // sorted(arr) — new array, lexicographic by toString (original unchanged; unlike sort which mutates)
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -4881,7 +4880,7 @@ inline void registerAllBuiltins(VM& vm) {
         });
         return Value::fromArray(std::move(arr));
     });
-    setGlobalFn("sorted", 315);
+    setGlobalFn("sorted", i - 1);
 
     // enumerate(arr [, start]) — [[i, v], ...] with int indices (default start 0)
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
@@ -4898,7 +4897,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("enumerate", 316);
+    setGlobalFn("enumerate", i - 1);
 
     // partition(s, sep) — [before, sep, after]; sep not found => [s, "", ""]; empty sep => [s, "", ""]
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
@@ -4924,16 +4923,16 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(out));
     });
-    setGlobalFn("partition", 317);
+    setGlobalFn("partition", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         return Value::fromBool(args.size() >= 1 && args[0] && args[0]->type == Value::Type::INT);
     });
-    setGlobalFn("is_int", 318);
+    setGlobalFn("is_int", i - 1);
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         return Value::fromBool(args.size() >= 1 && args[0] && args[0]->type == Value::Type::FLOAT);
     });
-    setGlobalFn("is_float", 319);
+    setGlobalFn("is_float", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string s = args.empty() || !args[0] ? "" : args[0]->toString();
@@ -4980,7 +4979,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString(std::move(out));
     });
-    setGlobalFn("html_unescape", 320);
+    setGlobalFn("html_unescape", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string s = args.empty() || !args[0] ? "" : args[0]->toString();
@@ -4994,7 +4993,7 @@ inline void registerAllBuiltins(VM& vm) {
             return Value::fromString(s);
         }
     });
-    setGlobalFn("strip_html", 321);
+    setGlobalFn("strip_html", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string s = args.empty() || !args[0] ? "" : args[0]->toString();
@@ -5017,13 +5016,13 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString(std::move(out));
     });
-    setGlobalFn("css_escape", 322);
+    setGlobalFn("css_escape", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string s = args.empty() || !args[0] ? "" : args[0]->toString();
         return Value::fromString(jsonEscape(s));
     });
-    setGlobalFn("js_escape", 323);
+    setGlobalFn("js_escape", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string s = args.empty() || !args[0] ? "" : args[0]->toString();
@@ -5053,7 +5052,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString(std::move(out));
     });
-    setGlobalFn("xml_escape", 324);
+    setGlobalFn("xml_escape", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::MAP) return Value::fromString("");
@@ -5073,14 +5072,14 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString(q.str());
     });
-    setGlobalFn("build_query", 325);
+    setGlobalFn("build_query", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string base = args.size() >= 1 && args[0] ? args[0]->toString() : "";
         std::string rel = args.size() >= 2 && args[1] ? args[1]->toString() : "";
         return Value::fromString(kernUrlResolve(base, rel));
     });
-    setGlobalFn("url_resolve", 326);
+    setGlobalFn("url_resolve", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string path = args.empty() || !args[0] ? "" : args[0]->toString();
@@ -5115,7 +5114,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (it != kMime.end()) return Value::fromString(it->second);
         return Value::fromString("application/octet-stream");
     });
-    setGlobalFn("mime_type_guess", 327);
+    setGlobalFn("mime_type_guess", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::unordered_map<std::string, ValuePtr> out;
@@ -5156,7 +5155,7 @@ inline void registerAllBuiltins(VM& vm) {
         set("data", std::make_shared<Value>(Value::fromString(std::move(dataOut))));
         return Value::fromMap(std::move(out));
     });
-    setGlobalFn("parse_data_url", 328);
+    setGlobalFn("parse_data_url", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::unordered_map<std::string, ValuePtr> out;
@@ -5176,7 +5175,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromMap(std::move(out));
     });
-    setGlobalFn("parse_cookie_header", 329);
+    setGlobalFn("parse_cookie_header", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::MAP) return Value::fromString("");
@@ -5219,7 +5218,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (!ss.empty()) line << "; SameSite=" << ss;
         return Value::fromString(line.str());
     });
-    setGlobalFn("set_cookie_fields", 330);
+    setGlobalFn("set_cookie_fields", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string s = args.empty() || !args[0] ? "" : args[0]->toString();
@@ -5247,7 +5246,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString(charset);
     });
-    setGlobalFn("content_type_charset", 331);
+    setGlobalFn("content_type_charset", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string url = args.empty() || !args[0] ? "" : kernTrimHttpWs(args[0]->toString());
@@ -5288,7 +5287,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromBool(true);
     });
-    setGlobalFn("is_safe_http_redirect", 332);
+    setGlobalFn("is_safe_http_redirect", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         auto trimStr = [](std::string& s) {
@@ -5382,7 +5381,7 @@ inline void registerAllBuiltins(VM& vm) {
         out["ok"] = std::make_shared<Value>(Value::fromBool(true));
         return Value::fromMap(std::move(out));
     });
-    setGlobalFn("http_parse_request", 333);
+    setGlobalFn("http_parse_request", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::vector<ValuePtr> links;
@@ -5421,7 +5420,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(links));
     });
-    setGlobalFn("parse_link_header", 334);
+    setGlobalFn("parse_link_header", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::unordered_map<std::string, ValuePtr> out;
@@ -5458,13 +5457,13 @@ inline void registerAllBuiltins(VM& vm) {
         out["filename_star"] = std::make_shared<Value>(Value::fromString(filenameStar));
         return Value::fromMap(std::move(out));
     });
-    setGlobalFn("parse_content_disposition", 335);
+    setGlobalFn("parse_content_disposition", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string u = args.empty() || !args[0] ? "" : args[0]->toString();
         return Value::fromString(kernUrlNormalize(u));
     });
-    setGlobalFn("url_normalize", 336);
+    setGlobalFn("url_normalize", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string html = args.empty() || !args[0] ? "" : args[0]->toString();
@@ -5493,13 +5492,13 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString(kernHtmlSanitizeStrict(html, allow));
     });
-    setGlobalFn("html_sanitize_strict", 337);
+    setGlobalFn("html_sanitize_strict", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string s = args.empty() || !args[0] ? "" : args[0]->toString();
         return Value::fromString(kernCssUrlEscape(s));
     });
-    setGlobalFn("css_url_escape", 338);
+    setGlobalFn("css_url_escape", i - 1);
 
     makeBuiltin(i++, [toInt](VM*, std::vector<ValuePtr> args) {
         int64_t status = args.empty() || !args[0] ? 200 : toInt(args[0]);
@@ -5529,7 +5528,7 @@ inline void registerAllBuiltins(VM& vm) {
         std::string body = args.size() >= 3 && args[2] ? args[2]->toString() : "";
         return Value::fromString(head.str() + body);
     });
-    setGlobalFn("http_build_response", 339);
+    setGlobalFn("http_build_response", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string s = args.empty() || !args[0] ? "" : args[0]->toString();
@@ -5572,14 +5571,14 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromString(std::move(r));
     });
-    setGlobalFn("html_nl2br", 340);
+    setGlobalFn("html_nl2br", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string a = args.size() >= 1 && args[0] ? args[0]->toString() : "";
         std::string b = args.size() >= 2 && args[1] ? args[1]->toString() : "";
         return Value::fromString(kernUrlPathJoin(a, b));
     });
-    setGlobalFn("url_path_join", 341);
+    setGlobalFn("url_path_join", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::unordered_map<std::string, ValuePtr> out;
@@ -5603,7 +5602,7 @@ inline void registerAllBuiltins(VM& vm) {
         out["password"] = std::make_shared<Value>(Value::fromString(std::move(pass)));
         return Value::fromMap(std::move(out));
     });
-    setGlobalFn("parse_authorization_basic", 342);
+    setGlobalFn("parse_authorization_basic", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string url = args.size() >= 1 && args[0] ? args[0]->toString() : "";
@@ -5643,7 +5642,7 @@ inline void registerAllBuiltins(VM& vm) {
         if (keys.empty()) return Value::fromString(base);
         return Value::fromString(base + "?" + q.str());
     });
-    setGlobalFn("merge_query", 343);
+    setGlobalFn("merge_query", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         std::string s = args.empty() || !args[0] ? "" : args[0]->toString();
@@ -5683,7 +5682,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromArray(std::move(arr));
     });
-    setGlobalFn("parse_accept_language", 344);
+    setGlobalFn("parse_accept_language", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         if (!vm || args.empty() || !args[0]) return Value::fromBool(false);
@@ -5694,7 +5693,7 @@ inline void registerAllBuiltins(VM& vm) {
             allow.push_back(lib);
         return Value::fromBool(true);
     });
-    setGlobalFn("ffi_allow_library", 345);
+    setGlobalFn("ffi_allow_library", i - 1);
 
     makeBuiltin(i++, [toInt, toPtr](VM* vm, std::vector<ValuePtr> args) {
         if (!vm) return Value::nil();
@@ -5855,7 +5854,7 @@ inline void registerAllBuiltins(VM& vm) {
         throw VMError("ffi_call is currently implemented for Windows only in phase1", 0, 0, 1);
 #endif
     });
-    setGlobalFn("ffi_call", 346);
+    setGlobalFn("ffi_call", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         if (!vm || args.empty() || !args[0] || args[0]->type != Value::Type::MAP) return Value::nil();
@@ -5902,7 +5901,7 @@ inline void registerAllBuiltins(VM& vm) {
 
         std::string decoratorName = std::get<std::string>(decoratorNameV->data);
         std::unordered_map<std::string, ValuePtr> registryMap;
-        ValuePtr reg = vm->getGlobal("__decorator_registry");
+        ValuePtr reg = vm->getDecoratorRegistry();
         if (reg && reg->type == Value::Type::MAP) {
             registryMap = std::get<std::unordered_map<std::string, ValuePtr>>(reg->data);
         } else {
@@ -6073,10 +6072,10 @@ inline void registerAllBuiltins(VM& vm) {
             ensureArray("events")->push_back(std::make_shared<Value>(Value::fromMap(std::move(entry))));
         }
 
-        vm->setGlobal("__decorator_registry", std::make_shared<Value>(Value::fromMap(std::move(registryMap))));
+        vm->setDecoratorRegistry(std::make_shared<Value>(Value::fromMap(std::move(registryMap))));
         return *target;
     });
-    setGlobalFn("__apply_decorator", 348);
+    setGlobalFn("__apply_decorator", i - 1);
 
     // Cooperative task: runs the callable on the current VM (same thread). Result map is awaitable via __await_task.
     // For OS threads or subprocesses use stdlib process / concurrency modules, not this helper.
@@ -6101,7 +6100,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromMap(std::move(task));
     });
-    setGlobalFn("__spawn_task", 349);
+    setGlobalFn("__spawn_task", i - 1);
 
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0]) return Value::nil();
@@ -6120,11 +6119,11 @@ inline void registerAllBuiltins(VM& vm) {
         if (itRes != m.end() && itRes->second) return *(itRes->second);
         return Value::nil();
     });
-    setGlobalFn("__await_task", 350);
+    setGlobalFn("__await_task", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         if (!vm || args.empty() || !args[0] || args[0]->type != Value::Type::MAP) return Value::fromInt(0);
-        ValuePtr regV = vm->getGlobal("__decorator_registry");
+        ValuePtr regV = vm->getDecoratorRegistry();
         if (!regV || regV->type != Value::Type::MAP) return Value::fromInt(0);
 
         auto& runtime = std::get<std::unordered_map<std::string, ValuePtr>>(args[0]->data);
@@ -6310,7 +6309,7 @@ inline void registerAllBuiltins(VM& vm) {
 
         return Value::fromInt(applied);
     });
-    setGlobalFn("__runtime_apply_decorators", 351);
+    setGlobalFn("__runtime_apply_decorators", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
         std::unordered_map<std::string, ValuePtr> out;
@@ -6333,7 +6332,7 @@ inline void registerAllBuiltins(VM& vm) {
         }
         return Value::fromMap(std::move(out));
     });
-    setGlobalFn("__safe_invoke2", 352);
+    setGlobalFn("__safe_invoke2", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr>) {
         std::unordered_map<std::string, ValuePtr> out;

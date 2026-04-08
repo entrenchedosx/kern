@@ -22,6 +22,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.14] - 2026-04-06
+
+### Fixed
+
+- **VM builtins:** `setGlobalFn("…", index)` now matches each `makeBuiltin` slot (fixes wrong builtins for `__spawn_task`, async, web helpers, `readFile` / `writeFile`, and related `.kn` tests).
+- **Decorators:** pending `@command` / `@event` registry is stored on the VM instance so module imports no longer overwrite shared global decorator state.
+
+---
+
 ## [1.0.13] - 2026-04-06
 
 ### Added
@@ -271,7 +280,8 @@ Initial **Kern** release: **language** + **VM** + **builtins** + **`import`** mo
 
 - **CMake 3.14+**, **C++17**, optional **Raylib**; version from **`KERN_VERSION.txt`** (in post-1.0.0 trees; **`VERSION`** renamed in **1.0.6**).
 
-[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.13...HEAD
+[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.14...HEAD
+[1.0.14]: https://github.com/entrenchedosx/kern/compare/v1.0.13...v1.0.14
 [1.0.13]: https://github.com/entrenchedosx/kern/compare/v1.0.12...v1.0.13
 [1.0.12]: https://github.com/entrenchedosx/kern/compare/v1.0.11...v1.0.12
 [1.0.11]: https://github.com/entrenchedosx/kern/compare/v1.0.10...v1.0.11
