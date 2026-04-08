@@ -52,7 +52,7 @@ function kargoCliVersion() {
 }
 
 function help() {
-  console.log(`kargo — GitHub-first packages for Kern (no central registry)
+  console.log(`kargo — Kern packages: GitHub installs, Kern registry search
 
 Usage:
   kargo --version | -V
@@ -62,7 +62,8 @@ Usage:
   kargo update [owner/repo[@tag]] [--resolve-debug] [--explain] [--verbose] [--dry-run] [--refresh]   Re-fetch (all [dependencies] if no arg)
   kargo graph [--project <dir>] [--json] [--why owner/repo]   Dependency tree from kargo.toml + kargo.lock; --why lists paths from the project root
   kargo list                        Cached packages under ~/.kargo/packages
-  kargo search <query>              GitHub repository search (API)
+  kargo search <query>              Search Kern package registry (see KERN_REGISTRY_URL / ~/.kern/registry-auth.json)
+  kargo search --github <query>     Search GitHub repositories (legacy)
   kargo publish --tag vX.Y.Z        Validate kargo.toml, git tag + push (+ release if token)
   kargo login --token <pat>
   kargo build [--project <dir>] [entry.kn]
@@ -85,7 +86,7 @@ Imports in .kn (after install):
   import "owner/repo"          — GitHub-style key
   import "github.com/owner/repo"
 
-Requires: git on PATH, Node 18+, network for install/search/publish.
+Requires: git on PATH, Node 18+, network for install/publish; search uses the registry index (network unless local path).
 `);
 }
 

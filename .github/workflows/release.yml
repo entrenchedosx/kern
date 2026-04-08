@@ -66,7 +66,7 @@ jobs:
 
       - name: Build
         shell: cmd
-        run: cmake --build build --config Release --target kern kernc kern-scan kern_game kern_contract_humanize --parallel 4
+        run: cmake --build build --config Release --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize --parallel 4
 
       - name: Verify
         shell: cmd
@@ -74,7 +74,7 @@ jobs:
           # Trusted release CI: smoke tests touch std/process/fs paths that need broad caps.
           KERN_ENFORCE_PERMISSIONS: "0"
         run: |
-          build\Release\kern.exe --version
+          build\Release\kern.exe --version | findstr /C:"graphics: g2d+g3d+game (Raylib linked)"
           build\Release\kern.exe --scan --registry-only
           build\Release\kern.exe tests\std_v1_builtins_smoke.kn
           build\Release\kern.exe examples\basic\01_hello_world.kn
@@ -102,6 +102,9 @@ jobs:
           # Windows: real compiler is kern-impl.exe; kernc.exe in build/ is a dev launcher (cmake + exec). Ship impl as kernc.exe for portable use.
           Copy-Item build/Release/kern-impl.exe pkg/kern-${ver}-win64/kernc.exe
           Copy-Item build/Release/kern-scan.exe pkg/kern-${ver}-win64/
+          Copy-Item build/Release/kern_game.exe pkg/kern-${ver}-win64/
+          Copy-Item build/Release/kern_repl.exe pkg/kern-${ver}-win64/
+          Copy-Item build/Release/kern_lsp.exe pkg/kern-${ver}-win64/
           Copy-Item build/Release/kern_contract_humanize.exe pkg/kern-${ver}-win64/
           Copy-Item LICENSE pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
           Copy-Item README.md pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
@@ -113,6 +116,14 @@ jobs:
           Copy-Item kern-registry/package-lock.json pkg/kern-${ver}-win64/kern-registry/ -Force
           Compress-Archive -Path pkg/kern-${ver}-win64 -DestinationPath $out -Force
           Add-Content -Path $env:GITHUB_OUTPUT -Value "zip_path=$out"
+
+      - name: SHA256 fragment (Kern Windows zip)
+        shell: pwsh
+        run: |
+          $out = "${{ steps.zip.outputs.zip_path }}"
+          $bn = Split-Path $out -Leaf
+          $h = (Get-FileHash $out -Algorithm SHA256).Hash.ToLowerInvariant()
+          "${h} *${bn}" | Set-Content -Encoding ascii kern-SHA256.partial-windows
 
       - name: Install NSIS
         run: choco install nsis -y
@@ -129,6 +140,7 @@ jobs:
           path: |
             ${{ steps.zip.outputs.zip_path }}
             ${{ steps.nsis.outputs.installer_path }}
+            kern-SHA256.partial-windows
 
   linux:
     runs-on: ubuntu-latest
@@ -160,13 +172,13 @@ jobs:
           cmake -B build -DCMAKE_BUILD_TYPE=Release \
             -DKERN_BUILD_GAME=ON \
             -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF
-          cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_contract_humanize
+          cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize
 
       - name: Verify
         env:
           KERN_ENFORCE_PERMISSIONS: "0"
         run: |
-          ./build/kern --version
+          ./build/kern --version | grep -F "graphics: g2d+g3d+game (Raylib linked)"
           ./build/kern --scan --registry-only
           ./build/kern tests/std_v1_builtins_smoke.kn
           ./build/kern examples/basic/01_hello_world.kn
@@ -184,16 +196,25 @@ jobs:
           ver=$(tr -d ' \t\r\n' < KERN_VERSION.txt)
           out="kern-linux-x64-v${ver}.tar.gz"
           mkdir -p "pkg/kern-${ver}-linux-x64"
-          chmod +x build/kern build/kernc build/kern-scan build/kern_contract_humanize
-          cp build/kern build/kernc build/kern-scan build/kern_contract_humanize "pkg/kern-${ver}-linux-x64/"
+          chmod +x build/kern build/kernc build/kern-scan build/kern_game build/kern_repl build/kern_lsp build/kern_contract_humanize
+          cp build/kern build/kernc build/kern-scan build/kern_game build/kern_repl build/kern_lsp build/kern_contract_humanize "pkg/kern-${ver}-linux-x64/"
           cp LICENSE README.md KERN_VERSION.txt "pkg/kern-${ver}-linux-x64/" 2>/dev/null || true
           tar -czvf "$out" -C pkg "kern-${ver}-linux-x64"
           echo "tgz_path=$out" >> "$GITHUB_OUTPUT"
 
+      - name: SHA256 fragment (Kern linux archive)
+        run: |
+          out="${{ steps.tgz.outputs.tgz_path }}"
+          bn=$(basename "$out")
+          h=$(sha256sum "$out" | awk '{print $1}')
+          echo "$h *$bn" > kern-SHA256.partial-linux
+
       - uses: actions/upload-artifact@v4
         with:
           name: kern-release-linux
-          path: ${{ steps.tgz.outputs.tgz_path }}
+          path: |
+            ${{ steps.tgz.outputs.tgz_path }}
+            kern-SHA256.partial-linux
 
   docs:
     runs-on: ubuntu-latest
@@ -228,13 +249,13 @@ jobs:
           cmake -B build -DCMAKE_BUILD_TYPE=Release \
             -DKERN_BUILD_GAME=ON \
             -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF
-          cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_contract_humanize
+          cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize
 
       - name: Verify
         env:
           KERN_ENFORCE_PERMISSIONS: "0"
         run: |
-          ./build/kern --version
+          ./build/kern --version | grep -F "graphics: g2d+g3d+game (Raylib linked)"
           ./build/kern --scan --registry-only
           ./build/kern tests/std_v1_builtins_smoke.kn
           ./build/kern examples/basic/01_hello_world.kn
@@ -251,16 +272,25 @@ jobs:
           ver=$(tr -d ' \t\r\n' < KERN_VERSION.txt)
           out="kern-macos-v${ver}.tar.gz"
           mkdir -p "pkg/kern-${ver}-macos"
-          chmod +x build/kern build/kernc build/kern-scan build/kern_contract_humanize
-          cp build/kern build/kernc build/kern-scan build/kern_contract_humanize "pkg/kern-${ver}-macos/"
+          chmod +x build/kern build/kernc build/kern-scan build/kern_game build/kern_repl build/kern_lsp build/kern_contract_humanize
+          cp build/kern build/kernc build/kern-scan build/kern_game build/kern_repl build/kern_lsp build/kern_contract_humanize "pkg/kern-${ver}-macos/"
           cp LICENSE README.md KERN_VERSION.txt "pkg/kern-${ver}-macos/" 2>/dev/null || true
           tar -czvf "$out" -C pkg "kern-${ver}-macos"
           echo "tgz_path=$out" >> "$GITHUB_OUTPUT"
 
+      - name: SHA256 fragment (Kern macOS archive)
+        run: |
+          out="${{ steps.tgz.outputs.tgz_path }}"
+          bn=$(basename "$out")
+          h=$(shasum -a 256 "$out" | awk '{print $1}')
+          echo "$h *$bn" > kern-SHA256.partial-macos
+
       - uses: actions/upload-artifact@v4
         with:
           name: kern-release-macos
-          path: ${{ steps.tgz.outputs.tgz_path }}
+          path: |
+            ${{ steps.tgz.outputs.tgz_path }}
+            kern-SHA256.partial-macos
 
   kargo-dist:
     runs-on: ubuntu-latest
@@ -294,8 +324,59 @@ jobs:
             kargo-SHA256SUMS
             kargo-release.json
 
+  kern-bootstrap:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            suffix: linux-x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            suffix: windows-x64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            suffix: macos-arm64
+          - os: macos-13
+            target: x86_64-apple-darwin
+            suffix: macos-x64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build kern-bootstrap
+        run: cargo build --release --manifest-path kern-bootstrap/Cargo.toml --target ${{ matrix.target }}
+
+      - name: Stage binary for release
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          V="${TAG#v}"
+          mkdir -p _kern_bs_out
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            src="kern-bootstrap/target/${{ matrix.target }}/release/kern-bootstrap.exe"
+            cp "$src" "_kern_bs_out/kern-bootstrap-${V}-${{ matrix.suffix }}.exe"
+          else
+            src="kern-bootstrap/target/${{ matrix.target }}/release/kern-bootstrap"
+            cp "$src" "_kern_bs_out/kern-bootstrap-${V}-${{ matrix.suffix }}"
+            chmod +x "_kern_bs_out/kern-bootstrap-${V}-${{ matrix.suffix }}"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kern-bootstrap-${{ matrix.suffix }}
+          path: _kern_bs_out/*
+
   publish:
-    needs: [windows, linux, macos, docs, kargo-dist]
+    needs: [windows, linux, macos, docs, kargo-dist, kern-bootstrap]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -304,6 +385,26 @@ jobs:
         with:
           path: release-assets
           merge-multiple: true
+
+      - name: Merge Kern + kern-bootstrap SHA256SUMS
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-assets
+          if compgen -G "kern-SHA256.partial-*" > /dev/null; then
+            cat kern-SHA256.partial-* > kern-SHA256SUMS
+          fi
+          shopt -s nullglob
+          kb=(kern-bootstrap-*)
+          kb_filtered=()
+          for f in "${kb[@]}"; do
+            [[ -f "$f" ]] || continue
+            [[ "$f" == kern-bootstrap-SHA256SUMS ]] && continue
+            kb_filtered+=("$f")
+          done
+          if [[ ${#kb_filtered[@]} -gt 0 ]]; then
+            sha256sum "${kb_filtered[@]}" > kern-bootstrap-SHA256SUMS
+          fi
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2

@@ -60,14 +60,15 @@ jobs:
             -DKERN_BUILD_GAME=ON ^
             -DKERN_PREFER_STATIC_RAYLIB=ON
 
-      - name: Build kern, kernc, kern-scan, kern_game, kern_contract_humanize
+      - name: Build toolchain (incl. Raylib / g2d+g3d)
         shell: cmd
-        run: cmake --build build --config Release --target kern kernc kern-scan kern_game kern_contract_humanize --parallel 4
+        run: cmake --build build --config Release --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize --parallel 4
 
       # GitHub windows-latest is headless (no OpenGL window). Skip coverage/g3d runs that init GLFW.
       - name: Smoke tests (.kn)
         shell: cmd
         run: |
+          build\Release\kern.exe --version | findstr /C:"graphics: g2d+g3d+game (Raylib linked)"
           build\Release\kern.exe --scan --registry-only
           build\Release\kern.exe graph --json tests\compile_pipeline_fixture\main.kn
           build\Release\kern.exe --allow=filesystem.read tests\coverage\test_g3d_api_surface_vnext_source.kn

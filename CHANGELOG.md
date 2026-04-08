@@ -22,6 +22,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.13] - 2026-04-06
+
+### Added
+
+- **`kern-bootstrap/`** — production installer for Kern + Kargo from GitHub Releases; CI workflow **`.github/workflows/kern-bootstrap-ci.yml`**. After staging, **`install`** runs **`kern --version`** and **rejects** builds that report **`graphics: none`** (expects Raylib-backed **`g2d` / `g3d` / `game`** in official release zips); older Kern without a **`graphics:`** line logs a warning only.
+- **`kern --version`** prints **`graphics: g2d+g3d+game (Raylib linked)`** or **`graphics: none`** for diagnostics and bootstrap checks.
+- **`kargo search`** queries the **Kern registry** index by default (env **`KERN_REGISTRY_URL`** / local **`registry/registry.json`**); **`kargo search --github`** preserves GitHub repository search.
+
+### Changed
+
+- **CMake:** with **`KERN_BUILD_GAME=ON`**, configuration **fails** if Raylib cannot be resolved (no silent headless **`kern`**). **`kern_lsp`** links **`kern_gfx`** when graphics are enabled. **Release / NSIS / `build.ps1`** ship **`kern_game`**, **`kern_repl`**, **`kern_lsp`** where built; CI verifies the **`graphics:`** line on **`kern --version`**.
+
+---
+
 ## [1.0.12] - 2026-04-08
 
 ### Added
@@ -257,7 +271,8 @@ Initial **Kern** release: **language** + **VM** + **builtins** + **`import`** mo
 
 - **CMake 3.14+**, **C++17**, optional **Raylib**; version from **`KERN_VERSION.txt`** (in post-1.0.0 trees; **`VERSION`** renamed in **1.0.6**).
 
-[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.12...HEAD
+[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.13...HEAD
+[1.0.13]: https://github.com/entrenchedosx/kern/compare/v1.0.12...v1.0.13
 [1.0.12]: https://github.com/entrenchedosx/kern/compare/v1.0.11...v1.0.12
 [1.0.11]: https://github.com/entrenchedosx/kern/compare/v1.0.10...v1.0.11
 [1.0.10]: https://github.com/entrenchedosx/kern/compare/v1.0.9...v1.0.10

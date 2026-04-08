@@ -25,33 +25,27 @@ The Windows portable build is intended to be self-contained: no extra runtime in
 
 **Requirements:** C++17 compiler (e.g. MSVC 2022, GCC 7+, Clang 5+), CMake 3.14+.
 
-**Without graphics (smallest build):**
+**Default (full Kern — g2d, g3d, game via Raylib):** `KERN_BUILD_GAME` defaults to **ON**. CMake **fails** if Raylib cannot be resolved (vcpkg, system install, or `KERN_AUTO_FETCH_RAYLIB` FetchContent). Confirm with `kern --version` → `graphics: g2d+g3d+game (Raylib linked)`.
+
+1. **Windows (recommended):** use the repo’s `vcpkg.json` + static triplet, e.g.  
+   `cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE=tools/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static`  
+   or run `.\build.ps1` (installs `raylib:x64-windows-static` via local vcpkg when present).
+2. **Linux:** install X11/OpenGL/ALSA dev packages (see `.github/workflows/linux-kern.yml`), then `cmake -B build -DCMAKE_BUILD_TYPE=Release` and build.
+3. **macOS:** Xcode Command Line Tools are usually enough; CMake may FetchContent Raylib on first configure.
 
 ```bash
-git clone <repo-url> kern
-cd kern
-cmake -B build -DKERN_BUILD_GAME=OFF
+cmake -B build -DCMAKE_BUILD_TYPE=Release   # add -G / toolchain flags on Windows as above
 cmake --build build --config Release
 ```
 
-Executables: `build/Release/kern.exe` (Windows) or `build/kern` (Unix).
+**Headless only (no graphics — opt-in):**
 
-**With graphics (g2d and game modules):**
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DKERN_BUILD_GAME=OFF
+cmake --build build --config Release
+```
 
-1. Install Raylib (build-time only), e.g. with vcpkg:
-   ```bash
-   git clone https://github.com/Microsoft/vcpkg.git
-   cd vcpkg && ./bootstrap-vcpkg.bat   # or bootstrap-vcpkg.sh on Unix
-   ./vcpkg install raylib:x64-windows   # or raylib for Linux/Mac
-   ```
-2. Configure and build:
-   ```bash
-   cd kern
-   cmake -B build -DKERN_BUILD_GAME=ON -DCMAKE_TOOLCHAIN_FILE=<path-to-vcpkg>/scripts/buildsystems/vcpkg.cmake
-   cmake --build build --config Release
-   ```
-
-Then run `build/Release/kern.exe examples/graphics/graphics_demo.kn` (or your script).
+Executables: `build/Release/kern.exe` (Windows) or `build/kern` (Unix), plus `kern-scan`, `kern_repl`, `kern_game`, `kern_lsp`, etc., when those targets are built.
 
 ### Option C: Kern-IDE (editors)
 
@@ -70,7 +64,7 @@ Use the **[Kern-IDE](Kern-IDE/README.md)** directory: Tk desktop IDE, Qt editor,
 
 3. **Build**
    - Build Release (and optionally Debug) for each target platform.
-   - With Raylib: build with `KERN_BUILD_GAME=ON` and the vcpkg (or system) Raylib so the published binaries include g2d/game.
+   - **Release artifacts must be graphics-capable:** default `KERN_BUILD_GAME=ON` requires Raylib; CI checks `kern --version` for `graphics: g2d+g3d+game (Raylib linked)`. Use `-DKERN_BUILD_GAME=OFF` only for intentional headless builds.
 
 4. **Test**
    - Run the test suite (see `docs/TESTING.md`).
@@ -78,7 +72,7 @@ Use the **[Kern-IDE](Kern-IDE/README.md)** directory: Tk desktop IDE, Qt editor,
 
 5. **Package**
    - Create archives (e.g. `kern-windows-x64-v1.0.7.zip`, `kern-linux-x64-v1.0.7.tar.gz`, `kern-macos-v1.0.7.tar.gz`) containing:
-     - `kern` (or `kern.exe`), `kern_repl` (or `kern_repl.exe`), and optionally `kern_game`.
+     - `kern`, `kernc`, `kern-scan`, `kern_game`, `kern_repl`, `kern_lsp`, `kern_contract_humanize` (with OS-specific `.exe` on Windows).
      - Optional: `examples/`, `docs/`, `LICENSE`, `README.md`.
    - Optionally coordinate a **Kern-IDE** release (separate repository) for editor binaries.
 

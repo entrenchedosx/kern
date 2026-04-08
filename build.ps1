@@ -91,13 +91,32 @@ try {
 }
 $kernExe = Join-Path $BuildDir "Release\kern.exe"
 $kerncExe = Join-Path $BuildDir "Release\kernc.exe"
+$kernImplExe = Join-Path $BuildDir "Release\kern-impl.exe"
 if (-not (Test-Path $kernExe)) { throw "kern.exe not found after build at $kernExe" }
+if (-not $NoGame) {
+    $verOut = & $kernExe --version 2>&1 | Out-String
+    if ($verOut -notmatch "graphics:\s+g2d\+g3d\+game\s+\(Raylib linked\)") {
+        throw "Kern Release build is missing linked Raylib (expected `graphics: g2d+g3d+game (Raylib linked)` in kern --version). Use vcpkg raylib:x64-windows-static or -NoGame for headless."
+    }
+    Write-Host "  OK: kern --version reports Raylib (g2d/g3d/game)" -ForegroundColor Green
+}
 Copy-Item $kernExe $binDir -Force
-if (Test-Path $kerncExe) {
+# Portable layout: ship the real compiler as kernc.exe (Windows dev tree uses kern-impl + launcher).
+if (Test-Path $kernImplExe) {
+    Copy-Item $kernImplExe (Join-Path $binDir "kernc.exe") -Force
+    Write-Host "  OK: kern.exe, kernc.exe (from kern-impl) -> BUILD\bin\" -ForegroundColor Green
+} elseif (Test-Path $kerncExe) {
     Copy-Item $kerncExe $binDir -Force
     Write-Host "  OK: kern.exe, kernc.exe -> BUILD\bin\" -ForegroundColor Green
 } else {
-    Write-Host "  OK: kern.exe -> BUILD\bin\ (kernc.exe not present)" -ForegroundColor Green
+    Write-Host "  OK: kern.exe -> BUILD\bin\ (kernc not present)" -ForegroundColor Green
+}
+foreach ($tool in @("kern-scan.exe", "kern_game.exe", "kern_repl.exe", "kern_lsp.exe", "kern_contract_humanize.exe")) {
+    $tp = Join-Path $BuildDir "Release\$tool"
+    if (Test-Path $tp) {
+        Copy-Item $tp $binDir -Force
+        Write-Host "  OK: $tool -> BUILD\bin\" -ForegroundColor Gray
+    }
 }
 $raylibDll = Join-Path $BuildDir "Release\raylib.dll"
 if (Test-Path $raylibDll) {
@@ -199,8 +218,9 @@ if (-not $SkipInstaller) {
 @"
 Kern Build Output
 ================
-  bin\kern.exe         - Kern interpreter / runner
-  bin\kernc.exe        - Standalone compiler (if built)
+  bin\kern.exe         - Kern interpreter / runner (Raylib linked unless -NoGame)
+  bin\kernc.exe        - Standalone compiler (kern-impl on Windows)
+  bin\kern-scan.exe, kern_game.exe, kern_repl.exe, kern_lsp.exe, kern_contract_humanize.exe - toolchain (when built)
   lib\kern\            - Standard library (set KERN_LIB to this BUILD folder for imports)
   modules\             - .kn module files
   examples\            - Example scripts

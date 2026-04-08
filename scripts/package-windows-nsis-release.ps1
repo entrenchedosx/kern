@@ -47,13 +47,19 @@ foreach ($d in @($bin, $libRoot, $kernLibDst, $kargoDst, $modules, $examples, $d
 $kernExe = Join-Path $BuildReleaseDir "kern.exe"
 $implExe = Join-Path $BuildReleaseDir "kern-impl.exe"
 $scanExe = Join-Path $BuildReleaseDir "kern-scan.exe"
+$gameExe = Join-Path $BuildReleaseDir "kern_game.exe"
+$replExe = Join-Path $BuildReleaseDir "kern_repl.exe"
+$lspExe = Join-Path $BuildReleaseDir "kern_lsp.exe"
 $humExe = Join-Path $BuildReleaseDir "kern_contract_humanize.exe"
-foreach ($p in @($kernExe, $implExe, $scanExe, $humExe)) {
+foreach ($p in @($kernExe, $implExe, $scanExe, $gameExe, $replExe, $lspExe, $humExe)) {
     if (-not (Test-Path -LiteralPath $p)) { throw "Missing build output: $p" }
 }
 Copy-Item -LiteralPath $kernExe -Destination $bin -Force
 Copy-Item -LiteralPath $implExe -Destination (Join-Path $bin "kernc.exe") -Force
 Copy-Item -LiteralPath $scanExe -Destination $bin -Force
+Copy-Item -LiteralPath $gameExe -Destination $bin -Force
+Copy-Item -LiteralPath $replExe -Destination $bin -Force
+Copy-Item -LiteralPath $lspExe -Destination $bin -Force
 Copy-Item -LiteralPath $humExe -Destination $bin -Force
 
 $kargoSrc = Join-Path $RepoRoot "kargo"

@@ -13,7 +13,7 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release --target kern kern_repl kernc
 ```
 
-If you need graphics/game modules (`import g2d`), build with `KERN_BUILD_GAME=ON` (the default). CMake will fetch Raylib via FetchContent when it is not installed system-wide. **Linux:** install X11/OpenGL/ALSA development packages first (same `apt install …` list as the `Install Raylib build dependencies` step in `.github/workflows/linux-kern.yml`). **macOS:** Xcode Command Line Tools are usually enough. For Windows portable drops (no installs), use the shareable build scripts (see below).
+Graphics/game modules (`import g2d`, `g3d`, `game`) are **included by default** (`KERN_BUILD_GAME=ON`). CMake **fails configuration** if Raylib cannot be resolved (vcpkg/static triplet on Windows, system packages + optional FetchContent on Linux/macOS). **Linux:** install X11/OpenGL/ALSA development packages first (same `apt install …` list as the `Install Raylib build dependencies` step in `.github/workflows/linux-kern.yml`). **macOS:** Xcode Command Line Tools are usually enough. **Windows:** use `.\build.ps1` or pass `-DCMAKE_TOOLCHAIN_FILE=…/vcpkg.cmake` and `-DVCPKG_TARGET_TRIPLET=x64-windows-static` (see `RELEASE.md`). For a headless toolchain only, configure with `-DKERN_BUILD_GAME=OFF`.
 
 ## Run
 

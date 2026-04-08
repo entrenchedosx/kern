@@ -2,7 +2,8 @@
 
 GitHub-first package manager for **Kern**: clone tagged repositories into `~/.kargo/packages`, write `kargo.lock` (with **commit SHA**), and merge **`.kern/package-paths.json`** so the VM can resolve imports.
 
-- **No central registry** — packages live at `https://github.com/<owner>/<repo>`, versions are **git tags** `vMAJOR.MINOR.PATCH`.
+- **GitHub as source of truth for installs** — packages live at `https://github.com/<owner>/<repo>`, versions are **git tags** `vMAJOR.MINOR.PATCH`.
+- **Kern registry search** — `kargo search` queries the Kern registry index (`KERN_REGISTRY_URL`, local `registry/registry.json`, or `kern-registry/registry/registry.json` in cwd, else the public index). Use `kargo search --github` for GitHub repository search.
 - **Determinism** — lockfile stores `commit_sha` after checkout, plus **constraint provenance** (`resolved_constraints`, `resolved_from`, `resolved_version_range` = sorted conjunction of raw inputs). When possible, **`resolved_version_range_normalized`** gives a single **half-open** range (e.g. `>=1.3.0 <2.0.0`) for intersecting `^` / `~` / `>= … < …` constraints; it is omitted if not expressible that way or if it would not include the **resolved** version. **`kargo.lock` JSON** is written with **sorted package keys** and a **fixed field order** inside each entry for stable diffs. Remote tag lists are **sorted and deduped**; the work queue is **sorted by package id**. Wildcard `*` in a dependency **never overrides** stricter ranges—it adds no restriction.
 - **Single version per repo** — every `owner/repo` appears at most once in the graph; the resolver picks the **highest** remote `v*` tag that satisfies **all** incoming constraints (npm-style `^` / `~`, comparators, exact).
 - **PAT** — optional `~/.kargo/config.json` (`kargo login --token …`) for private repos and GitHub API (search / releases).
@@ -16,7 +17,8 @@ kargo remove owner/repo
 kargo update              # resolve all [dependencies] in kargo.toml (ranges, one version per repo)
 kargo update owner/repo@v2.0.0
 kargo list
-kargo search query
+kargo search <query>              # Kern registry (package names like sec.auth)
+kargo search --github <query>     # GitHub repos
 kargo publish --tag v1.0.0
 kargo login --token ghp_...
 kargo build

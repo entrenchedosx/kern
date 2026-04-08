@@ -269,6 +269,7 @@ if(WIN32)
   set_target_properties(kernc PROPERTIES OUTPUT_NAME "kern-impl")
   add_executable(kern_launcher "${KERN_REPO_TOOLS_DIR}/kernc_launcher.c" ${KERN_WIN32_RESOURCES})
   set_target_properties(kern_launcher PROPERTIES OUTPUT_NAME "kernc")
+  target_link_libraries(kern_launcher PRIVATE user32)
   # Do NOT add_dependencies(kern_launcher kernc): kernc POST_BUILD runs nested build for launcher.
   add_custom_command(TARGET kernc POST_BUILD
     COMMAND ${CMAKE_COMMAND} --build "${CMAKE_BINARY_DIR}" --config $<CONFIG> --target kern_launcher
@@ -386,10 +387,12 @@ if(KERN_BUILD_GAME)
     target_link_libraries(kern_repl PRIVATE kern_gfx)
     target_link_libraries(kernc PRIVATE kern_gfx)
     target_link_libraries(kern-scan PRIVATE kern_gfx)
+    target_link_libraries(kern_lsp PRIVATE kern_gfx)
     target_compile_definitions(kern PRIVATE KERN_BUILD_GAME=1)
     target_compile_definitions(kern_repl PRIVATE KERN_BUILD_GAME=1)
     target_compile_definitions(kernc PRIVATE KERN_BUILD_GAME=1)
     target_compile_definitions(kern-scan PRIVATE KERN_BUILD_GAME=1)
+    target_compile_definitions(kern_lsp PRIVATE KERN_BUILD_GAME=1)
     add_executable(kern_game "${KERN_GAME_MODULE_DIR}/game_main.cpp" ${KERN_WIN32_RESOURCES})
     target_link_libraries(kern_game PRIVATE kern_core kern_gfx)
     target_compile_definitions(kern_game PRIVATE KERN_BUILD_GAME=1 KERN_VERSION="${KERN_VERSION}")
@@ -421,9 +424,21 @@ if(KERN_BUILD_GAME)
       message(STATUS "Kern: graphics integrated - Raylib available")
     endif()
   else()
-    message(WARNING "KERN_BUILD_GAME=ON but Raylib was unavailable. Enable KERN_AUTO_FETCH_RAYLIB=ON or install Raylib manually.")
+    message(FATAL_ERROR
+      "KERN_BUILD_GAME is ON but Raylib was not found (and auto-fetch did not produce a target). "
+      "Shipped and default Kern builds require g2d/g3d/game (Raylib). "
+      "Fix: install Raylib (e.g. vcpkg with x64-windows-static + repo vcpkg.json, or system packages on Linux per .github/workflows/linux-kern.yml), "
+      "ensure KERN_AUTO_FETCH_RAYLIB=ON for FetchContent fallback, or set -DKERN_BUILD_GAME=OFF for a headless-only toolchain.")
   endif()
 endif()
 
 include(GNUInstallDirs)
-install(TARGETS kern kern-scan RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS kern kern-scan kern_repl kern_lsp kern_contract_humanize
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+if(TARGET kern_game)
+  install(TARGETS kern_game RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+# Windows renames this target to kern-impl.exe; use the release/NSIS scripts for a portable kernc.exe.
+if(NOT WIN32)
+  install(TARGETS kernc RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()

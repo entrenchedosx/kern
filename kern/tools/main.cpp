@@ -957,7 +957,10 @@ static int cmdDocs(const char* /*prog*/) {
 
 static int cmdBuildHint() {
     std::cout << "The Kern toolchain is built with CMake (compiler + VM + CLI).\n\n"
-              << "Typical release build (no Raylib / headless):\n"
+              << "Default release build includes g2d/g3d/game (Raylib); configure fails if Raylib is missing.\n"
+              << "  cmake -B build -DCMAKE_BUILD_TYPE=Release\n"
+              << "  cmake --build build --parallel\n\n"
+              << "Headless-only (no graphics):\n"
               << "  cmake -B build -DCMAKE_BUILD_TYPE=Release -DKERN_BUILD_GAME=OFF -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF\n"
               << "  cmake --build build --parallel --target kern kernc kern-scan\n\n"
               << "See docs/GETTING_STARTED.md for OS-specific steps (vcpkg, Raylib, portable packaging).\n";
@@ -1790,6 +1793,11 @@ int main(int argc, char** argv) {
 #endif
             std::cout << "Kern " << ver << "\n";
             std::cout << "bytecode-schema: " << kBytecodeSchemaVersion << "\n";
+#ifdef KERN_BUILD_GAME
+            std::cout << "graphics: g2d+g3d+game (Raylib linked)\n";
+#else
+            std::cout << "graphics: none\n";
+#endif
 #ifdef KERN_BUILD_ID
             std::cout << "build: " << KERN_BUILD_ID << "\n";
 #endif

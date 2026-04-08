@@ -1,0 +1,145 @@
+# Build kern-bootstrap on every push/PR (no GitHub release required).
+name: kern-bootstrap CI
+
+on:
+  push:
+    paths:
+      - "kern-bootstrap/**"
+      - ".github/workflows/kern-bootstrap-ci.yml"
+  pull_request:
+    paths:
+      - "kern-bootstrap/**"
+      - ".github/workflows/kern-bootstrap-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: cargo build
+        run: cargo build --release --manifest-path kern-bootstrap/Cargo.toml
+
+      - name: Smoke (--help)
+        run: cargo run --release --manifest-path kern-bootstrap/Cargo.toml -- --help
+
+      - name: Smoke (doctor + list on empty prefix)
+        shell: bash
+        run: |
+          set -e
+          BS="cargo run --release --manifest-path kern-bootstrap/Cargo.toml --"
+          PREFIX="${RUNNER_TEMP}/kern-bs-empty"
+          mkdir -p "$PREFIX"
+          $BS doctor --prefix "$PREFIX"
+          $BS list --prefix "$PREFIX"
+
+      - name: Unit tests (Windows path helpers)
+        if: runner.os == 'Windows'
+        run: cargo test --manifest-path kern-bootstrap/Cargo.toml -- --nocapture
+
+  # Real install + doctor exit codes (managed bin first vs shadowed fake kern earlier on PATH).
+  windows-doctor-scenarios:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [clean, shadowed, corrupt_shim, interrupted]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build bootstrapper (release)
+        run: cargo build --release --manifest-path kern-bootstrap/Cargo.toml
+
+      - name: Fresh install under RUNNER_TEMP
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $prefix = Join-Path $env:RUNNER_TEMP "kern-bs-scenario"
+          if (Test-Path $prefix) { Remove-Item -Recurse -Force $prefix }
+          $bs = Join-Path $env:GITHUB_WORKSPACE "kern-bootstrap/target/release/kern-bootstrap.exe"
+          & $bs install --prefix $prefix
+          if ($LASTEXITCODE -ne 0) { throw "install failed with $LASTEXITCODE" }
+          Add-Content -Path $env:GITHUB_ENV -Value "KERN_BS_PREFIX=$prefix"
+
+      - name: Doctor — managed bin first (expect 0)
+        if: matrix.scenario == 'clean'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $prefix = $env:KERN_BS_PREFIX
+          $bin = Join-Path $prefix "bin"
+          $sys32 = Join-Path $env:WINDIR "System32"
+          $env:Path = "$bin;$sys32;$env:WINDIR"
+          $bs = Join-Path $env:GITHUB_WORKSPACE "kern-bootstrap/target/release/kern-bootstrap.exe"
+          & $bs doctor --prefix $prefix
+          if ($LASTEXITCODE -ne 0) { throw "expected doctor exit 0, got $LASTEXITCODE" }
+
+      - name: Doctor — shadowed kern earlier on PATH (expect 1)
+        if: matrix.scenario == 'shadowed'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $prefix = $env:KERN_BS_PREFIX
+          $bin = Join-Path $prefix "bin"
+          $fake = Join-Path $env:RUNNER_TEMP "kern-bs-fake-kern"
+          New-Item -ItemType Directory -Force -Path $fake | Out-Null
+          $kernImpl = Get-ChildItem -Path (Join-Path $prefix "versions") -Directory | ForEach-Object {
+            $p = Join-Path $_.FullName "kern/kern.exe"
+            if (Test-Path -LiteralPath $p) { $p }
+          } | Select-Object -First 1
+          if (-not $kernImpl) { throw "no versions/*/kern/kern.exe under $prefix" }
+          Copy-Item -LiteralPath $kernImpl -Destination (Join-Path $fake "kern.exe") -Force
+          $sys32 = Join-Path $env:WINDIR "System32"
+          $env:Path = "$fake;$bin;$sys32;$env:WINDIR"
+          $bs = Join-Path $env:GITHUB_WORKSPACE "kern-bootstrap/target/release/kern-bootstrap.exe"
+          $out = & $bs doctor --prefix $prefix 2>&1 | Out-String
+          Write-Host $out
+          if ($LASTEXITCODE -ne 1) { throw "expected doctor exit 1, got $LASTEXITCODE" }
+          if ($out -notmatch "\[ACTIVE\]") { throw "expected [ACTIVE] in doctor output" }
+          if ($out -notmatch "\[EXTERNAL\]") { throw "expected [EXTERNAL] in doctor output" }
+          if ($out -notmatch "NOT using the managed Kern") { throw "expected managed-Kern stale-shell message" }
+
+      - name: Doctor — corrupt shim (expect 2)
+        if: matrix.scenario == 'corrupt_shim'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $prefix = $env:KERN_BS_PREFIX
+          $bin = Join-Path $prefix "bin"
+          Set-Content -LiteralPath (Join-Path $bin "kern.cmd") -Value "@echo off`r`necho SHIM_BROKEN_FOR_CI"
+          $sys32 = Join-Path $env:WINDIR "System32"
+          $env:Path = "$bin;$sys32;$env:WINDIR"
+          $bs = Join-Path $env:GITHUB_WORKSPACE "kern-bootstrap/target/release/kern-bootstrap.exe"
+          $out = & $bs doctor --prefix $prefix 2>&1 | Out-String
+          Write-Host $out
+          if ($LASTEXITCODE -ne 2) { throw "expected doctor exit 2 (strict shim/verify failure), got $LASTEXITCODE" }
+
+      - name: Interrupted install — sentinel then reinstall (expect repair + clean sentinels)
+        if: matrix.scenario == 'interrupted'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $prefix = $env:KERN_BS_PREFIX
+          $fakePid = "424242"
+          New-Item -ItemType File -Force -Path (Join-Path $prefix ".installing.$fakePid") -Value "$fakePid`n" | Out-Null
+          if (-not (Test-Path -LiteralPath (Join-Path $prefix ".installing.$fakePid"))) { throw "failed to create fake sentinel" }
+          $bs = Join-Path $env:GITHUB_WORKSPACE "kern-bootstrap/target/release/kern-bootstrap.exe"
+          & $bs install --prefix $prefix
+          if ($LASTEXITCODE -ne 0) { throw "expected install exit 0 after auto-repair, got $LASTEXITCODE" }
+          $markers = Get-ChildItem -LiteralPath $prefix -Force -File | Where-Object { $_.Name -like '.installing*' }
+          if ($markers.Count -gt 0) {
+            throw "expected all .installing* sentinels cleared after success, still have: $($markers.Name -join ', ')"
+          }

@@ -30,11 +30,11 @@ jobs:
             -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF
 
       - name: Build
-        run: cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_contract_humanize
+        run: cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize
 
       - name: Smoke
         run: |
-          ./build/kern --version
+          ./build/kern --version | grep -F "graphics: g2d+g3d+game (Raylib linked)"
           ./build/kern docs
           ./build/kern build
           ./build/kern --scan --registry-only

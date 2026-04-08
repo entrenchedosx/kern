@@ -1,8 +1,8 @@
 {
   "name": "kargo",
-  "version": "0.1.0",
+  "version": "1.0.13",
   "private": true,
-  "description": "GitHub-first package manager for Kern (no central registry)",
+  "description": "Package manager for Kern: GitHub installs + Kern registry search",
   "type": "module",
   "bin": {
     "kargo": "./cli/entry.js"
