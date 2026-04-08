@@ -22,6 +22,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.16] - 2026-04-08
+
+### Fixed
+
+- **Graphics imports:** `kern_core` is now compiled with `KERN_BUILD_GAME` when game/Raylib is enabled. Previously only CLI targets received the define, so `import_resolution.cpp` omitted the `g2d` / `g3d` / `game` branches while `kern --version` still reported Raylib — release zips could not load graphics modules.
+
+---
+
 ## [1.0.15] - 2026-04-08
 
 ### Fixed
@@ -291,7 +299,8 @@ Initial **Kern** release: **language** + **VM** + **builtins** + **`import`** mo
 
 - **CMake 3.14+**, **C++17**, optional **Raylib**; version from **`KERN_VERSION.txt`** (in post-1.0.0 trees; **`VERSION`** renamed in **1.0.6**).
 
-[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.15...HEAD
+[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.16...HEAD
+[1.0.16]: https://github.com/entrenchedosx/kern/compare/v1.0.15...v1.0.16
 [1.0.15]: https://github.com/entrenchedosx/kern/compare/v1.0.14...v1.0.15
 [1.0.14]: https://github.com/entrenchedosx/kern/compare/v1.0.13...v1.0.14
 [1.0.13]: https://github.com/entrenchedosx/kern/compare/v1.0.12...v1.0.13

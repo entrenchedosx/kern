@@ -380,6 +380,9 @@ if(KERN_BUILD_GAME)
     )
     add_library(kern_gfx STATIC "${KERN_GAME_MODULE_DIR}/game_builtins.cpp" ${G2D_SOURCES})
     target_include_directories(kern_gfx PUBLIC ${KERN_TOOLCHAIN_PRIVATE_INCLUDES})
+    # import_resolution.cpp and other kern_core TUs use #ifdef KERN_BUILD_GAME; without this, --version
+    # can report Raylib while import("g2d") still hits the "unavailable" stub path.
+    target_compile_definitions(kern_core PRIVATE KERN_BUILD_GAME=1)
     target_compile_definitions(kern_gfx PRIVATE KERN_BUILD_GAME=1)
     # game_builtins / g2d call into VM + Value; GNU ld needs kern_core on the link line after kern_gfx.
     target_link_libraries(kern_gfx PUBLIC kern_core ${KERN_RAYLIB_TARGET})
