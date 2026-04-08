@@ -424,21 +424,19 @@ pub fn verify_toolchain_minimal_path(
 
     let path_env = minimal_verify_path(bin_dir, install_prefix);
 
-    let kern_raw = where_tool_paths(&path_env, "kern")?;
-    let kern_paths = detect::normalize_where_by_directory_prefer_cmd(kern_raw);
-    for p in &kern_paths {
-        assert_path_under_managed_bin(p, &bin_canon)?;
-    }
-    let kern_where = kern_paths[0].clone();
+    // Resolve shims by path — do not trust `where kern` / `where kargo`. A stray `C:\Windows\System32\kern`
+    // (no extension / wrong binary) can appear ahead of or beside managed `kern.cmd` in some setups.
+    let kern_where = kern_cmd
+        .canonicalize()
+        .unwrap_or_else(|_| kern_cmd.clone());
+    let kargo_where = kargo_cmd
+        .canonicalize()
+        .unwrap_or_else(|_| kargo_cmd.clone());
+    assert_path_under_managed_bin(&kern_where, &bin_canon)?;
+    assert_path_under_managed_bin(&kargo_where, &bin_canon)?;
 
-    let kargo_raw = where_tool_paths(&path_env, "kargo")?;
-    let kargo_paths = detect::normalize_where_by_directory_prefer_cmd(kargo_raw);
-    for p in &kargo_paths {
-        assert_path_under_managed_bin(p, &bin_canon)?;
-    }
-    let kargo_where = kargo_paths[0].clone();
-
-    let kern_ver = run_cmd_captured(&path_env, "kern --version")?;
+    let kern_inv = format!(r#""{}" --version"#, kern_where.display());
+    let kern_ver = run_cmd_captured(&path_env, &kern_inv)?;
     if !kern_ver.status.success() {
         return Err(AppError::msg(format!(
             "`kern --version` failed under minimal PATH.\nstdout:\n{}\nstderr:\n{}",
@@ -454,7 +452,8 @@ pub fn verify_toolchain_minimal_path(
     }
     assert_kern_output_contains_semver(&kern_line, exp.kern_semver)?;
 
-    let kargo_ver = run_cmd_captured(&path_env, "kargo --version")?;
+    let kargo_inv = format!(r#""{}" --version"#, kargo_where.display());
+    let kargo_ver = run_cmd_captured(&path_env, &kargo_inv)?;
     if !kargo_ver.status.success() {
         return Err(AppError::msg(format!(
             "`kargo --version` failed under minimal PATH.\nstdout:\n{}\nstderr:\n{}",
@@ -471,8 +470,8 @@ pub fn verify_toolchain_minimal_path(
     assert_kargo_output_matches(&kargo_line, exp.kargo_package_version)?;
 
     prog.ok("Strict verify (minimal PATH: managed bin + Windows system dirs):");
-    prog.info(&format!("    where kern  -> {}", kern_where.display()));
-    prog.info(&format!("    where kargo -> {}", kargo_where.display()));
+    prog.info(&format!("    kern shim -> {}", kern_where.display()));
+    prog.info(&format!("    kargo shim -> {}", kargo_where.display()));
     prog.info(&format!("    kern --version -> {}", kern_line));
     prog.info(&format!("    kargo --version -> {}", kargo_line));
 

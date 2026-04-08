@@ -262,6 +262,7 @@ pub fn run_install(p: InstallParams<'_>) -> Result<()> {
                     None,
                 );
                 clear_managed_payload(&p.prefix)?;
+                fs::create_dir_all(versions_dir(&p.prefix)).map_err(|e| path_ctx(&versions_dir(&p.prefix), e))?;
             }
             ExistingAction::Upgrade => {}
         }
@@ -383,6 +384,8 @@ pub fn run_install(p: InstallParams<'_>) -> Result<()> {
 
         prog.step("Promoting version directory...");
         let final_v = version_home(&p.prefix, &tag);
+        // Reinstall [6] removes `versions/` entirely; `rename` needs the parent directory to exist (Windows: ERROR_PATH_NOT_FOUND).
+        fs::create_dir_all(versions_dir(&p.prefix)).map_err(|e| path_ctx(&versions_dir(&p.prefix), e))?;
         if final_v.exists() {
             fs::remove_dir_all(&final_v).map_err(|e| path_ctx(&final_v, e))?;
         }

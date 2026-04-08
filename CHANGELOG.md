@@ -22,6 +22,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.17] - 2026-04-08
+
+### Fixed
+
+- **kern-bootstrap (Windows):** reinstall menu `[6]` removed `versions/` but did not recreate it before `rename`, causing `Promoting version directory` to fail with “path not found” (os error 3).
+- **kern-bootstrap (Windows):** post-install strict verify now invokes `kern.cmd` / `kargo.cmd` by full path instead of `where kern` / `where kargo`, so a stray `C:\Windows\System32\kern` cannot make verification fail when managed shims are correct.
+
+---
+
 ## [1.0.16] - 2026-04-08
 
 ### Fixed
@@ -299,7 +308,8 @@ Initial **Kern** release: **language** + **VM** + **builtins** + **`import`** mo
 
 - **CMake 3.14+**, **C++17**, optional **Raylib**; version from **`KERN_VERSION.txt`** (in post-1.0.0 trees; **`VERSION`** renamed in **1.0.6**).
 
-[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.16...HEAD
+[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.17...HEAD
+[1.0.17]: https://github.com/entrenchedosx/kern/compare/v1.0.16...v1.0.17
 [1.0.16]: https://github.com/entrenchedosx/kern/compare/v1.0.15...v1.0.16
 [1.0.15]: https://github.com/entrenchedosx/kern/compare/v1.0.14...v1.0.15
 [1.0.14]: https://github.com/entrenchedosx/kern/compare/v1.0.13...v1.0.14

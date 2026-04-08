@@ -1,6 +1,6 @@
 {
   "name": "kargo",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "private": true,
   "description": "Package manager for Kern: GitHub installs + Kern registry search",
   "type": "module",
