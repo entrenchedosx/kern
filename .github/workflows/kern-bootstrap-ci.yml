@@ -39,7 +39,15 @@ jobs:
           BS="cargo run --release --manifest-path kern-bootstrap/Cargo.toml --"
           PREFIX="${RUNNER_TEMP}/kern-bs-empty"
           mkdir -p "$PREFIX"
+          # Doctor exit: 0 healthy, 1 warnings only, 2 failures. Empty prefix → expect 2 (no kern / no active version).
+          set +e
           $BS doctor --prefix "$PREFIX"
+          code=$?
+          set -e
+          if [ "$code" -ne 2 ]; then
+            echo "expected doctor exit 2 on empty prefix, got $code"
+            exit 1
+          fi
           $BS list --prefix "$PREFIX"
 
       - name: Unit tests (Windows path helpers)
