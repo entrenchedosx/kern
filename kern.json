@@ -1,0 +1,8 @@
+{
+  "name": "kern-project",
+  "version": "1.0.17",
+  "entry": "src/main.kn",
+  "dependencies": {
+    "sec.auth": "^1.0.0"
+  }
+}

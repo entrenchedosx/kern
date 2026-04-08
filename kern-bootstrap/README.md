@@ -2,7 +2,7 @@
 
 Production-grade bootstrapper for **Kern** and **Kargo**. It downloads matching artifacts from a GitHub release (default [`entrenchedosx/kern`](https://github.com/entrenchedosx/kern)), verifies **Kargo** with `kargo-SHA256SUMS` and **Kern** with `kern-SHA256SUMS` when that file exists on the release, extracts with path-traversal checks, normalizes trees to `versions/<tag>/kern` and `versions/<tag>/kargo`, smoke-tests `kern --version`, and **rejects** Kern zips built without **Raylib** (`graphics: none` from `kern --version`) so `import("g2d")` / `import("g3d")` / `import("game")` work. Official release CI builds with **`KERN_BUILD_GAME=ON`**. Then it **renames** the staged tree into `versions/<tag>/` and switches the active pointer (`current` symlink on Unix, `active-release.txt` + optional directory junction on Windows) before refreshing `bin/` launchers. A cross-process lock (`<prefix>/.install.lock`) blocks concurrent installs.
 
-**Versioning:** The repo’s canonical toolchain version is **`KERN_VERSION.txt`** at the repository root (same value as `kern --version`). `kern-bootstrap --version` and `kern-bootstrap/Cargo.toml`’s `version` must stay identical to that file; the build script errors if they drift.
+**Versioning:** The repo’s canonical toolchain version is **`KERN_VERSION.txt`** at the repository root (same value as `kern --version`). `kern-bootstrap --version` and `kern-bootstrap/Cargo.toml`’s `version` must stay identical to that file; the build script errors if they drift. On release, also match **`kargo/package.json`**, **`kern-registry/package.json`**, and root **`kern.json`** (see **`docs/RELEASE_CHECKLIST.md`**).
 
 ## Install (from GitHub Releases)
 

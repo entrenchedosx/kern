@@ -257,11 +257,11 @@ See [docs/TESTING.md](docs/TESTING.md) for example sweeps, `kernc` tests, and st
 
 ## Releases & versioning
 
-- **Version:** `KERN_VERSION.txt` at repo root (e.g. `1.0.12`).
+- **Version:** [`KERN_VERSION.txt`](KERN_VERSION.txt) at repo root (semver). Keep **`kern-bootstrap/Cargo.toml`**, **`kargo/package.json`**, and **`kern-registry/package.json`** on the same value (see [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)).
 - **Changelog:** [CHANGELOG.md](CHANGELOG.md) follows [Keep a Changelog](https://keepachangelog.com/).
-- **Tags:** release tags look like `v1.0.12` (see [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)).
+- **Tags:** release tags are `v` + that semver (e.g. `v1.0.17`).
 - **CI:** [`.github/workflows/windows-kern.yml`](.github/workflows/windows-kern.yml), [`.github/workflows/linux-kern.yml`](.github/workflows/linux-kern.yml), and [`.github/workflows/macos-kern.yml`](.github/workflows/macos-kern.yml) build and smoke-test on pushes and PRs.
-- **Releases:** Pushing a `v*` tag runs [`.github/workflows/release.yml`](.github/workflows/release.yml), which uploads **Windows** (zip, Raylib-enabled), **Linux** (`.tar.gz`, headless), and **macOS** (`.tar.gz`, headless) assets to the GitHub Release.
+- **Releases:** Pushing a `v*` tag runs [`.github/workflows/release.yml`](.github/workflows/release.yml), which uploads **Windows** (zip + NSIS, Raylib-enabled), **Linux** (`.tar.gz`, Raylib-enabled), and **macOS** (`.tar.gz`, Raylib-enabled) assets to the GitHub Release.
 
 ---
 

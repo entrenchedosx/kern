@@ -4,9 +4,9 @@ Use this before tagging a public release. Pair with [RELEASE.md](../RELEASE.md) 
 
 ## Pre-release
 
-- [ ] **Version:** update root [`KERN_VERSION.txt`](../KERN_VERSION.txt) (semver, e.g. `1.0.7`).
+- [ ] **Version:** set root [`KERN_VERSION.txt`](../KERN_VERSION.txt) to semver `X.Y.Z`, then align the same value in [`kern-bootstrap/Cargo.toml`](../kern-bootstrap/Cargo.toml), [`kargo/package.json`](../kargo/package.json), [`kern-registry/package.json`](../kern-registry/package.json), and root [`kern.json`](../kern.json) (`version` field). Run `npm install --package-lock-only` under `kern-registry/` if you change its `package.json` version.
 - [ ] **Changelog:** move `[Unreleased]` items into a dated section with the new version; keep `[Unreleased]` empty or stub for the next cycle.
-- [ ] **README:** badge/version line matches `KERN_VERSION.txt` if you display it explicitly.
+- [ ] **README:** the version badge points at `KERN_VERSION.txt`; confirm the badge text matches after editing.
 - [ ] **CI green:** latest `main` passes [Windows Kern](../.github/workflows/windows-kern.yml), [Linux Kern](../.github/workflows/linux-kern.yml), and [macOS Kern](../.github/workflows/macos-kern.yml) (all three build **with** Raylib / `import g2d`).
 
 ## Build & test (local or CI)

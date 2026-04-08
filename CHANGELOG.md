@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **Build layout (Phase 7):** C++ CLI entrypoints moved to **`kern/tools/`** (`main.cpp`, `kernc_main.cpp`, `repl_main.cpp`, `lsp_main.cpp`, `scan_main.cpp`, **`version_info.rc.in`**). Shared toolchain objects compile into static **`kern_core`**; Raylib/game surface is **`kern_gfx`** linked only by binaries that need graphics (not **`kern_lsp`**). CMake: **`KERN_TOOLS_DIR`** / **`KERN_CLI_DIR`** → **`kern/tools/`**; repo-root launchers use **`KERN_REPO_TOOLS_DIR`** (`tools/`).
 
+- **Version metadata:** `kern.json`, `kern-registry/package.json`, and `kern-registry/package-lock.json` root entries aligned with **`KERN_VERSION.txt`**; **`README.md`**, **`RELEASE.md`**, and **`docs/RELEASE_CHECKLIST.md`** document matching files and avoid stale example versions.
+
 ---
 
 ## [1.0.17] - 2026-04-08
