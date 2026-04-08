@@ -1,4 +1,6 @@
-use crate::error::{path_ctx, AppError, Result};
+use crate::error::{path_ctx, Result};
+#[cfg(windows)]
+use crate::error::AppError;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 

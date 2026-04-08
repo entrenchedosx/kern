@@ -59,9 +59,10 @@ fn is_executable_file(p: &Path) -> bool {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        if let Ok(m) = p.metadata() {
-            return m.permissions().mode() & 0o111 != 0;
-        }
+        return p
+            .metadata()
+            .map(|m| m.permissions().mode() & 0o111 != 0)
+            .unwrap_or(false);
     }
     #[cfg(windows)]
     {

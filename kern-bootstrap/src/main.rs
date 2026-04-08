@@ -323,6 +323,7 @@ fn run() -> Result<(), AppError> {
                 .prefix
                 .clone()
                 .unwrap_or_else(detect::default_user_prefix);
+            #[cfg(windows)]
             let prefix_for_shell = prefix.clone();
             let code = doctor::run_doctor(doctor::DoctorParams {
                 prefix,

@@ -19,7 +19,7 @@ use crate::state::InstallState;
 use crate::versions_cmd;
 use serde_json::Value;
 use std::fs;
-use std::io::{BufRead, IsTerminal};
+use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -554,7 +554,7 @@ pub fn run_install(p: InstallParams<'_>) -> Result<()> {
             prog.ok(&format!("  Kargo: {}", win_tc.kargo_line));
             crate::shell_hint::print_windows_session_path_hint(&bin, &prog);
             if p.activate_here {
-                if p.non_interactive || !std::io::stdin().is_terminal() {
+                if p.non_interactive || !std::io::IsTerminal::is_terminal(&std::io::stdin()) {
                     prog.warn(
                         "--activate-here ignored (non-interactive mode or stdin is not a TTY)",
                     );

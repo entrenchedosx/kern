@@ -27,6 +27,7 @@ pub fn run_doctor(p: DoctorParams) -> Result<i32> {
     prog.step("Running diagnostics...");
     let mut fails = 0u32;
     let mut warns = 0u32;
+    #[cfg(windows)]
     let mut stale_shell_external = false;
 
     let kern_raw = dedupe_paths(&detect::all_on_path("kern"));
@@ -70,7 +71,10 @@ pub fn run_doctor(p: DoctorParams) -> Result<i32> {
                 }
             }
             if i == 0 && !path.starts_with(&p.prefix) {
-                stale_shell_external = true;
+                #[cfg(windows)]
+                {
+                    stale_shell_external = true;
+                }
                 prog.err(&format!(
                     "[PATH] {} [EXTERNAL] The `kern` that runs first is NOT under managed prefix {} — you are not using the managed Kern from this install.\n         {}",
                     active,

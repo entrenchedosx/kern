@@ -1,16 +1,21 @@
 //! On Windows, Kargo is launched with Node. Clean machines often have no Node — download official
 //! Node.js x64 zip from nodejs.org under `<prefix>/tools/nodejs/` (includes npm).
 
-use crate::download::{
-    download_to_file, verify_sha256sum_file, DownloadContext,
-};
-use crate::error::{path_ctx, AppError, Result};
-use crate::extract::{extract_zip, find_single_subdirectory};
+use crate::error::Result;
 use crate::progress::Progress;
-use crate::tree_copy::copy_dir_all;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+#[cfg(windows)]
+use crate::download::{download_to_file, verify_sha256sum_file, DownloadContext};
+#[cfg(windows)]
+use crate::error::{path_ctx, AppError};
+#[cfg(windows)]
+use crate::extract::{extract_zip, find_single_subdirectory};
+#[cfg(windows)]
+use crate::tree_copy::copy_dir_all;
+#[cfg(windows)]
+use std::fs;
 
 /// Default Node.js version to bundle when `node` is missing (LTS). Override with `KERN_BOOTSTRAP_NODE_VERSION`.
 pub const EMBEDDED_NODE_WIN_VERSION_DEFAULT: &str = "20.18.1";

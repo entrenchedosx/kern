@@ -2,6 +2,8 @@
 
 use crate::progress::Progress;
 use std::path::Path;
+
+#[cfg(windows)]
 use std::process::Command;
 
 fn ps_single_quoted_literal(s: &str) -> String {
