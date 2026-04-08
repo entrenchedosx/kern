@@ -1,6 +1,6 @@
 [package]
 name = "kern-bootstrap"
-version = "1.0.14"
+version = "1.0.15"
 edition = "2021"
 license = "GPL-3.0"
 description = "Production bootstrapper for Kern + Kargo from GitHub Releases"

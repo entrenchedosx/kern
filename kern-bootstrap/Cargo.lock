@@ -807,7 +807,7 @@ dependencies = [
 
 [[package]]
 name = "kern-bootstrap"
-version = "1.0.14"
+version = "1.0.15"
 dependencies = [
  "chrono",
  "clap",

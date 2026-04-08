@@ -22,6 +22,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.15] - 2026-04-08
+
+### Fixed
+
+- **Release CI:** `kern-bootstrap` builds on Linux/macOS (import `DownloadContext` for the non-Windows `ensure_windows_node_for_kargo` stub).
+- **Linux link (graphics):** `kern_gfx` now links `kern_core` so `game_builtins` / g2d resolve `VM` / `Value` symbols under GNU `ld`.
+- **Release CI:** stable `.kn` suite runs with default permission enforcement (`KERN_ENFORCE_PERMISSIONS` was incorrectly forced off for the coverage step, breaking `test_permissions_smoke`).
+- **Release CI:** Intel macOS bootstrapper builds on `macos-latest` via `x86_64-apple-darwin` (replaces removed `macos-13` runner).
+
+---
+
 ## [1.0.14] - 2026-04-06
 
 ### Fixed
@@ -280,7 +291,8 @@ Initial **Kern** release: **language** + **VM** + **builtins** + **`import`** mo
 
 - **CMake 3.14+**, **C++17**, optional **Raylib**; version from **`KERN_VERSION.txt`** (in post-1.0.0 trees; **`VERSION`** renamed in **1.0.6**).
 
-[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.14...HEAD
+[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.15...HEAD
+[1.0.15]: https://github.com/entrenchedosx/kern/compare/v1.0.14...v1.0.15
 [1.0.14]: https://github.com/entrenchedosx/kern/compare/v1.0.13...v1.0.14
 [1.0.13]: https://github.com/entrenchedosx/kern/compare/v1.0.12...v1.0.13
 [1.0.12]: https://github.com/entrenchedosx/kern/compare/v1.0.11...v1.0.12

@@ -8,6 +8,8 @@ use std::process::Command;
 
 #[cfg(windows)]
 use crate::download::{download_to_file, verify_sha256sum_file, DownloadContext};
+#[cfg(not(windows))]
+use crate::download::DownloadContext;
 #[cfg(windows)]
 use crate::error::{path_ctx, AppError};
 #[cfg(windows)]

@@ -84,7 +84,6 @@ jobs:
         shell: pwsh
         env:
           KERN_COVERAGE_SKIP_GRAPHICS: "1"
-          KERN_ENFORCE_PERMISSIONS: "0"
         run: pwsh -NoProfile -File ./tests/run_stable.ps1
 
       - name: Install registry CLI deps for portable bundle
@@ -187,7 +186,6 @@ jobs:
       - name: Stable suite (contract, golden, coverage)
         env:
           KERN_COVERAGE_SKIP_GRAPHICS: "1"
-          KERN_ENFORCE_PERMISSIONS: "0"
         run: pwsh -NoProfile -File ./tests/run_stable.ps1
 
       - name: Package tarball
@@ -263,7 +261,6 @@ jobs:
       - name: Stable suite (contract, golden, coverage)
         env:
           KERN_COVERAGE_SKIP_GRAPHICS: "1"
-          KERN_ENFORCE_PERMISSIONS: "0"
         run: pwsh -NoProfile -File ./tests/run_stable.ps1
 
       - name: Package tarball
@@ -340,7 +337,8 @@ jobs:
           - os: macos-latest
             target: aarch64-apple-darwin
             suffix: macos-arm64
-          - os: macos-13
+          # Intel slice: cross-compile from Apple Silicon (macos-13 runner removed upstream).
+          - os: macos-latest
             target: x86_64-apple-darwin
             suffix: macos-x64
     steps:
