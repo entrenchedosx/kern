@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 
 - **kern-bootstrap:** `install` / `upgrade` now default to this binary’s **semver** (same as `KERN_VERSION.txt` / `Cargo.toml`) instead of GitHub **`releases/latest`**, avoiding install races after a tag push and checksum failures when `latest` still referred to an older release.
+- **kern-bootstrap (Windows):** strict verify no longer runs `cmd /c` with **canonical `\\?\`…** shim paths (cmd rejects them); it invokes **`kern.cmd` / `kargo.cmd`** via normal paths while still using canonical paths for under-`bin/` checks.
 
 ---
 

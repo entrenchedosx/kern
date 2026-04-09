@@ -435,7 +435,9 @@ pub fn verify_toolchain_minimal_path(
     assert_path_under_managed_bin(&kern_where, &bin_canon)?;
     assert_path_under_managed_bin(&kargo_where, &bin_canon)?;
 
-    let kern_inv = format!(r#""{}" --version"#, kern_where.display());
+    // Invoke shims by non-verbatim paths. `canonicalize()` on Windows returns `\\?\` prefixes;
+    // `cmd.exe /C` does not treat those as valid command lines (quoted verbatim paths fail).
+    let kern_inv = format!(r#""{}" --version"#, kern_cmd.display());
     let kern_ver = run_cmd_captured(&path_env, &kern_inv)?;
     if !kern_ver.status.success() {
         return Err(AppError::msg(format!(
@@ -452,7 +454,7 @@ pub fn verify_toolchain_minimal_path(
     }
     assert_kern_output_contains_semver(&kern_line, exp.kern_semver)?;
 
-    let kargo_inv = format!(r#""{}" --version"#, kargo_where.display());
+    let kargo_inv = format!(r#""{}" --version"#, kargo_cmd.display());
     let kargo_ver = run_cmd_captured(&path_env, &kargo_inv)?;
     if !kargo_ver.status.success() {
         return Err(AppError::msg(format!(
