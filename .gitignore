@@ -1,4 +1,7 @@
 # Build
+kern-bootstrap/target/
+kern-portable-bootstrap/target/
+release-staging-*/
 build/
 BUILD/
 build-ide/
@@ -73,6 +76,10 @@ tools/**/downloads/
 *.swp
 .DS_Store
 Thumbs.db
+
+# Kargo / registry local install (machine-specific paths; never commit)
+.kern/
+kern.lock
 
 # Kern IDE / analyzer local state (optional)
 .kern-ide-state.json

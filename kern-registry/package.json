@@ -1,6 +1,6 @@
 {
   "name": "kern-registry",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "private": true,
   "description": "Production-grade package registry toolkit for Kern",
   "type": "module",

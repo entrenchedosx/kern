@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+---
+
+## [1.0.20] - 2026-04-06
+
+### Added
+
+- **`kern-portable-bootstrap/`** — Windows-first **`kern-portable.exe`**: `init` / `upgrade` / `doctor` with SHA256 verification, artifact cache (`integrity.json` v2), atomic staging and rollback, `KERN_ROOT_CACHE`, and delegation to **`.kern/bin/kern.exe`** with inherited stdio. Release ships **`kern-core.exe`**, **`kern-runtime.zip`**, **`kern-portable.exe`**, **`kern-SHA256SUMS`**, **`kargo-<tag>.tar.gz`**, **`kargo-SHA256SUMS`**.
+
+### Changed
+
+- **`kern` (Windows):** if **`kargo.toml`** exists and **`.kern/bin/kargo.cmd`** is found walking upward, **`kern add`** / **`kern remove`** delegate to the portable Kargo shim (`install` / `remove`).
+
 ---
 
 ## [1.0.19] - 2026-04-10
@@ -329,7 +343,8 @@ Initial **Kern** release: **language** + **VM** + **builtins** + **`import`** mo
 
 - **CMake 3.14+**, **C++17**, optional **Raylib**; version from **`KERN_VERSION.txt`** (in post-1.0.0 trees; **`VERSION`** renamed in **1.0.6**).
 
-[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.19...HEAD
+[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.20...HEAD
+[1.0.20]: https://github.com/entrenchedosx/kern/compare/v1.0.19...v1.0.20
 [1.0.19]: https://github.com/entrenchedosx/kern/compare/v1.0.18...v1.0.19
 [1.0.18]: https://github.com/entrenchedosx/kern/compare/v1.0.17...v1.0.18
 [1.0.17]: https://github.com/entrenchedosx/kern/compare/v1.0.16...v1.0.17

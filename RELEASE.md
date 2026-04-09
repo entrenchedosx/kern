@@ -8,7 +8,7 @@ This guide is for **users** who want to run Kern (run scripts, use the REPL) and
 
 ### Option A: Pre-built binaries (when available)
 
-1. Download the latest release for your OS (artifact names follow `kern-windows-x64-vX.Y.Z.zip`, `kern-linux-x64-vX.Y.Z.tar.gz`, `kern-macos-vX.Y.Z.tar.gz` — replace `X.Y.Z` with the release semver from the **Releases** page).
+1. Download the latest release for your OS (artifact names follow `kern-windows-x64-vX.Y.Z.zip`, `kern-linux-x64-vX.Y.Z.tar.gz`, `kern-macos-arm64-vX.Y.Z.tar.gz` / `kern-macos-x64-vX.Y.Z.tar.gz` — replace `X.Y.Z` with the release semver from the **Releases** page).
 2. Unzip to a folder (e.g. `C:\Program Files\Kern` or `~/bin`).
 3. Add that folder to your PATH (optional but recommended).
 4. Run:
@@ -18,6 +18,62 @@ This guide is for **users** who want to run Kern (run scripts, use the REPL) and
    - `kern --help` — show all options
 
 The Windows portable build is intended to be self-contained: no extra runtime installs are required. Graphics support (when included) is bundled as part of the distribution.
+
+### Option A2: Project-local `.kern/` (Windows, no global install)
+
+GitHub Releases also ship **portable-env** artifacts built by CI:
+
+| Asset | Role |
+|--------|------|
+| `kern-portable.exe` | Tiny bootstrapper: `kern-portable init` downloads `kern-core.exe`, `kern-runtime.zip`, and the same release’s `kargo-*.tar.gz`, lays out `./.kern/` (`bin/kern.exe`, `kargo.cmd`, `runtime/`, bundled Node if needed), then **`kern-portable <args>`** forwards to `.kern/bin/kern.exe`. |
+| `kern-core.exe` | Copy of the full `kern` compiler (same as in the big zip). |
+| `kern-runtime.zip` | `kern-registry` tree (CLI + `node_modules`) extracted under `.kern/runtime/kern-registry/`. |
+
+**Note:** The bootstrapper’s `init` is **not** the same as the compiler’s `kern init` (which scaffolds `kern.json`). After `kern-portable init`, use `.kern/bin/kern.exe init` if you need the project scaffold. On Windows there is no Unix `exec`; the bootstrapper **spawns** the local `kern.exe` and exits with its status.
+
+#### Portable Kern environments (Windows)
+
+Kern supports fully isolated, per-project environments under `.kern/`.
+
+**Initialize**
+
+```text
+kern-portable init
+```
+
+Useful options: `--latest`, `--nightly`, `--version <tag>`, `--force`, `--project <dir>`.
+
+**Upgrade** (keeps `packages/` and `lock.toml` when present)
+
+```text
+kern-portable upgrade
+```
+
+**Layout**
+
+After init, `.kern/` contains `bin/kern.exe`, `bin/kargo.cmd`, `runtime/`, `packages/`, `cache/`, and config. Dependencies stay inside the project.
+
+**Security**
+
+Downloads are verified with SHA256. Official releases **must** ship **`kern-SHA256SUMS`** and **`kargo-SHA256SUMS`**; installs fail if verification fails or those files are missing.
+
+**Portability**
+
+Projects are portable: zip → move → unzip → run. No machine-wide install is required on the target system.
+
+**Reliability**
+
+Installs use temp staging and rollback on failure; upgrades can preserve your package tree and lockfile.
+
+**Delegation**
+
+Windows does not support true process replacement; the bootstrapper runs `.kern/bin/kern.exe` as a child with inherited stdin/stdout/stderr and exits with its status.
+
+**Naming**
+
+- **`kern-portable.exe`** (bootstrapper) vs **`.kern/bin/kern.exe`** (full compiler copied from **`kern-core.exe`** on the GitHub release). Invoking **`kern-portable`** in a project delegates to the local core; **`kern-core.exe`** is the release artifact name only.
+
+**Requirements for `kern-portable init`:** network access to GitHub (and optionally nodejs.org if Node is not already installed). The release must include **`kargo-<tag>.tar.gz`** (published by the same release workflow) so Kargo can be unpacked into `.kern/kargo/`.
 
 **First run (Windows):** The first time you start `kern.exe` for your user account, Kern self-registers under **HKCU** (no admin): **`.kn`** → **KernFile**, type name **“Kern Script”**, **Content Type** `text/x-kern`, **DefaultIcon** from **`<exe_dir>\\kern_logo.ico`** when present else **`kern.exe,0`**, **open** command **`\"path\\to\\kern.exe\" \"%1\"`**, optional context menu **Edit with Kern**, then **`SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, …)`** (plus a flush notify). It writes **`%APPDATA%\\kern\\setup_done.flag`** so later launches only stat that file and skip. Run **`kern --repair-association`** to re-apply if something breaks. Set **`KERN_SKIP_FILE_ASSOCIATION`** to any value (e.g. in CI) to disable auto setup. Set **`KERN_RESTART_EXPLORER_AFTER_ASSOC`** to force **Explorer restart** after association (brief desktop blink; last resort for stubborn icon cache). Errors go to **`%APPDATA%\\kern\\setup.log`**; Kern keeps running.
 
@@ -71,14 +127,19 @@ Use the **[Kern-IDE](Kern-IDE/README.md)** directory: Tk desktop IDE, Qt editor,
    - Smoke-test: `kern --version`, `kern --help`, `kern examples/basic/01_hello_world.kn`, `kern` (REPL: exit), and if built with game: `kern examples/graphics/graphics_demo.kn`.
 
 5. **Package**
-   - Create archives (e.g. `kern-windows-x64-vX.Y.Z.zip`, `kern-linux-x64-vX.Y.Z.tar.gz`, `kern-macos-vX.Y.Z.tar.gz`) containing:
-     - `kern`, `kernc`, `kern-scan`, `kern_game`, `kern_repl`, `kern_lsp`, `kern_contract_humanize` (with OS-specific `.exe` on Windows).
-     - Optional: `examples/`, `docs/`, `LICENSE`, `README.md`.
+   - **Windows (bootstrapper-compatible zip from your local Release build):** after `cmake --build build --config Release --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize`, run:
+     - `pwsh -NoProfile -File scripts/package-windows-kern-github-release-zip.ps1`
+     - Produces `kern-windows-x64-vX.Y.Z.zip` and `kern-SHA256.partial-windows` at the repo root, matching [`.github/workflows/release.yml`](.github/workflows/release.yml) layout (including embedded `kern-registry` with `npm ci`).
+   - **Upload that zip to an existing GitHub release** (same asset name the bootstrapper downloads): install [GitHub CLI](https://cli.github.com/), `gh auth login`, then:
+     - `pwsh -NoProfile -File scripts/upload-kern-windows-zip-to-github-release.ps1 -Tag vX.Y.Z`
+     - The tag’s release must already exist. For a **full** multi-platform release with merged checksums and `kern-bootstrap-*` binaries, prefer pushing tag `vX.Y.Z` and letting CI attach all artifacts.
+   - Other platforms: create archives (e.g. `kern-linux-x64-vX.Y.Z.tar.gz`, `kern-macos-arm64-vX.Y.Z.tar.gz`, `kern-macos-x64-vX.Y.Z.tar.gz`) per the workflow, or rely on CI.
+   - Each archive should include: `kern`, `kernc`, `kern-scan`, `kern_game`, `kern_repl`, `kern_lsp`, `kern_contract_humanize` (`.exe` on Windows), plus `LICENSE` / `README.md` / `KERN_VERSION.txt` as in CI.
    - Optionally coordinate a **Kern-IDE** release (separate repository) for editor binaries.
 
 6. **Publish**
-   - Create a Git tag `vX.Y.Z` matching `KERN_VERSION.txt`.
-   - Attach the package(s) to the GitHub (or other) release and copy the relevant part of `CHANGELOG.md` into the release notes.
+   - Create a Git tag `vX.Y.Z` matching `KERN_VERSION.txt` and push it so **Release** CI builds and attaches all assets, **or** attach packages manually / via `gh release upload` as above.
+   - Copy the relevant part of `CHANGELOG.md` into the release notes.
 
 ### shareable drops used in this repository
 
