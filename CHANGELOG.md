@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **kern-bootstrap:** `install` / `upgrade` now default to this binary’s **semver** (same as `KERN_VERSION.txt` / `Cargo.toml`) instead of GitHub **`releases/latest`**, avoiding install races after a tag push and checksum failures when `latest` still referred to an older release.
+
 ---
 
 ## [1.0.18] - 2026-04-09

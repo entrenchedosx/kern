@@ -13,6 +13,10 @@ On each `v*` release, CI publishes executables named like:
 - `kern-bootstrap-<semver>-macos-arm64`
 - `kern-bootstrap-<semver>-macos-x64`
 
+**Kern** macOS payloads on the same release are **`kern-macos-arm64-v<semver>.tar.gz`** and **`kern-macos-x64-v<semver>.tar.gz`**; this tool picks the one that matches the host CPU. Older releases may only ship **`kern-macos-v<semver>.tar.gz`** (Apple Silicon); that name is still tried last so installs against old tags keep working.
+
+**Maintainers:** the Windows zip this tool downloads is built by release CI or locally via **`scripts/package-windows-kern-github-release-zip.ps1`** (must match **`kern-windows-x64-v<semver>.zip`** exactly). Upload with **`scripts/upload-kern-windows-zip-to-github-release.ps1`** or a full tag push; see **[RELEASE.md](../RELEASE.md)**.
+
 Download the file for your OS, then:
 
 **Linux / macOS**
@@ -54,7 +58,7 @@ Common flags:
 - `--log-json` or `-vv`: append structured JSON lines to `~/.kern/install.log`
 - `-v` / `--verbose`: extra stderr detail (use twice for JSON install log, same as `--log-json`)
 - `--repo owner/name`: alternate GitHub repo
-- `--version v1.2.3` or `--version latest`: release to use (default latest)
+- `--version v1.2.3` or `--version latest`: release to use (default: **this bootstrapper’s semver**, same as official GitHub tag; use `latest` for GitHub’s newest release)
 - `--prefix /path`: install prefix
 - `--system`: default prefix `/usr/local` (Unix) or `C:\Program Files\Kern` (Windows)
 - `--no-modify-path`: do not edit shell config or Windows user `PATH`

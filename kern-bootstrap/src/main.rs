@@ -71,7 +71,7 @@ enum Commands {
     /// Install or refresh Kern + Kargo under the chosen prefix
     #[command(visible_alias = "INSTALL")]
     Install(InstallOpts),
-    /// Same as install with latest release; skips interactive menu when state exists
+    /// Same as `install` (same default release); skips interactive menu when state exists
     #[command(visible_alias = "UPGRADE")]
     Upgrade(InstallOpts),
     /// Remove managed binaries, versions, and optional PATH changes
@@ -102,6 +102,8 @@ enum Commands {
 
 #[derive(Parser, Debug)]
 struct InstallOpts {
+    /// Release to install: `1.2.3` / `v1.2.3`, or `latest` for GitHub's current "latest" release.
+    /// Default is this binary's version (aligned with `KERN_VERSION.txt` for official builds).
     #[arg(long)]
     version: Option<String>,
 
@@ -231,7 +233,7 @@ fn release_spec(cmd: &InstallOpts) -> String {
     cmd.version
         .clone()
         .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "latest".to_string())
+        .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string())
 }
 
 fn lock_wait_prompt(ni: bool) -> bool {
