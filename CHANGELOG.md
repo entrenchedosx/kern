@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.18] - 2026-04-09
+
+### Fixed
+
+- **CLI permissions:** `kern` now defaults to **permissive** permission enforcement (trust-the-programmer for local scripts and examples). Set **`KERN_ENFORCE_PERMISSIONS=1`** to restore strict gating. Debug-mode script runs use an **unlimited VM step budget** so game-style loops no longer hit `VM-STEP-LIMIT` under the default `--debug` profile.
+- **kern-bootstrap / releases:** macOS installs now target **arch-specific** Kern tarballs (`kern-macos-arm64-v*`, `kern-macos-x64-v*`) with a **legacy** `kern-macos-v*` fallback for older tags; previously a single Apple-Silicon tarball was offered under the generic name, which could not run on **Intel Macs**. Release CI builds both slices (full stable suite on arm64; smoke tests on x64).
+- **kern-bootstrap:** GitHub API **User-Agent** uses the real bootstrapper version (from `KERN_VERSION.txt` / `Cargo.toml`) instead of a hard-coded `kern-bootstrap/0.1`.
+
 ### Added
 
 - **`kargo/`** — standalone Node CLI for **GitHub-only** packages: `install` / `remove` / `update` / `list` / `search` / `publish` / `login` / `build` / `run`. Caches under `~/.kargo/packages`, writes **`kargo.lock`** (tag + **commit SHA**, **`resolved_constraints`** / **`resolved_from`** / **`resolved_version_range`** / optional **`resolved_version_range_normalized`**, v2), **deterministic JSON** (sorted `packages`, fixed per-entry key order), merges **`.kern/package-paths.json`**. **Resolver:** `[dependencies]` **semver ranges**, **deterministic** ordering (sorted package ids / constraints / edges), **per-run `ls-remote` cache**, **prerelease fallback** when no stable tag matches (toggle via **`[kargo] allow_prerelease`**), structured **resolution failure** messages with sampled versions; **`--resolve-debug`** prints an expanded **decision trace** (`why_selected`, rejections + selection reason, `resolution_mode`) + tree on stderr; **`--verbose`** prints a short **why this version** for the root on **`install` / `update <spec>`**. **Conflict errors** include a **minimal unsatisfiable core** when smaller than the full constraint list. **`[kargo] resolution_mode = "locked"`** uses **kargo.lock** only for versions (CI-style); **`latest`** resolves from remote tags. **`kargo graph`** (`--json` optional) draws the dependency tree from **kargo.toml** + on-disk manifests + lock. **`kargo update`** (no args) resolves the full graph from **`kargo.toml`**. **`install.ps1`** / **`install.sh`** copy `kargo` to `<prefix>/lib/kargo`, run `npm install --omit=dev`, and add **`kargo`** beside **`kern`**. **`kern`** import resolution accepts **`owner/repo`** and **`github.com/owner/repo`** when listed in `package-paths.json`. **`build.ps1`** stages **`BUILD/lib/kargo`** and **`BUILD/bin/kargo.cmd`** for **NSIS**. **`install.sh`** sets **`PATH_BIN`** before the kargo shim copy.
@@ -310,7 +320,8 @@ Initial **Kern** release: **language** + **VM** + **builtins** + **`import`** mo
 
 - **CMake 3.14+**, **C++17**, optional **Raylib**; version from **`KERN_VERSION.txt`** (in post-1.0.0 trees; **`VERSION`** renamed in **1.0.6**).
 
-[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.17...HEAD
+[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.18...HEAD
+[1.0.18]: https://github.com/entrenchedosx/kern/compare/v1.0.17...v1.0.18
 [1.0.17]: https://github.com/entrenchedosx/kern/compare/v1.0.16...v1.0.17
 [1.0.16]: https://github.com/entrenchedosx/kern/compare/v1.0.15...v1.0.16
 [1.0.15]: https://github.com/entrenchedosx/kern/compare/v1.0.14...v1.0.15
