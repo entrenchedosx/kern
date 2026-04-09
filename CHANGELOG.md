@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.19] - 2026-04-10
+
 ### Fixed
 
 - **kern-bootstrap:** `install` / `upgrade` now default to this binary’s **semver** (same as `KERN_VERSION.txt` / `Cargo.toml`) instead of GitHub **`releases/latest`**, avoiding install races after a tag push and checksum failures when `latest` still referred to an older release.
@@ -325,7 +329,8 @@ Initial **Kern** release: **language** + **VM** + **builtins** + **`import`** mo
 
 - **CMake 3.14+**, **C++17**, optional **Raylib**; version from **`KERN_VERSION.txt`** (in post-1.0.0 trees; **`VERSION`** renamed in **1.0.6**).
 
-[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.18...HEAD
+[Unreleased]: https://github.com/entrenchedosx/kern/compare/v1.0.19...HEAD
+[1.0.19]: https://github.com/entrenchedosx/kern/compare/v1.0.18...v1.0.19
 [1.0.18]: https://github.com/entrenchedosx/kern/compare/v1.0.17...v1.0.18
 [1.0.17]: https://github.com/entrenchedosx/kern/compare/v1.0.16...v1.0.17
 [1.0.16]: https://github.com/entrenchedosx/kern/compare/v1.0.15...v1.0.16
