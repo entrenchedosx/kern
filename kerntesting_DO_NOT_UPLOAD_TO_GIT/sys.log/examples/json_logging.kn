@@ -1,0 +1,8 @@
+let slog = import("sys.log")
+let lg = slog["create_logger"]({
+    "name": "orders-api",
+    "level": "info",
+    "format": "json",
+    "redact_keys": ["token", "password"]
+})
+slog["info"](lg, "order accepted", { "order_id": "ord-100", "token": "tok_live_abc" })

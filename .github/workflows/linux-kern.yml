@@ -44,7 +44,7 @@ jobs:
             -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF
 
       - name: Build
-        run: cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize
+        run: cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize kargo
 
       - name: Smoke
         run: |
@@ -111,7 +111,7 @@ jobs:
             -DKERN_WERROR=OFF
 
       - name: Build
-        run: cmake --build build-dbg --parallel 4 --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize
+        run: cmake --build build-dbg --parallel 4 --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize kargo
 
       # Bash path avoids needing pwsh for contract + golden only (coverage skipped with --quick).
       - name: Quick stable (contract + golden, Debug tree)

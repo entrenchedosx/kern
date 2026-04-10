@@ -1,0 +1,14 @@
+{
+  "name": "sec.secrets",
+  "version": "1.0.0",
+  "main": "src/index.kn",
+  "dependencies": {
+    "sec.crypto": "^1.0.0",
+    "sys.config": "^1.0.0"
+  },
+  "trusted": false,
+  "dist": {
+    "tarball": "../../../dist/sec.secrets/sec.secrets-1.0.0.tgz",
+    "shasum": "sha256-4b46e80ce0aa2d7ebf9533d4cfdcc7904a12c5db9091c172354c3d4933ad767c"
+  }
+}

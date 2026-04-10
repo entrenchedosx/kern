@@ -6,6 +6,7 @@
 #endif
 #include "import_resolution.hpp"
 #include "platform/env_compat.hpp"
+#include "platform/kern_env.hpp"
 #include "compiler/lexer.hpp"
 #include "compiler/parser.hpp"
 #include "compiler/codegen.hpp"
@@ -42,46 +43,31 @@ namespace kern {
 namespace {
 namespace fs = std::filesystem;
 
-#ifdef _WIN32
-#include <windows.h>
-#endif
-
-static fs::path getExecutableDir() {
-    std::error_code ec;
-#ifdef _WIN32
-    char buf[MAX_PATH];
-    DWORD n = GetModuleFileNameA(nullptr, buf, MAX_PATH);
-    if (n > 0 && n < MAX_PATH) {
-        fs::path p(std::string(buf, n));
-        if (p.has_parent_path()) return p.parent_path();
-    }
-#endif
-    fs::path cwd = fs::current_path(ec);
-    return ec ? fs::path() : cwd;
-}
-
 static void addBundledStdlibRootIfPresent(std::vector<fs::path>& roots) {
-    // If a portable drop ships `lib/kern/` next to `kern.exe`, prefer that automatically
-    // so users don't need KERN_LIB.
-    fs::path exeDir = getExecutableDir();
-    if (exeDir.empty()) return;
-    fs::path libKern = exeDir / "lib" / "kern";
     std::error_code ec;
-    if (fs::is_directory(libKern, ec) && !ec) {
-        roots.push_back(exeDir);
+    if (auto kr = tryResolveKernRoot()) {
+        if (!isResolvedToolchainRoot(*kr)) return;
+        fs::path libKern = *kr / "lib" / "kern";
+        if (fs::is_directory(libKern, ec) && !ec) roots.push_back(*kr);
     }
 }
 
-struct ImportState {
+/// Per-process import cache and related state (no loose globals).
+class ImportResolver {
+public:
     std::unordered_map<std::string, ValuePtr> moduleCache;
     std::unordered_set<std::string> loading;
+    VM* cacheOwner = nullptr;
+    std::shared_ptr<RuntimeServices> runtimeServices = std::make_shared<RuntimeServices>();
+    EmbeddedModuleProvider embeddedProvider = nullptr;
 };
 
-static ImportState g_importState;
+static ImportResolver& getImportResolver() {
+    thread_local ImportResolver instance;
+    return instance;
+}
+
 [[maybe_unused]] static const auto& g_builtinModuleCatalog = get_builtin_modules();
-static VM* g_importCacheOwner = nullptr;
-static std::shared_ptr<RuntimeServices> g_runtimeServices = std::make_shared<RuntimeServices>();
-static EmbeddedModuleProvider g_embeddedProvider = nullptr;
 
 static std::string normalizeKey(const std::string& path) {
     std::string out = path;
@@ -169,19 +155,15 @@ static std::string kargoPackagePathKey(const std::string& path) {
 
 static std::string resolveInstalledPackageMain(const std::string& packageName, std::string* errOut = nullptr) {
     std::error_code ec;
-    fs::path cwd = fs::current_path(ec);
-    if (ec) {
-        if (errOut) *errOut = "cannot determine current directory";
-        return "";
-    }
-    fs::path pathsFile = cwd / ".kern" / "package-paths.json";
-    if (!fs::exists(pathsFile)) {
-        if (errOut) *errOut = ".kern/package-paths.json not found";
+    std::error_code ecPath;
+    fs::path pathsFile = resolvePackagePathsJsonFile();
+    if (!fs::exists(pathsFile, ecPath)) {
+        if (errOut) *errOut = "config/package-paths.json not found (set KERN_HOME or use kargo install)";
         return "";
     }
     std::ifstream f(pathsFile, std::ios::in | std::ios::binary);
     if (!f) {
-        if (errOut) *errOut = "cannot read .kern/package-paths.json";
+        if (errOut) *errOut = "cannot read config/package-paths.json";
         return "";
     }
     std::stringstream buf;
@@ -191,15 +173,37 @@ static std::string resolveInstalledPackageMain(const std::string& packageName, s
     std::regex mainRe("\"" + escaped + "\"\\s*:\\s*\\{[\\s\\S]*?\"main\"\\s*:\\s*\"([^\"]+)\"");
     std::smatch m;
     if (!std::regex_search(json, m, mainRe) || m.size() < 2) {
-        if (errOut) *errOut = "package not installed in .kern/package-paths.json";
+        if (errOut) *errOut = "package not installed in config/package-paths.json";
         return "";
     }
     fs::path mainPath(m[1].str());
     std::error_code ecCan;
-    fs::path can = fs::weakly_canonical(mainPath, ecCan);
-    if (ecCan || !fs::exists(can)) {
-        if (errOut) *errOut = "installed package main path does not exist";
-        return "";
+    fs::path can;
+    if (mainPath.is_absolute()) {
+        can = fs::weakly_canonical(mainPath, ecCan);
+        if (ecCan || !fs::exists(can)) {
+            if (errOut) *errOut = "installed package main path does not exist";
+            return "";
+        }
+    } else {
+        if (pathContainsTraversal(mainPath)) {
+            if (errOut) *errOut = "invalid package main path in package-paths.json";
+            return "";
+        }
+        auto kr = tryResolveKernRoot();
+        if (!kr) {
+            if (errOut) *errOut = "cannot resolve Kern root for package-paths.json entry";
+            return "";
+        }
+        can = fs::weakly_canonical(*kr / mainPath, ecCan);
+        if (ecCan || !fs::exists(can)) {
+            if (errOut) *errOut = "installed package main path does not exist";
+            return "";
+        }
+        if (!isSubpathOf(can, *kr)) {
+            if (errOut) *errOut = "package main path escapes Kern root";
+            return "";
+        }
     }
     return can.string();
 }
@@ -259,14 +263,18 @@ static std::string resolveImportPath(const std::string& importPath, std::string*
 
 static ValuePtr makeModuleFromGlobalDelta(VM& vm, const std::unordered_map<std::string, ValuePtr>& before) {
     std::unordered_map<std::string, ValuePtr> exports;
-    std::unordered_set<std::string> builtinNames;
-    insertAllBuiltinNamesForAnalysis(builtinNames);
-    builtinNames.insert("__import");
+    // Do not strip exports just because a name matches a builtin. A .kn file may define `def require`
+    // (or any other name) that shadows the builtin in globals; that definition must appear on the
+    // module map or imports see a false API (callable in-host but missing on the module object).
+    // Only omit names that must never be re-exported from file modules.
+    static const std::unordered_set<std::string> kNeverExportFromFileModule = {
+        "__import",
+    };
 
     const auto after = vm.getGlobalsSnapshot();
     for (const auto& kv : after) {
         const std::string& name = kv.first;
-        if (builtinNames.find(name) != builtinNames.end()) continue;
+        if (kNeverExportFromFileModule.find(name) != kNeverExportFromFileModule.end()) continue;
         auto itBefore = before.find(name);
         if (itBefore == before.end() || itBefore->second != kv.second) {
             exports[name] = kv.second ? kv.second : std::make_shared<Value>(Value::nil());
@@ -288,9 +296,9 @@ static bool compileAndRunImportedSource(VM* v, const std::string& displayPath, c
         Bytecode code = gen.generate(std::move(program));
         v->runSubScript(code, gen.getConstants(), gen.getValueConstants(), displayPath);
         outModule = makeModuleFromGlobalDelta(*v, beforeGlobals);
-        g_importState.moduleCache[resolvedKey] = outModule;
-        g_importState.moduleCache[cacheKey] = outModule;
-        g_importState.loading.erase(resolvedKey);
+        getImportResolver().moduleCache[resolvedKey] = outModule;
+        getImportResolver().moduleCache[cacheKey] = outModule;
+        getImportResolver().loading.erase(resolvedKey);
         return true;
     } catch (const LexerError& e) {
         ErrorReporterImportScope scope(g_errorReporter, displayPath, source);
@@ -329,7 +337,7 @@ static bool compileAndRunImportedSource(VM* v, const std::string& displayPath, c
             "Non-typed throw while loading a module.", "IMP-INTERNAL-UNKNOWN",
             importEmbeddedFailureDetail(displayPath));
     }
-    g_importState.loading.erase(resolvedKey);
+    getImportResolver().loading.erase(resolvedKey);
     return false;
 }
 
@@ -345,26 +353,26 @@ static Value runImportBuiltin(VM* v, std::vector<ValuePtr> args) {
 
     // Imported file modules execute inside the VM's global namespace. Reusing cached file modules
     // across different VM instances breaks because functions resolve globals dynamically.
-    if (g_importCacheOwner != v) {
-        g_importState.moduleCache.clear();
-        g_importState.loading.clear();
-        g_importCacheOwner = v;
+    if (getImportResolver().cacheOwner != v) {
+        getImportResolver().moduleCache.clear();
+        getImportResolver().loading.clear();
+        getImportResolver().cacheOwner = v;
     }
 
 #ifdef KERN_BUILD_GAME
     if (path == "game" || path == "game.kn" || base == "game") {
         ValuePtr mod = createGameModule(*v);
-        g_importState.moduleCache[cacheKey] = mod;
+        getImportResolver().moduleCache[cacheKey] = mod;
         return mod ? *mod : Value::nil();
     }
     if (path == "g2d" || path == "g2d.kn" || path == "2dgraphics" || path == "2dgraphics.kn" || base == "g2d" || base == "2dgraphics") {
         ValuePtr mod = create2dGraphicsModule(*v);
-        g_importState.moduleCache[cacheKey] = mod;
+        getImportResolver().moduleCache[cacheKey] = mod;
         return mod ? *mod : Value::nil();
     }
     if (path == "g3d" || path == "g3d.kn" || base == "g3d") {
         ValuePtr mod = create3dGraphicsModule(*v);
-        g_importState.moduleCache[cacheKey] = mod;
+        getImportResolver().moduleCache[cacheKey] = mod;
         return mod ? *mod : Value::nil();
     }
 #endif
@@ -390,35 +398,35 @@ static Value runImportBuiltin(VM* v, std::vector<ValuePtr> args) {
             VMErrorCode::IMPORT_UNSUPPORTED_MODULE);
     }
     if (base == "process" || base == "kern::process") {
-        ValuePtr mod = createProcessModule(*v, g_runtimeServices);
-        g_importState.moduleCache[cacheKey] = mod;
+        ValuePtr mod = createProcessModule(*v, getImportResolver().runtimeServices);
+        getImportResolver().moduleCache[cacheKey] = mod;
         return mod ? *mod : Value::nil();
     }
     if (base == "input" || base == "kern::input") {
-        ValuePtr mod = createInputModule(*v, g_runtimeServices);
-        g_importState.moduleCache[cacheKey] = mod;
+        ValuePtr mod = createInputModule(*v, getImportResolver().runtimeServices);
+        getImportResolver().moduleCache[cacheKey] = mod;
         return mod ? *mod : Value::nil();
     }
     if (base == "vision" || base == "kern::vision") {
-        ValuePtr mod = createVisionModule(*v, g_runtimeServices);
-        g_importState.moduleCache[cacheKey] = mod;
+        ValuePtr mod = createVisionModule(*v, getImportResolver().runtimeServices);
+        getImportResolver().moduleCache[cacheKey] = mod;
         return mod ? *mod : Value::nil();
     }
     if (base == "render" || base == "kern::render") {
-        ValuePtr mod = createRenderModule(*v, g_runtimeServices);
-        g_importState.moduleCache[cacheKey] = mod;
+        ValuePtr mod = createRenderModule(*v, getImportResolver().runtimeServices);
+        getImportResolver().moduleCache[cacheKey] = mod;
         return mod ? *mod : Value::nil();
     }
     if (isStdlibModuleName(base)) {
         ValuePtr mod = createStdlibModule(*v, base);
-        g_importState.moduleCache[cacheKey] = mod;
+        getImportResolver().moduleCache[cacheKey] = mod;
         return mod ? *mod : Value::nil();
     }
 
     // File/embedded modules can be cached across imports. Built-in/stdlib modules above must be
     // created per-VM so their function values always point at the current VM's builtin table.
-    auto cacheIt = g_importState.moduleCache.find(cacheKey);
-    if (cacheIt != g_importState.moduleCache.end()) {
+    auto cacheIt = getImportResolver().moduleCache.find(cacheKey);
+    if (cacheIt != getImportResolver().moduleCache.end()) {
         return cacheIt->second ? *cacheIt->second : Value::nil();
     }
 
@@ -448,26 +456,26 @@ static Value runImportBuiltin(VM* v, std::vector<ValuePtr> args) {
 
     // embedded module path resolution (used by standalone bundled executables).
     if (kernGetEnv("KERNC_TRACE_IMPORTS")) {
-        std::cerr << "[kern-embed] import request=" << path << " provider=" << (g_embeddedProvider ? "set" : "null") << std::endl;
+        std::cerr << "[kern-embed] import request=" << path << " provider=" << (getImportResolver().embeddedProvider ? "set" : "null") << std::endl;
     }
-    if (g_embeddedProvider) {
+    if (getImportResolver().embeddedProvider) {
         std::string embeddedSource;
         std::string logicalPath;
-        if (g_embeddedProvider(path, embeddedSource, &logicalPath)) {
+        if (getImportResolver().embeddedProvider(path, embeddedSource, &logicalPath)) {
             std::string resolvedKey = normalizeKey(logicalPath.empty() ? path : logicalPath);
-            auto resolvedIt = g_importState.moduleCache.find(resolvedKey);
-            if (resolvedIt != g_importState.moduleCache.end()) {
-                g_importState.moduleCache[cacheKey] = resolvedIt->second;
+            auto resolvedIt = getImportResolver().moduleCache.find(resolvedKey);
+            if (resolvedIt != getImportResolver().moduleCache.end()) {
+                getImportResolver().moduleCache[cacheKey] = resolvedIt->second;
                 return resolvedIt->second ? *resolvedIt->second : Value::nil();
             }
-            if (g_importState.loading.find(resolvedKey) != g_importState.loading.end()) {
+            if (getImportResolver().loading.find(resolvedKey) != getImportResolver().loading.end()) {
                 g_errorReporter.reportCompileError(ErrorCategory::Other, 0, 0,
                     "Cyclic import detected: " + resolvedKey,
                     "Refactor modules to remove the dependency cycle.", "IMP-CYCLE",
                     importWhileLoadingDetail(resolvedKey));
                 return importFailure("IMP-CYCLE: cyclic import detected: " + resolvedKey, VMErrorCode::IMPORT_CYCLE);
             }
-            g_importState.loading.insert(resolvedKey);
+            getImportResolver().loading.insert(resolvedKey);
             std::string displayPath = logicalPath.empty() ? resolvedKey : logicalPath;
             ValuePtr fileModule;
             if (compileAndRunImportedSource(v, displayPath, embeddedSource, cacheKey, resolvedKey, fileModule))
@@ -492,12 +500,12 @@ static Value runImportBuiltin(VM* v, std::vector<ValuePtr> args) {
         return importFailure("IMP-RESOLVE: could not resolve module import: " + path, code);
     }
     std::string resolvedKey = normalizeKey(resolved);
-    auto resolvedIt = g_importState.moduleCache.find(resolvedKey);
-    if (resolvedIt != g_importState.moduleCache.end()) {
-        g_importState.moduleCache[cacheKey] = resolvedIt->second;
+    auto resolvedIt = getImportResolver().moduleCache.find(resolvedKey);
+    if (resolvedIt != getImportResolver().moduleCache.end()) {
+        getImportResolver().moduleCache[cacheKey] = resolvedIt->second;
         return resolvedIt->second ? *resolvedIt->second : Value::nil();
     }
-    if (g_importState.loading.find(resolvedKey) != g_importState.loading.end()) {
+    if (getImportResolver().loading.find(resolvedKey) != getImportResolver().loading.end()) {
         g_errorReporter.reportCompileError(ErrorCategory::Other, 0, 0,
             "Cyclic import detected: " + resolved,
             "Refactor modules to remove the dependency cycle.", "IMP-CYCLE",
@@ -505,13 +513,13 @@ static Value runImportBuiltin(VM* v, std::vector<ValuePtr> args) {
         return importFailure("IMP-CYCLE: cyclic import detected: " + resolved, VMErrorCode::IMPORT_CYCLE);
     }
 
-    g_importState.loading.insert(resolvedKey);
+    getImportResolver().loading.insert(resolvedKey);
     std::ifstream f(resolved, std::ios::in | std::ios::binary);
     if (!f) {
         g_errorReporter.reportCompileError(ErrorCategory::FileError, 0, 0,
             "Could not read module file: " + resolved,
             importResolveFailureHint(), "IMP-READ", fileOpenErrorDetail());
-        g_importState.loading.erase(resolvedKey);
+        getImportResolver().loading.erase(resolvedKey);
         return importFailure("IMP-READ: could not read module file: " + resolved, VMErrorCode::IMPORT_READ_FAIL);
     }
     std::stringstream buf;
@@ -528,9 +536,9 @@ static Value runImportBuiltin(VM* v, std::vector<ValuePtr> args) {
 void registerImportBuiltin(VM& vm) {
     // Each VM owns its own global namespace. Clear the import cache when a new VM installs
     // the import builtin so cached modules never leak between VM instances.
-    g_importState.moduleCache.clear();
-    g_importState.loading.clear();
-    g_importCacheOwner = &vm;
+    getImportResolver().moduleCache.clear();
+    getImportResolver().loading.clear();
+    getImportResolver().cacheOwner = &vm;
 
     auto importFn = std::make_shared<FunctionObject>();
     importFn->isBuiltin = true;
@@ -540,7 +548,7 @@ void registerImportBuiltin(VM& vm) {
 }
 
 void setEmbeddedModuleProvider(EmbeddedModuleProvider provider) {
-    g_embeddedProvider = std::move(provider);
+    getImportResolver().embeddedProvider = std::move(provider);
     if (kernGetEnv("KERNC_TRACE_IMPORTS")) {
         std::cerr << "[kern-embed] provider installed" << std::endl;
     }
@@ -550,7 +558,11 @@ void clearEmbeddedModuleProvider() {
     if (kernGetEnv("KERNC_TRACE_IMPORTS")) {
         std::cerr << "[kern-embed] provider cleared" << std::endl;
     }
-    g_embeddedProvider = nullptr;
+    getImportResolver().embeddedProvider = nullptr;
+}
+
+void replClearImportLoadingAtReplLineStart() {
+    getImportResolver().loading.clear();
 }
 
 } // namespace kern

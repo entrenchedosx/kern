@@ -8,7 +8,7 @@ use crate::extract::{
     extract_tar_gz, extract_zip, find_single_subdirectory, verify_kern_bundle_layout,
 };
 use crate::tree_copy::copy_dir_all;
-use crate::github::{self, find_asset};
+use crate::github::{self, find_asset, ReleaseAsset, ReleaseInfo};
 use crate::layout::{self, version_home, versions_dir};
 use crate::lock::InstallLock;
 use crate::log::{self, LogFormat};
@@ -56,7 +56,7 @@ fn semver_from_tag(tag: &str) -> String {
     tag.strip_prefix('v').unwrap_or(tag).to_string()
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum OsKind {
     Linux,
     Macos,
@@ -72,12 +72,45 @@ fn detect_os() -> Result<OsKind> {
     }
 }
 
-fn kern_asset_name(os: OsKind, semver: &str) -> String {
-    match os {
-        OsKind::Linux => format!("kern-linux-x64-v{}.tar.gz", semver),
-        OsKind::Macos => format!("kern-macos-v{}.tar.gz", semver),
-        OsKind::Windows => format!("kern-windows-x64-v{}.zip", semver),
+/// macOS release tarballs: prefer arch-specific names (see release workflow); fall back to legacy single `kern-macos-v*.tar.gz` for older tags.
+fn macos_kern_tarball_candidates_for(arch: &str, semver: &str) -> Vec<String> {
+    let mut v = Vec::new();
+    match arch {
+        "aarch64" => v.push(format!("kern-macos-arm64-v{}.tar.gz", semver)),
+        "x86_64" => v.push(format!("kern-macos-x64-v{}.tar.gz", semver)),
+        _ => {}
     }
+    v.push(format!("kern-macos-v{}.tar.gz", semver));
+    v
+}
+
+fn macos_kern_tarball_candidates(semver: &str) -> Vec<String> {
+    macos_kern_tarball_candidates_for(std::env::consts::ARCH, semver)
+}
+
+fn kern_tarball_candidates(os: OsKind, semver: &str) -> Vec<String> {
+    match os {
+        OsKind::Linux => vec![format!("kern-linux-x64-v{}.tar.gz", semver)],
+        OsKind::Macos => macos_kern_tarball_candidates(semver),
+        OsKind::Windows => vec![format!("kern-windows-x64-v{}.zip", semver)],
+    }
+}
+
+fn pick_kern_asset<'a>(
+    release: &'a ReleaseInfo,
+    os: OsKind,
+    semver: &str,
+) -> Result<&'a ReleaseAsset> {
+    let candidates = kern_tarball_candidates(os, semver);
+    for name in &candidates {
+        if let Some(a) = find_asset(release, name) {
+            return Ok(a);
+        }
+    }
+    Err(AppError::AssetNotFound(format!(
+        "Kern archive for this platform ({os:?}). Tried: {candidates:?}. Available: {:?}",
+        release.assets.iter().map(|a| &a.name).collect::<Vec<_>>()
+    )))
 }
 
 fn smoke_kern(kern_exe: &Path, prog: &Progress) -> Result<String> {
@@ -273,15 +306,9 @@ pub fn run_install(p: InstallParams<'_>) -> Result<()> {
     let semver = semver_from_tag(&release.tag_name);
     prog.info(&format!("release {}", release.tag_name));
 
-    let kern_name = kern_asset_name(os, &semver);
     let kargo_tar = format!("kargo-{}.tar.gz", release.tag_name);
-    let kern_asset = find_asset(&release, &kern_name).ok_or_else(|| {
-        AppError::AssetNotFound(format!(
-            "{} (platform asset). Available: {:?}",
-            kern_name,
-            release.assets.iter().map(|a| &a.name).collect::<Vec<_>>()
-        ))
-    })?;
+    let kern_asset = pick_kern_asset(&release, os, &semver)?;
+    let kern_name = kern_asset.name.clone();
     let kargo_asset = find_asset(&release, &kargo_tar).ok_or_else(|| {
         AppError::AssetNotFound(format!(
             "kargo tarball {} — Kern and Kargo must come from the same GitHub release.",
@@ -745,5 +772,62 @@ pub fn default_prefix(system: bool) -> PathBuf {
         detect::default_system_prefix()
     } else {
         default_user_prefix()
+    }
+}
+
+#[cfg(test)]
+mod kern_asset_tests {
+    use super::*;
+
+    #[test]
+    fn macos_arm64_candidates_order() {
+        let c = macos_kern_tarball_candidates_for("aarch64", "1.0.0");
+        assert_eq!(
+            c,
+            vec![
+                "kern-macos-arm64-v1.0.0.tar.gz",
+                "kern-macos-v1.0.0.tar.gz"
+            ]
+        );
+    }
+
+    #[test]
+    fn macos_x64_candidates_order() {
+        let c = macos_kern_tarball_candidates_for("x86_64", "1.0.0");
+        assert_eq!(
+            c,
+            vec![
+                "kern-macos-x64-v1.0.0.tar.gz",
+                "kern-macos-v1.0.0.tar.gz"
+            ]
+        );
+    }
+
+    #[test]
+    fn pick_kern_linux_exact_name() {
+        let release = ReleaseInfo {
+            tag_name: "v1.0.0".into(),
+            assets: vec![ReleaseAsset {
+                name: "kern-linux-x64-v1.0.0.tar.gz".into(),
+                browser_download_url: "https://example/l.tgz".into(),
+                size: 1,
+            }],
+        };
+        let a = pick_kern_asset(&release, OsKind::Linux, "1.0.0").expect("pick");
+        assert_eq!(a.name, "kern-linux-x64-v1.0.0.tar.gz");
+    }
+
+    #[test]
+    fn pick_kern_macos_legacy_fallback() {
+        let release = ReleaseInfo {
+            tag_name: "v0.9.0".into(),
+            assets: vec![ReleaseAsset {
+                name: "kern-macos-v0.9.0.tar.gz".into(),
+                browser_download_url: "https://example/legacy.tgz".into(),
+                size: 1,
+            }],
+        };
+        let a = pick_kern_asset(&release, OsKind::Macos, "0.9.0").expect("pick");
+        assert_eq!(a.name, "kern-macos-v0.9.0.tar.gz");
     }
 }

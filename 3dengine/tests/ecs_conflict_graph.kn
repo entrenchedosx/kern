@@ -1,0 +1,38 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let w = ecs["world_create"]()
+let pass = lambda (world, dt) => { return null }
+
+if (!ecs["world_register_system"](w, "POST_SIMULATION", "cg.a", pass, [], {"write_mask": ["transform"]})) { panic("ecs_conflict_graph: register cg.a failed") }
+if (!ecs["world_register_system"](w, "POST_SIMULATION", "cg.b", pass, [], {"write_mask": ["transform"]})) { panic("ecs_conflict_graph: register cg.b failed") }
+if (!ecs["world_register_system"](w, "POST_SIMULATION", "cg.c", pass, ["cg.a"], {"write_mask": ["registry"]})) { panic("ecs_conflict_graph: register cg.c failed") }
+
+let g = ecs["world_scheduler_conflict_graph"](w)
+let g2 = ecs["world_debug_print_conflict_graph"](w)
+let nodes = default(g["nodes"], {})
+let edges = default(g["edges"], [])
+if (!has(nodes, "cg.a") || !has(nodes, "cg.b") || !has(nodes, "cg.c")) { panic("ecs_conflict_graph: missing expected nodes") }
+if (len(default(g2["edges"], [])) != len(edges)) { panic("ecs_conflict_graph: debug print graph edge count mismatch") }
+
+let found_write_conflict = false
+let found_dependency = false
+let i = 0
+while (i < len(edges)) {
+    let e = default(edges[i], {})
+    let src = str(default(e["from"], ""))
+    let to = str(default(e["to"], ""))
+    let t = str(default(e["type"], ""))
+    if (((src == "cg.a" && to == "cg.b") || (src == "cg.b" && to == "cg.a")) && t == "write_conflict") { found_write_conflict = true }
+    if (src == "cg.a" && to == "cg.c" && t == "dependency") { found_dependency = true }
+    i = i + 1
+}
+if (!found_write_conflict) { panic("ecs_conflict_graph: expected write_conflict edge between cg.a and cg.b") }
+if (!found_dependency) { panic("ecs_conflict_graph: expected dependency edge cg.a -> cg.c") }
+
+let sb = default(g["stage_batches"], [])
+if (len(sb) == 0) { panic("ecs_conflict_graph: stage_batches missing") }
+
+print("ecs_conflict_graph: ok")

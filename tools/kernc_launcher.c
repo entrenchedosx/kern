@@ -46,6 +46,13 @@ int main(int argc, char** argv) {
     int cr = system(cmakeCmd);
     if (cr != 0) {
         fprintf(stderr, "kern: cmake --build failed (%d)\n", cr);
+        char msg[2048];
+        snprintf(msg, sizeof(msg),
+                 "cmake --build failed (exit %d).\n\n"
+                 "Common causes: CMake not on PATH, or build\\ is missing/misconfigured.\n\n"
+                 "Command:\n%s",
+                 cr, cmakeCmd);
+        MessageBoxA(NULL, msg, "kernc launcher", MB_OK | MB_ICONERROR);
         return cr > 255 ? 255 : cr;
     }
 
@@ -64,6 +71,9 @@ int main(int argc, char** argv) {
     if (rc == -1) {
         fprintf(stderr, "kern: could not run %s\n", impl);
         perror("kern");
+        char msg[1024];
+        snprintf(msg, sizeof(msg), "Could not start:\n%s\n\n(Is kern-impl.exe missing?)", impl);
+        MessageBoxA(NULL, msg, "kernc launcher", MB_OK | MB_ICONERROR);
         return 1;
     }
     if (rc > 255) return 255;

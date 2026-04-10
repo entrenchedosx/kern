@@ -1,0 +1,3 @@
+let tasks = import("sys.tasks")
+let key = tasks["idempotency_key"]("payment.capture", { "payment_id": "pay_1", "amount": 2000 })
+print("idempotency-key: " + key)

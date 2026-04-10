@@ -195,8 +195,16 @@ set(KERN_ENGINE_SOURCES
     ${SCANNER_SOURCES}
     ${KERNC_SUPPORT_SOURCES}
 )
+add_library(kern_env_lib STATIC "${KERN_PLATFORM_DIR}/kern_env.cpp")
+target_include_directories(kern_env_lib PUBLIC ${KERN_CORE_DIR})
+# Parent walk for `lib/kern` is Debug-only so release builds resolve strictly:
+# --root → KERN_HOME → exe dir → cache (see kern_env.cpp).
+target_compile_definitions(kern_env_lib PRIVATE $<$<CONFIG:Debug>:KERN_DEV_BUILD=1>)
+kern_apply_strict_warnings(kern_env_lib)
+
 add_library(kern_core STATIC ${KERN_ENGINE_SOURCES})
 target_include_directories(kern_core PUBLIC ${KERN_TOOLCHAIN_PRIVATE_INCLUDES})
+target_link_libraries(kern_core PUBLIC kern_env_lib)
 target_compile_definitions(kern_core PRIVATE KERN_VERSION="${KERN_VERSION}")
 if(KERN_BUILD_ID)
   target_compile_definitions(kern_core PRIVATE KERN_BUILD_ID="${KERN_BUILD_ID}")
@@ -251,6 +259,14 @@ if(KERN_BUILD_ID)
   target_compile_definitions(kern-scan PRIVATE KERN_BUILD_ID="${KERN_BUILD_ID}")
 endif()
 kern_apply_strict_warnings(kern-scan)
+
+add_executable(kargo "${KERN_CLI_DIR}/kargo_main.cpp" ${KERN_WIN32_RESOURCES})
+target_link_libraries(kargo PRIVATE kern_env_lib)
+target_compile_definitions(kargo PRIVATE KERN_VERSION="${KERN_VERSION}")
+if(KERN_BUILD_ID)
+  target_compile_definitions(kargo PRIVATE KERN_BUILD_ID="${KERN_BUILD_ID}")
+endif()
+kern_apply_strict_warnings(kargo)
 
 if(WIN32)
   target_link_libraries(kern_core PUBLIC psapi winhttp wininet ws2_32)

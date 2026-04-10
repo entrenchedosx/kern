@@ -45,6 +45,7 @@
 #include "platform/win32_associate_kn.hpp"
 #endif
 #include "platform/env_compat.hpp"
+#include "platform/kern_env.hpp"
 
 using namespace kern;
 
@@ -190,6 +191,7 @@ static bool resolveKnScriptPath(const std::string& given, ResolvedKnPath& out, s
 }
 
 static bool runSource(VM& vm, const std::string& sourceIn, const std::string& filename = "") {
+    if (filename == "<repl>") replClearImportLoadingAtReplLineStart();
     std::string source = sourceIn;
     normalizeKernSourceText(source, filename);
     g_errorReporter.setSource(source);
@@ -596,6 +598,42 @@ static std::string shellQuote(const std::string& raw) {
 #endif
 }
 
+/// Native `kargo` next to resolved Kern root or next to `kern`, when `kargo.json` is present.
+static std::optional<std::filesystem::path> findNativeKargoExe() {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    if (!fs::is_regular_file("kargo.json", ec)) return std::nullopt;
+    if (auto r = kern::tryResolveKernRoot()) {
+#ifdef _WIN32
+        fs::path k = *r / "kargo.exe";
+#else
+        fs::path k = *r / "kargo";
+#endif
+        if (fs::is_regular_file(k, ec)) return fs::weakly_canonical(k, ec);
+    }
+    fs::path exe = kern::getKernExecutablePath();
+#ifdef _WIN32
+    fs::path k2 = exe.parent_path() / "kargo.exe";
+#else
+    fs::path k2 = exe.parent_path() / "kargo";
+#endif
+    if (fs::is_regular_file(k2, ec)) return fs::weakly_canonical(k2, ec);
+    return std::nullopt;
+}
+
+static int runNativeKargo(const std::vector<std::string>& args) {
+    auto kexe = findNativeKargoExe();
+    if (!kexe.has_value()) {
+        std::cerr << "kern: kargo.json present but kargo executable not found (use a full kern-* env or build "
+                     "kargo with CMake).\n";
+        return 1;
+    }
+    std::ostringstream o;
+    o << shellQuote(kexe->string());
+    for (const auto& a : args) o << ' ' << shellQuote(a);
+    return std::system(o.str().c_str());
+}
+
 static std::optional<std::string> detectRegistryCliPath() {
     if (const char* env = kernGetEnv("KERN_REGISTRY_CLI")) {
         if (env[0]) return std::string(env);
@@ -732,21 +770,22 @@ static void printKernInstallKargoNotice() {
     }
     namespace fs = std::filesystem;
     const bool haveKernJson = fs::exists("kern.json");
+    const bool haveKargoJson = fs::exists("kargo.json");
     const bool haveKargoToml = fs::exists("kargo.toml");
 
-    if (haveKernJson && haveKargoToml) {
-        std::cerr << "kern: this directory has both kern.json and kargo.toml.\n"
+    if (haveKernJson && (haveKargoJson || haveKargoToml)) {
+        std::cerr << "kern: this directory has both kern.json and a Kargo manifest.\n"
                   << "  - kern install  → hosted kern-registry + kern.lock\n"
-                  << "  - kargo install → GitHub packages + kargo.lock\n";
+                  << "  - kargo install → GitHub packages + kargo.lock (native kargo.json or legacy kargo.toml)\n";
     } else if (haveKernJson) {
         std::cerr << "kern: kern-registry project (kern.json here). `kern install` updates kern.lock from the registry API.\n"
-                  << "  For GitHub packages (kargo.toml / kargo.lock), use: kargo install <owner/repo[@range]>\n";
-    } else if (haveKargoToml) {
-        std::cerr << "kern: kargo.toml present — use kargo install … or kargo update for dependencies.\n"
-                  << "  kern install is only for kern.json + kern.lock (hosted registry).\n";
+                  << "  For GitHub packages (kargo.json / kargo.lock), use: kargo install <owner/repo[@ref]>\n";
+    } else if (haveKargoJson || haveKargoToml) {
+        std::cerr << "kern: Kargo project here — use `kargo install` / `kargo update` (native kargo.json preferred).\n"
+                  << "  `kern install` is only for kern.json + kern.lock (hosted registry).\n";
     } else {
         std::cerr << "kern: package workflows:\n"
-                  << "  - GitHub: kargo init → kargo install <owner/repo[@range]> (kargo.toml / kargo.lock)\n"
+                  << "  - GitHub: kargo.json + kargo install <owner/repo[@ref]> (packages under KERN_HOME)\n"
                   << "  - Hosted registry: kern init → kern install (kern.json / kern.lock)\n";
     }
     std::cerr << "  (Set KERN_SUPPRESS_INSTALL_NOTICE=1 to hide.)\n";
@@ -1622,6 +1661,7 @@ int main(int argc, char** argv) {
     // %APPDATA%\\kern\\setup_done.flag exists, or if KERN_SKIP_FILE_ASSOCIATION is set.
     kern::win32::maybeRegisterKnFileAssociation();
 #endif
+    kern::initKernEnvironmentFromArgv(argc, argv);
     const char* prog = argc >= 1 ? argv[0] : "kern";
     int argBase = 1;
     bool vmTraceCli = false;
@@ -1843,6 +1883,9 @@ int main(int argc, char** argv) {
         }
         if (arg == "add" && argc > argBase + 1) {
             const std::string depArg = argv[argBase + 1];
+            if (findNativeKargoExe().has_value()) {
+                return runNativeKargo({"install", depArg});
+            }
             // DX shortcut: if registry CLI is available, route add through install flow so
             // `kern add pkg@^1.2.0` immediately resolves, installs, and updates lockfile.
             if (detectActivePackageCliPath().has_value()) {
@@ -1857,6 +1900,10 @@ int main(int argc, char** argv) {
             return 0;
         }
         if (arg == "remove" && argc > argBase + 1) {
+            if (findNativeKargoExe().has_value()) {
+                const std::string depArg = argv[argBase + 1];
+                return runNativeKargo({"remove", depArg});
+            }
             if (!upsertDependency("kern.json", argv[argBase + 1], true)) {
                 std::cerr << "remove: failed to update kern.json\n";
                 return 1;

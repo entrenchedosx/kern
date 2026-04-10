@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <algorithm>
 #include "platform/env_compat.hpp"
+#include "platform/kern_env.hpp"
 
 #ifdef _MSC_VER
 static std::string kerncGetEnvStr(const char* name) {
@@ -504,6 +505,7 @@ static int runPackageMode(const CliOptions& cli) {
 } // namespace
 
 int main(int argc, char** argv) {
+    kern::initKernEnvironmentFromArgv(argc, argv);
     CliOptions cli;
     std::string error;
     if (!parseArgs(argc, argv, cli, error)) {

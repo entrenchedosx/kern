@@ -1,4 +1,4 @@
-//! Portable `.kern/` bootstrap (Windows-first).
+//! Portable `kern-<version>/` bootstrap (Windows-first).
 #![forbid(unsafe_code)]
 
 pub mod artifact_cache;
@@ -14,18 +14,12 @@ pub mod sha256_verify;
 pub mod tree_copy;
 
 pub use error::{PortableError, Result};
-pub use paths::{find_kern_env_dir, find_kern_env_dir_with_cache};
-
-/// Walk parents from `start` for `.kern/bin/kern.exe` (respects [`paths::KERN_ROOT_CACHE_ENV`]).
-pub fn find_kern_root(start: &std::path::Path) -> Option<std::path::PathBuf> {
-    find_kern_env_dir_with_cache(start)
-}
+pub use paths::{kern_exe_from_cwd_kern_dirs, kern_exe_from_home_env, kern_home_doctor_line};
 
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-/// Run `.kern/bin/kern.exe` with the same arguments (argv after program name).
-/// On Windows there is no Unix `execve`; we spawn and exit with the child status.
+/// Run local `kern.exe` with forwarded args. Sets `KERN_HOME` for the child to the env root.
 pub fn delegate_to_local_kern(forward_args: &[String]) -> ! {
     if !cfg!(windows) {
         eprintln!("error: delegation is only implemented on Windows.");
@@ -33,19 +27,32 @@ pub fn delegate_to_local_kern(forward_args: &[String]) -> ! {
     }
 
     let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
-    let Some(env_dir) = find_kern_env_dir_with_cache(&cwd) else {
-        eprintln!("No Kern environment found. Run `kern-portable init`.");
-        std::process::exit(2);
+    let (exe, env_root) = if let Some(ex) = kern_exe_from_home_env() {
+        let root = ex
+            .parent()
+            .expect("kern.exe has parent")
+            .to_path_buf();
+        (ex, root)
+    } else {
+        match kern_exe_from_cwd_kern_dirs(&cwd) {
+            Ok(ex) => {
+                let root = ex
+                    .parent()
+                    .expect("kern.exe has parent")
+                    .to_path_buf();
+                (ex, root)
+            }
+            Err(msg) => {
+                eprintln!("error: {}", msg);
+                eprintln!("hint: run `kern-portable init` or set {} to your environment folder.", paths::KERN_HOME_ENV);
+                std::process::exit(2);
+            }
+        }
     };
-
-    let exe = env_dir.join("bin").join("kern.exe");
-    if !exe.is_file() {
-        eprintln!("No Kern environment found. Run `kern-portable init`.");
-        std::process::exit(2);
-    }
 
     let status = Command::new(&exe)
         .args(forward_args)
+        .env(paths::KERN_HOME_ENV, &env_root)
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())

@@ -2,11 +2,13 @@
 
 #include "scanner/scan_driver.hpp"
 #include "import_resolution.hpp"
+#include "platform/kern_env.hpp"
 #include "vm/builtins.hpp"
 #include "vm/vm.hpp"
 #include "vm/permissions.hpp"
 
 int main(int argc, char** argv) {
+    kern::initKernEnvironmentFromArgv(argc, argv);
     const char* prog = argc >= 1 ? argv[0] : "kern-scan";
     kern::VM vm;
     kern::registerAllBuiltins(vm);

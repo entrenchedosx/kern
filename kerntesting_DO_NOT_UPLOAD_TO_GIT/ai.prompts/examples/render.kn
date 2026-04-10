@@ -1,0 +1,6 @@
+let prompts = import("ai.prompts")
+let out = prompts["render"]("Create a webhook summary for {{event}} by {{actor}}", {
+    "event": "invoice.paid",
+    "actor": "billing-worker"
+})
+print(out)

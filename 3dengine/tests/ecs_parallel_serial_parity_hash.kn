@@ -1,0 +1,83 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+let vec3 = import("src/math/vec3.kn")
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+def world_sig(world, e1, e2) {
+    let t1 = default(ecs["world_get_transform"](world, e1), {})
+    let t2 = default(ecs["world_get_transform"](world, e2), {})
+    let v1 = default(ecs["world_get_velocity"](world, e1), {})
+    let v2 = default(ecs["world_get_velocity"](world, e2), {})
+    let p1 = default(t1["local_position"], {})
+    let p2 = default(t2["local_position"], {})
+    let l1 = default(v1["linear"], {})
+    let l2 = default(v2["linear"], {})
+    let ec = int(default(ecs["world_entity_count"](world), 0))
+    let tc = int(default(ecs["world_transform_count"](world), 0))
+    let vc = int(default(ecs["world_velocity_count"](world), 0))
+    let extra = float(default(world["parallel_parity_extra"], 0.0))
+    let sig = str(default(p1["x"], 0.0)) + "|" + str(default(p1["y"], 0.0)) + "|" + str(default(p1["z"], 0.0)) + ";" + str(default(p2["x"], 0.0)) + "|" + str(default(p2["y"], 0.0)) + "|" + str(default(p2["z"], 0.0)) + ";" + str(default(l1["x"], 0.0)) + "|" + str(default(l1["y"], 0.0)) + "|" + str(default(l1["z"], 0.0)) + ";" + str(default(l2["x"], 0.0)) + "|" + str(default(l2["y"], 0.0)) + "|" + str(default(l2["z"], 0.0)) + ";" + str(ec) + "|" + str(tc) + "|" + str(vc) + "|" + str(extra)
+    return sig
+}
+
+def run_world(use_parallel) {
+    let w = ecs["world_create"]()
+    w["parallel_parity_extra"] = 0.0
+
+    let e1 = ecs["world_create_entity"](w)
+    let e2 = ecs["world_create_entity"](w)
+    ecs["world_add_transform"](w, e1, ecs["transform_make"](vec3["make"](0, 0, 0), null, null))
+    ecs["world_add_transform"](w, e2, ecs["transform_make"](vec3["make"](2, 0, 0), null, null))
+    ecs["world_add_velocity"](w, e1, ecs["velocity_make"](vec3["make"](1, 0, 0)))
+    ecs["world_add_velocity"](w, e2, ecs["velocity_make"](vec3["make"](0, 1, 0)))
+
+    let sys_vel = lambda (world, dt) => {
+        let q = ecs["world_query"](world, ["velocity"])
+        let i = 0
+        while (i < int(default(q["count"], 0))) {
+            let v = q["components"]["velocity"][i]
+            let lin = default(v["linear"], vec3["zero"]())
+            v["linear"] = vec3["make"](float(default(lin["x"], 0.0)) + 0.25, float(default(lin["y"], 0.0)), float(default(lin["z"], 0.0)))
+            i = i + 1
+        }
+    }
+    let sys_reg = lambda (world, dt) => { world["parallel_parity_extra"] = float(default(world["parallel_parity_extra"], 0.0)) + float(default(dt, 0.0)) }
+    let sys_tr = lambda (world, dt) => {
+        let q = ecs["world_query"](world, ["transform", "velocity"])
+        let i = 0
+        while (i < int(default(q["count"], 0))) {
+            let t = q["components"]["transform"][i]
+            let v = q["components"]["velocity"][i]
+            let p = default(t["local_position"], vec3["zero"]())
+            let lin = default(v["linear"], vec3["zero"]())
+            t["local_position"] = vec3["make"](float(default(p["x"], 0.0)), float(default(p["y"], 0.0)) + float(default(lin["y"], 0.0)) * float(default(dt, 0.0)), float(default(p["z"], 0.0)))
+            t["dirty"] = true
+            i = i + 1
+        }
+    }
+
+    if (!ecs["world_register_system"](w, "POST_SIMULATION", "par.vel", sys_vel, [], {"write_mask": ["velocity"]})) { panic("ecs_parallel_serial_parity_hash: register par.vel failed") }
+    if (!ecs["world_register_system"](w, "POST_SIMULATION", "par.reg", sys_reg, [], {"write_mask": ["registry"]})) { panic("ecs_parallel_serial_parity_hash: register par.reg failed") }
+    if (!ecs["world_register_system"](w, "POST_SIMULATION", "par.tr", sys_tr, ["par.vel"], {"write_mask": ["transform"]})) { panic("ecs_parallel_serial_parity_hash: register par.tr failed") }
+
+    let i = 0
+    while (i < 90) {
+        if (default(use_parallel, false)) { ecs["world_run_fixed_pipeline_parallel"](w, 1.0 / 60.0) }
+        else { ecs["world_run_fixed_pipeline"](w, 1.0 / 60.0) }
+        i = i + 1
+    }
+
+    let sig = world_sig(w, e1, e2)
+    let state_hash = sha256(sig)
+    let graph_hash = str(default(ecs["world_scheduler_conflict_graph_hash"](w)["hash"], ""))
+    return {"sig": sig, "state_hash": state_hash, "graph_hash": graph_hash, "stats": ecs["world_parallel_runtime_stats"](w)}
+}
+
+let serial = run_world(false)
+let parallel = run_world(true)
+if (str(default(serial["state_hash"], "")) != str(default(parallel["state_hash"], ""))) { panic("ecs_parallel_serial_parity_hash: serial and parallel state hash mismatch") }
+if (str(default(serial["graph_hash"], "")) != str(default(parallel["graph_hash"], ""))) { panic("ecs_parallel_serial_parity_hash: serial and parallel graph hash mismatch") }
+if (int(default(default(parallel["stats"], {})["parallel_batches_executed"], 0)) <= 0) { panic("ecs_parallel_serial_parity_hash: expected parallel batches to execute") }
+
+print("ecs_parallel_serial_parity_hash: ok")

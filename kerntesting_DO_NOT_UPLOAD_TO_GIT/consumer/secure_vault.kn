@@ -1,0 +1,223 @@
+// secure_vault.kn
+// Useful local credential vault powered by sec.crypto@1.0.0
+//
+// Commands:
+//   kern secure_vault.kn init <vault.json> <master_key>
+//   kern secure_vault.kn add <vault.json> <master_key> <entry_name> <username> <password>
+//   kern secure_vault.kn list <vault.json> <master_key>
+//   kern secure_vault.kn get <vault.json> <master_key> <entry_name>
+//   kern secure_vault.kn rotate-key <vault.json> <old_key> <new_key>
+
+// Use the installed sec.crypto@1.0.0 package path directly for maximum compatibility.
+let crypto = import(".kern/packages/sec.crypto/1.0.0/src/index.kn")
+if (crypto == null) { panic("sec.crypto@1.0.0 is not installed. Install with: kern install sec.crypto@^1.0.0") }
+
+require("fs.readwrite")
+require("process.control")
+
+def usage() {
+    print("secure_vault usage:")
+    print("  kern secure_vault.kn init <vault.json> <master_key>")
+    print("  kern secure_vault.kn add <vault.json> <master_key> <entry_name> <username> <password>")
+    print("  kern secure_vault.kn list <vault.json> <master_key>")
+    print("  kern secure_vault.kn get <vault.json> <master_key> <entry_name>")
+    print("  kern secure_vault.kn rotate-key <vault.json> <old_key> <new_key>")
+}
+
+def key_digest(master_key) {
+    return crypto["hash_sha256"](master_key)
+}
+
+def now_ts() {
+    return int(time())
+}
+
+def load_vault(path) {
+    if (!fileExists(path)) { return null }
+    let raw = read_file(path)
+    if (trim(raw) == "") { return null }
+    try {
+        return json_parse(raw)
+    } catch (e) {
+        return null
+    }
+}
+
+def save_vault(path, vault) {
+    let body = json_stringify(vault, 2)
+    return write_file(path, body)
+}
+
+def verify_master_key(vault, master_key) {
+    if (!has(vault, "master_key_hash")) { return false }
+    return str(vault["master_key_hash"]) == key_digest(master_key)
+}
+
+def make_empty_vault(master_key) {
+    return { "format": "secure_vault_v1", "created_at": now_ts(), "updated_at": now_ts(), "master_key_hash": key_digest(master_key), "entries": [] }
+}
+
+def find_entry(entries, name) {
+    let i = 0
+    while (i < len(entries)) {
+        let e = entries[i]
+        if (str(e["name"]) == str(name)) {
+            return i
+        }
+        i = i + 1
+    }
+    return -1
+}
+
+def cmd_init(path, master_key) {
+    if (fileExists(path)) {
+        panic("vault file already exists: " + path)
+    }
+    let vault = make_empty_vault(master_key)
+    if (!save_vault(path, vault)) {
+        panic("failed to create vault: " + path)
+    }
+    print("vault initialized: " + path)
+}
+
+def cmd_add(path, master_key, entry_name, username, password) {
+    let vault = load_vault(path)
+    if (vault == null) { panic("vault missing or invalid: " + path) }
+    if (!verify_master_key(vault, master_key)) { panic("master key mismatch") }
+
+    let entries = vault["entries"]
+    let idx = find_entry(entries, entry_name)
+    if (idx >= 0) {
+        panic("entry already exists: " + entry_name)
+    }
+
+    let cipher = crypto["encrypt_xor_base64"](password, master_key)
+    let sig = crypto["sign_message"](cipher, master_key)
+    let entry = { "name": str(entry_name), "username": str(username), "password_cipher": str(cipher), "password_sig": str(sig), "created_at": now_ts() }
+    push(entries, entry)
+    vault["entries"] = entries
+    vault["updated_at"] = now_ts()
+
+    if (!save_vault(path, vault)) { panic("failed to save vault") }
+    print("entry added: " + entry_name)
+}
+
+def cmd_list(path, master_key) {
+    let vault = load_vault(path)
+    if (vault == null) { panic("vault missing or invalid: " + path) }
+    if (!verify_master_key(vault, master_key)) { panic("master key mismatch") }
+    let entries = vault["entries"]
+    if (len(entries) == 0) {
+        print("no entries")
+        return
+    }
+    print("entries:")
+    for e in entries {
+        print("  - " + str(e["name"]) + " (user: " + str(e["username"]) + ")")
+    }
+}
+
+def cmd_get(path, master_key, entry_name) {
+    let vault = load_vault(path)
+    if (vault == null) { panic("vault missing or invalid: " + path) }
+    if (!verify_master_key(vault, master_key)) { panic("master key mismatch") }
+
+    let entries = vault["entries"]
+    let idx = find_entry(entries, entry_name)
+    if (idx < 0) { panic("entry not found: " + entry_name) }
+    let e = entries[idx]
+
+    let cipher = str(e["password_cipher"])
+    let sig = str(e["password_sig"])
+    if (!crypto["verify_signature"](cipher, master_key, sig)) {
+        panic("integrity check failed for entry: " + entry_name)
+    }
+    let plain = crypto["decrypt_xor_base64"](cipher, master_key)
+    if (plain == null) { panic("failed to decrypt entry: " + entry_name) }
+
+    print("name: " + str(e["name"]))
+    print("username: " + str(e["username"]))
+    print("password: " + str(plain))
+}
+
+def cmd_rotate_key(path, old_key, new_key) {
+    let vault = load_vault(path)
+    if (vault == null) { panic("vault missing or invalid: " + path) }
+    if (!verify_master_key(vault, old_key)) { panic("old master key mismatch") }
+
+    let entries = vault["entries"]
+    let i = 0
+    while (i < len(entries)) {
+        let e = entries[i]
+        let old_cipher = str(e["password_cipher"])
+        let old_sig = str(e["password_sig"])
+        if (!crypto["verify_signature"](old_cipher, old_key, old_sig)) {
+            panic("integrity check failed while rotating key for entry: " + str(e["name"]))
+        }
+        let plain = crypto["decrypt_xor_base64"](old_cipher, old_key)
+        if (plain == null) { panic("decrypt failed while rotating key for: " + str(e["name"])) }
+        let new_cipher = crypto["encrypt_xor_base64"](plain, new_key)
+        e["password_cipher"] = new_cipher
+        e["password_sig"] = crypto["sign_message"](new_cipher, new_key)
+        entries[i] = e
+        i = i + 1
+    }
+
+    vault["entries"] = entries
+    vault["master_key_hash"] = key_digest(new_key)
+    vault["updated_at"] = now_ts()
+    if (!save_vault(path, vault)) { panic("failed to save vault after rotate-key") }
+    print("master key rotated")
+}
+
+let args = cli_args()
+let cmd_pos = -1
+let i = 0
+while (i < len(args)) {
+    let t = str(args[i])
+    if (t == "init" or t == "add" or t == "list" or t == "get" or t == "rotate-key") {
+        cmd_pos = i
+        break
+    }
+    i = i + 1
+}
+if (cmd_pos < 0) {
+    usage()
+    panic("missing command")
+}
+
+let cmd = str(args[cmd_pos])
+let rest = []
+let j = cmd_pos + 1
+while (j < len(args)) {
+    push(rest, args[j])
+    j = j + 1
+}
+
+if (cmd == "init") {
+    if (len(rest) < 2) { usage(); panic("missing args for init") }
+    cmd_init(str(rest[0]), str(rest[1]))
+} else {
+    if (cmd == "add") {
+        if (len(rest) < 5) { usage(); panic("missing args for add") }
+        cmd_add(str(rest[0]), str(rest[1]), str(rest[2]), str(rest[3]), str(rest[4]))
+    } else {
+        if (cmd == "list") {
+            if (len(rest) < 2) { usage(); panic("missing args for list") }
+            cmd_list(str(rest[0]), str(rest[1]))
+        } else {
+            if (cmd == "get") {
+                if (len(rest) < 3) { usage(); panic("missing args for get") }
+                cmd_get(str(rest[0]), str(rest[1]), str(rest[2]))
+            } else {
+                if (cmd == "rotate-key") {
+                    if (len(rest) < 3) { usage(); panic("missing args for rotate-key") }
+                    cmd_rotate_key(str(rest[0]), str(rest[1]), str(rest[2]))
+                } else {
+                    usage()
+                    panic("unknown command: " + cmd)
+                }
+            }
+        }
+    }
+}

@@ -18,6 +18,8 @@ Kern is a **solo-built project by a 15-year-old developer**. That does not mean 
 
 **Discord:** [discord.gg/JBa4RfT2tE](https://discord.gg/JBa4RfT2tE) — official server for help and discussion.
 
+**Experimental:** the language, module semantics, and tooling on the default branch move quickly. Treat **tagged releases** as snapshots; for day-to-day work, build `kern` from this tree. **Portable** here means a self-contained install layout (e.g. `kern-NN/` with `lib/`, `config/env.json`, and `KERN_HOME`); it does not imply a stability guarantee.
+
 ---
 
 ## Table of contents
@@ -87,7 +89,7 @@ On Windows from a fresh build:
 | Area | What you get |
 |------|----------------|
 | **Language** | Variables, `def`, classes, `match`, `try`/`catch`, modules via `import`, lambdas, and more |
-| **Tooling** | `kern` (run / REPL), `kernc` (compiler / project tools), `kern-scan` (registry + static analysis) |
+| **Tooling** | `kern` (run / REPL), `kargo` (native package manager), `kernc` (compiler / project tools), `kern-scan` (registry + static analysis) |
 | **Stdlib** | Builtins + `lib/kern/*.kn`; versioned VM modules under `std.v1.*` — see [STDLIB_STD_V1.md](docs/STDLIB_STD_V1.md) |
 | **Checks** | `kern --check`, `kern --scan`, `kern test` over `tests/coverage` |
 | **Graphics** | Optional Raylib-backed `g2d` / `game` when built with `KERN_BUILD_GAME=ON` |
@@ -108,9 +110,15 @@ Installer capabilities:
 - Performs SHA-256 integrity printout for installed binary.
 - Updates PATH idempotently (no duplicate entries).
 
+### Portable Windows environment (`kern-portable`)
+
+Run **`kern-portable.exe`** from a release (with `kern-core.exe`, `kern-runtime.zip`, and checksums). It creates a self-contained **`kern-NN/`** folder (two-digit name, e.g. `kern-07`) with **`kern.exe`** and **`kargo.exe`** at the root (no extra `bin/` layer), plus `lib/`, `runtime/`, `packages/`, `cache/`, `config/`, and **`config/env.json`** recording the install root.
+
+Details: **[docs/getting-started.md](docs/getting-started.md)** — use **`KERN_HOME`** or the activation scripts under `kern-*/Scripts/` so tools agree on the same root.
+
 ### Build from source
 
-See **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)** for CMake-only installs, vcpkg + static Raylib on Windows, and portable “shareable” drops.
+See **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)** for CMake, vcpkg + static Raylib on Windows, and shareable drops. Build **`kargo`** with the same CMake project (`cmake --build … --target kargo`).
 
 ---
 
@@ -155,6 +163,11 @@ kern publish
 **Imports:** `import "math"`, `from "math" import sqrt`, or `import("path")` / `let m = import("math")`. Set **`KERN_LIB`** to the directory that **contains** `lib/kern` (often the repo root) so `import("lib/kern/...")` resolves when your working directory is not the project root.
 
 **Shebang:** a leading `#!/usr/bin/env kern` line is ignored on the first line so `chmod +x script.kn` works on Unix.
+
+### Runtime safety: `--unsafe` and capabilities
+
+- **`--unsafe` is opt-in.** A normal run is `kern script.kn` (or `kern run script.kn`). Pass `--unsafe` only when you intentionally widen what the VM may do for that invocation (as required by some examples or host integrations).
+- **Capabilities / policy helpers** (filesystem and process gates, modern runtime bundle) live under **`lib/kern/runtime/modern/`**. They complement, not replace, host security; see **[docs/TRUST_MODEL.md](docs/TRUST_MODEL.md)** for how Kern thinks about trust and sandboxes.
 
 ---
 
@@ -206,6 +219,7 @@ cmake --build build --config Release --target kern kernc kern-scan
 | `Kern-IDE/` | **Editor bundle** (Python/Qt/VS Code) — not required to build `kern` |
 | `framework/` | Optional document-runtime demo (CMake-gated) |
 | `3dengine/` | Optional 3D engine / ECS package (separate from core VM) when present |
+| `release-assets/` | **Ignored in git** except `README.md` — optional local legacy bundles; not a second stdlib (see that README) |
 
 The canonical version string is the root **`KERN_VERSION.txt`** file (used by `kern --version` and `kern_version()`).
 
@@ -221,6 +235,10 @@ High-level layout, dependency direction between compiler / VM / native modules, 
 
 | Doc | Contents |
 |-----|----------|
+| [getting-started.md](docs/getting-started.md) | Portable `kern-*/`, `KERN_HOME`, native Kargo |
+| [kargo-guide.md](docs/kargo-guide.md) | `kargo.json`, install/remove/update/list |
+| [examples.md](docs/examples.md) | Example tiers and headless runner |
+| [language-guide.md](docs/language-guide.md) | Syntax/stdlib pointers |
 | [architecture.md](docs/architecture.md) | Repository layers, current vs target paths, migration phases |
 | [GETTING_STARTED.md](docs/GETTING_STARTED.md) | Build, run, portable drops |
 | [TESTING.md](docs/TESTING.md) | Test scripts and stress suites |

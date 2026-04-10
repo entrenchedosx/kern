@@ -1,0 +1,13 @@
+D:/simple_programming_language/build-plan/CMakeFiles/kern_env_lib.dir
+D:/simple_programming_language/build-plan/CMakeFiles/kern_core.dir
+D:/simple_programming_language/build-plan/CMakeFiles/kern.dir
+D:/simple_programming_language/build-plan/CMakeFiles/kern_repl.dir
+D:/simple_programming_language/build-plan/CMakeFiles/kernc.dir
+D:/simple_programming_language/build-plan/CMakeFiles/kern_lsp.dir
+D:/simple_programming_language/build-plan/CMakeFiles/kern_contract_humanize.dir
+D:/simple_programming_language/build-plan/CMakeFiles/kern-scan.dir
+D:/simple_programming_language/build-plan/CMakeFiles/kargo.dir
+D:/simple_programming_language/build-plan/CMakeFiles/kern_launcher.dir
+D:/simple_programming_language/build-plan/CMakeFiles/INSTALL.dir
+D:/simple_programming_language/build-plan/CMakeFiles/ALL_BUILD.dir
+D:/simple_programming_language/build-plan/CMakeFiles/ZERO_CHECK.dir

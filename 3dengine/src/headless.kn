@@ -1,0 +1,7 @@
+// 3dengine headless core entrypoint (no graphics initialization at import time)
+
+let _runtime = import("src/index.kn")
+let ecs = _runtime["ecs"]
+
+def conventions() { return _runtime["conventions"]() }
+def version() { return _runtime["version"]() + "-headless" }

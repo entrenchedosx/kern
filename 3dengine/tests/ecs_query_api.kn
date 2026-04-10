@@ -1,0 +1,32 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+let vec3 = import("src/math/vec3.kn")
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let w = ecs["world_create"]()
+let e1 = ecs["world_create_entity"](w)
+let e2 = ecs["world_create_entity"](w)
+let e3 = ecs["world_create_entity"](w)
+
+ecs["world_add_transform"](w, e1, ecs["transform_make"](vec3["make"](1, 0, 0), null, null))
+ecs["world_add_transform"](w, e2, ecs["transform_make"](vec3["make"](2, 0, 0), null, null))
+ecs["world_add_transform"](w, e3, ecs["transform_make"](vec3["make"](3, 0, 0), null, null))
+ecs["world_add_velocity"](w, e1, ecs["velocity_make"](vec3["make"](10, 0, 0)))
+ecs["world_add_velocity"](w, e3, ecs["velocity_make"](vec3["make"](30, 0, 0)))
+
+let q = ecs["world_query"](w, ["transform", "velocity"])
+if (int(default(q["count"], 0)) != 2) { panic("ecs_query_api: expected 2 transform+velocity rows") }
+let comps = default(q["components"], {})
+let tr = default(comps["transform"], [])
+let vv = default(comps["velocity"], [])
+if (len(tr) != 2 || len(vv) != 2) { panic("ecs_query_api: component arrays mismatch") }
+if (float(default(default(tr[0], {})["local_position"]["x"], 0.0)) != 1.0) { panic("ecs_query_api: first transform mismatch") }
+if (float(default(default(vv[0], {})["linear"]["x"], 0.0)) != 10.0) { panic("ecs_query_api: first velocity mismatch") }
+if (float(default(default(tr[1], {})["local_position"]["x"], 0.0)) != 3.0) { panic("ecs_query_api: second transform mismatch") }
+if (float(default(default(vv[1], {})["linear"]["x"], 0.0)) != 30.0) { panic("ecs_query_api: second velocity mismatch") }
+
+let q_bad = ecs["world_query"](w, ["transform", "bad_component"])
+if (int(q_bad["count"]) != 0) { panic("ecs_query_api: bad component query should be empty") }
+
+print("ecs_query_api: ok")

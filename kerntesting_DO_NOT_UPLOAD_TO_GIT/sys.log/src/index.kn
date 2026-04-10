@@ -1,0 +1,89 @@
+// sys.log - structured logger
+
+def _now_iso() { return str(time()) }
+def _lvl_value(level) {
+    let l = lower(str(default(level, "info")))
+    if (l == "debug") { return 10 }
+    if (l == "info") { return 20 }
+    if (l == "warn") { return 30 }
+    if (l == "error") { return 40 }
+    return 20
+}
+
+def _normalize_level(level) {
+    let l = lower(str(default(level, "info")))
+    if (l == "debug" || l == "info" || l == "warn" || l == "error") { return l }
+    return "info"
+}
+
+def create_logger(opts) {
+    let o = default(opts, {})
+    return {
+        "name": str(default(o["name"], "app")),
+        "level": _normalize_level(default(o["level"], "info")),
+        "format": str(default(o["format"], "text")),
+        "redact_keys": default(o["redact_keys"], ["password", "token", "secret"]),
+        "context": default(o["context"], {})
+    }
+}
+
+def _redact_meta(meta, redact_keys) {
+    let m = default(meta, {})
+    let out = {}
+    for k in keys(m) {
+        let should_hide = false
+        for rk in default(redact_keys, []) {
+            if (lower(str(k)) == lower(str(rk))) { should_hide = true }
+        }
+        out[k] = should_hide ? "[REDACTED]" : m[k]
+    }
+    return out
+}
+
+def _merge_map(a, b) {
+    let out = default(a, {})
+    let bb = default(b, {})
+    for k in keys(bb) { out[k] = bb[k] }
+    return out
+}
+
+def _emit_text(ev) {
+    let meta = default(ev["meta"], {})
+    let tail = ""
+    for k in keys(meta) { tail = tail + " " + str(k) + "=" + str(meta[k]) }
+    print("[" + ev["ts"] + "] [" + upper(ev["level"]) + "] " + ev["logger"] + ": " + ev["msg"] + tail)
+}
+
+def _emit_json(ev) { print(json_stringify(ev)) }
+
+def log(logger, level, message, meta) {
+    let lg = default(logger, create_logger({}))
+    let l = _normalize_level(level)
+    if (_lvl_value(l) < _lvl_value(lg["level"])) { return { "ok": true, "skipped": true } }
+    let event = {
+        "ts": _now_iso(),
+        "level": l,
+        "logger": str(default(lg["name"], "app")),
+        "msg": str(default(message, "")),
+        "meta": _redact_meta(_merge_map(default(lg["context"], {}), default(meta, {})), lg["redact_keys"])
+    }
+    if (lower(str(default(lg["format"], "text"))) == "json") { _emit_json(event) } else { _emit_text(event) }
+    return { "ok": true, "skipped": false, "event": event }
+}
+
+def debug(logger, message, meta) { return log(logger, "debug", message, meta) }
+def info(logger, message, meta) { return log(logger, "info", message, meta) }
+def warn(logger, message, meta) { return log(logger, "warn", message, meta) }
+def error(logger, message, meta) { return log(logger, "error", message, meta) }
+
+def child(logger, extra_context) {
+    let lg = default(logger, create_logger({}))
+    let ctx = _merge_map(default(lg["context"], {}), default(extra_context, {}))
+    return create_logger({
+        "name": lg["name"],
+        "level": lg["level"],
+        "format": lg["format"],
+        "redact_keys": lg["redact_keys"],
+        "context": ctx
+    })
+}

@@ -1,0 +1,14 @@
+{
+  "name": "sec.secrets",
+  "description": "Secret loading, encryption, and rotation helpers.",
+  "trusted": false,
+  "latest": "1.0.1",
+  "versions": {
+    "1.0.0": {
+      "manifest": "versions/1.0.0.json"
+    },
+    "1.0.1": {
+      "manifest": "versions/1.0.1.json"
+    }
+  }
+}

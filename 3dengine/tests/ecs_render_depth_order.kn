@@ -1,0 +1,33 @@
+let u = import("src/index.kn")
+let ecs = u["ecs"]
+def v3(x, y, z) { return {"x": float(default(x, 0.0)), "y": float(default(y, 0.0)), "z": float(default(z, 0.0))} }
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+def run_once() {
+    let w = ecs["world_create"]()
+    let e1 = ecs["world_create_entity"](w)
+    let e2 = ecs["world_create_entity"](w)
+    let e3 = ecs["world_create_entity"](w)
+    ecs["world_add_transform"](w, e1, ecs["transform_make"](v3(0, 0, 3), null, null))
+    ecs["world_add_transform"](w, e2, ecs["transform_make"](v3(0, 0, 1), null, null))
+    ecs["world_add_transform"](w, e3, ecs["transform_make"](v3(0, 0, 2), null, null))
+    ecs["world_add_mesh"](w, e1, ecs["mesh_make_quad"]())
+    ecs["world_add_mesh"](w, e2, ecs["mesh_make_quad"]())
+    ecs["world_add_mesh"](w, e3, ecs["mesh_make_quad"]())
+    ecs["world_add_material"](w, e1, ecs["material_make"](v3(1, 0, 0), "m.r", null))
+    ecs["world_add_material"](w, e2, ecs["material_make"](v3(0, 1, 0), "m.g", null))
+    ecs["world_add_material"](w, e3, ecs["material_make"](v3(0, 0, 1), "m.b", null))
+    ecs["world_run_fixed_pipeline"](w, 1.0 / 60.0)
+    let c = default(w["render"]["commands"], [])
+    let d0 = float(default(default(c[0], {})["depth_value"], -1))
+    let d1 = float(default(default(c[1], {})["depth_value"], -1))
+    let d2 = float(default(default(c[2], {})["depth_value"], -1))
+    if (!(d0 == 1.0 && d1 == 2.0 && d2 == 3.0)) { panic("ecs_render_depth_order: depth sort mismatch") }
+    return str(d0) + "|" + str(d1) + "|" + str(d2)
+}
+
+let a = run_once()
+let b = run_once()
+if (a != b) { panic("ecs_render_depth_order: non-deterministic depth ordering") }
+print("ecs_render_depth_order: ok")

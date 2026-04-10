@@ -1,0 +1,11 @@
+{
+	"InstallScripts" : 
+	[
+		"D:/simple_programming_language/build-debug/cmake_install.cmake",
+		"D:/simple_programming_language/build-debug/_deps/raylib_external-build/cmake_install.cmake",
+		"D:/simple_programming_language/build-debug/_deps/raylib_external-build/raylib/cmake_install.cmake",
+		"D:/simple_programming_language/build-debug/_deps/raylib_external-build/raylib/external/glfw/cmake_install.cmake",
+		"D:/simple_programming_language/build-debug/_deps/raylib_external-build/raylib/external/glfw/src/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

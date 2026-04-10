@@ -1,0 +1,9 @@
+{
+  "name": "sec.auth",
+  "version": "1.0.0",
+  "main": "src/index.kn",
+  "description": "Authentication helpers: token + session utilities for Kern.",
+  "dependencies": {
+    "sec.crypto": "^1.0.0"
+  }
+}

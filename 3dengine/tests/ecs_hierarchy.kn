@@ -1,0 +1,22 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+let vec3 = import("src/math/vec3.kn")
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let w = ecs["world_create"]()
+let parent = ecs["world_create_entity"](w)
+let child = ecs["world_create_entity"](w)
+
+ecs["world_add_transform"](w, parent, ecs["transform_make"](vec3["make"](10, 0, 0), null, null))
+ecs["world_add_transform"](w, child, ecs["transform_make"](vec3["make"](3, 0, 0), null, null))
+
+if (!ecs["world_set_parent"](w, child, parent)) { panic("ecs_hierarchy: set parent failed") }
+let ct = ecs["world_get_transform"](w, child)
+if (ct == null) { panic("ecs_hierarchy: child transform missing") }
+if (int(ct["parent"]["index"]) != int(parent["index"])) { panic("ecs_hierarchy: parent link missing") }
+
+// Must reject cycles.
+if (ecs["world_set_parent"](w, parent, child)) { panic("ecs_hierarchy: cycle should be rejected") }
+
+print("ecs_hierarchy: ok")

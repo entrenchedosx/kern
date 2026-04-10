@@ -1,0 +1,8 @@
+{
+  "name": "consumer-api-app",
+  "version": "1.0.0",
+  "main": "main.kn",
+  "dependencies": {
+    "sys.config": "^1.0.0"
+  }
+}

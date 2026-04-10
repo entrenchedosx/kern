@@ -10,7 +10,7 @@ def spin_init(name) {
 
 def spin_lock(name) {
     let k = str(name)
-    if (!has_key(_spins, k)) { spin_init(k) }
+    if (!has(_spins, k)) { spin_init(k) }
     if (_spins[k]) { return false }
     _spins[k] = true
     return true
@@ -18,7 +18,7 @@ def spin_lock(name) {
 
 def spin_unlock(name) {
     let k = str(name)
-    if (!has_key(_spins, k)) { spin_init(k) }
+    if (!has(_spins, k)) { spin_init(k) }
     _spins[k] = false
     return true
 }

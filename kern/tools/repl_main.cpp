@@ -14,6 +14,7 @@
 #include "bytecode/bytecode.hpp"
 #include "errors/errors.hpp"
 #include "import_resolution.hpp"
+#include "platform/kern_env.hpp"
 #ifdef KERN_BUILD_GAME
 #include "game/game_builtins.hpp"
 #endif
@@ -27,6 +28,7 @@
 using namespace kern;
 
 static bool runSource(VM& vm, const std::string& source) {
+    replClearImportLoadingAtReplLineStart();
     g_errorReporter.setSource(source);
     g_errorReporter.setFilename("<repl>");  // virtual path for diagnostics / stack traces
     try {
@@ -111,7 +113,8 @@ static bool runSource(VM& vm, const std::string& source) {
 
 static const size_t IMPORT_BUILTIN_INDEX = 200;
 
-int main() {
+int main(int argc, char** argv) {
+    kern::initKernEnvironmentFromArgv(argc, argv);
     VM vm;
     RuntimeGuardPolicy guards;
     guards.debugMode = true;

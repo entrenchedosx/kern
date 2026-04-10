@@ -1,0 +1,14 @@
+{
+  "name": "ai.prompts",
+  "description": "Prompt template, rendering, and guarded AI invocation helpers.",
+  "trusted": false,
+  "latest": "1.0.1",
+  "versions": {
+    "1.0.0": {
+      "manifest": "versions/1.0.0.json"
+    },
+    "1.0.1": {
+      "manifest": "versions/1.0.1.json"
+    }
+  }
+}

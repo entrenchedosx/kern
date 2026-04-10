@@ -1,0 +1,11 @@
+{
+  "name": "sys.config",
+  "version": "1.0.0",
+  "main": "src/index.kn",
+  "dependencies": {},
+  "trusted": false,
+  "dist": {
+    "tarball": "../../../dist/sys.config/sys.config-1.0.0.tgz",
+    "shasum": "sha256-314c54283588865c5823d1a5cd32f9bda6fdcfd347b93f27a10eef717b70a494"
+  }
+}

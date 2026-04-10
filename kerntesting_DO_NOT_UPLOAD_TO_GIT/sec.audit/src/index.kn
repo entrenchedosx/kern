@@ -1,0 +1,60 @@
+// sec.audit - signed audit events
+
+let _crypto = import("sec.crypto")
+let _perm = import("sec.perm")
+let _log = import("sys.log")
+
+def _ok(value) { return { "ok": true, "value": value, "error": "", "code": "ok" } }
+def _err(code, message) { return { "ok": false, "value": null, "error": str(default(message, "")), "code": str(default(code, "error")) } }
+
+def create_event(actor, action, resource, result_text, meta) {
+    return {
+        "id": "audit-" + uuid(),
+        "ts": int(time()),
+        "actor": str(default(actor, "system")),
+        "action": str(default(action, "unknown")),
+        "resource": str(default(resource, "unknown")),
+        "result": str(default(result_text, "ok")),
+        "meta": default(meta, {})
+    }
+}
+
+def sign_event(event_obj, secret) {
+    let body = json_stringify(default(event_obj, {}))
+    return _crypto["sign_message"](body, secret)
+}
+
+def verify_event(event_obj, signature, secret) {
+    let body = json_stringify(default(event_obj, {}))
+    return _ok(_crypto["verify_signature"](body, secret, signature))
+}
+
+def append_file(path, event_obj, signature) {
+    require("filesystem.write")
+    let line = json_stringify({ "event": default(event_obj, {}), "signature": str(default(signature, "")) }) + "\n"
+    let old = ""
+    if (fileExists(path)) {
+        require("filesystem.read")
+        old = read_file(path)
+    }
+    let ok = write_file(path, old + line)
+    if (!ok) { return _err("write.failed", "failed writing audit file") }
+    return _ok(true)
+}
+
+def audit(logger, actor, action, resource, result_text, meta, secret, file_path) {
+    let lg = default(logger, _log["create_logger"]({ "name": "sec.audit", "level": "info" }))
+    let ev = create_event(actor, action, resource, result_text, meta)
+    let sig = sign_event(ev, secret)
+    let write_res = append_file(file_path, ev, sig)
+    if (!write_res["ok"]) {
+        _log["error"](lg, "audit write failed", { "error": write_res["error"], "path": file_path })
+        return write_res
+    }
+    _log["info"](lg, "audit event recorded", { "action": action, "resource": resource, "id": ev["id"] })
+    return _ok({ "event": ev, "signature": sig })
+}
+
+def permissions_snapshot() {
+    return _perm["describe"]()
+}

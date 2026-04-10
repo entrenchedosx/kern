@@ -1,0 +1,54 @@
+// web.webhooks - signed webhook helpers
+
+let _http = import("web.httpplus")
+let _crypto = import("sec.crypto")
+let _log = import("sys.log")
+
+def _ok(value) { return { "ok": true, "value": value, "error": "", "code": "ok" } }
+def _err(code, message) { return { "ok": false, "value": null, "error": str(default(message, "")), "code": str(default(code, "error")) } }
+
+def sign_payload(payload_obj, secret) {
+    let body = json_stringify(default(payload_obj, {}))
+    return _crypto["sign_message"](body, secret)
+}
+
+def verify_payload(payload_obj, secret, signature) {
+    let body = json_stringify(default(payload_obj, {}))
+    let ok = _crypto["verify_signature"](body, secret, signature)
+    return _ok(ok)
+}
+
+def make_headers(event_name, payload_obj, secret) {
+    let body = json_stringify(default(payload_obj, {}))
+    return {
+        "x-kern-event": str(default(event_name, "event")),
+        "x-kern-signature": _crypto["sign_message"](body, secret),
+        "x-kern-ts": str(int(time()))
+    }
+}
+
+def verify_replay(timestamp_text, max_age_seconds) {
+    let ts = int(default(timestamp_text, "0"))
+    let now = int(time())
+    let age = now - ts
+    let limit = int(default(max_age_seconds, 300))
+    if (age < 0) { age = 0 }
+    return _ok(age <= limit)
+}
+
+def send(url, event_name, payload_obj, secret, logger) {
+    let lg = default(logger, _log["create_logger"]({ "name": "web.webhooks", "level": "info" }))
+    let payload = {
+        "event": str(default(event_name, "event")),
+        "payload": default(payload_obj, {}),
+        "signature": sign_payload(payload_obj, secret),
+        "ts": int(time())
+    }
+    let r = _http["post_json"](url, payload)
+    if (!r["ok"]) {
+        _log["error"](lg, "webhook send failed", { "url": url, "error": r["error"] })
+        return r
+    }
+    _log["info"](lg, "webhook sent", { "url": url, "event": event_name })
+    return _ok(r["value"])
+}

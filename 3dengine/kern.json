@@ -1,0 +1,7 @@
+{
+  "name": "3dengine",
+  "version": "0.1.0",
+  "main": "src/index.kn",
+  "description": "Production-grade game framework foundation for Kern (Phase 1).",
+  "dependencies": {}
+}

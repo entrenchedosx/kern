@@ -1,0 +1,71 @@
+// web.rest - simple REST client wrapper
+
+let _http = import("web.httpplus")
+let _auth = import("sec.auth")
+
+def _ok(value) { return { "ok": true, "value": value, "error": "", "code": "ok" } }
+def _err(code, message) { return { "ok": false, "value": null, "error": str(default(message, "")), "code": str(default(code, "error")) } }
+
+def create_client(opts) {
+    let o = default(opts, {})
+    return {
+        "base_url": str(default(o["base_url"], "")),
+        "token": str(default(o["token"], "")),
+        "timeout_ms": int(default(o["timeout_ms"], 10000)),
+        "retries": int(default(o["retries"], 2))
+    }
+}
+
+def _trim_slash(s) {
+    let v = str(default(s, ""))
+    if (len(v) > 0 && std_string_substr(v, len(v) - 1, len(v)) == "/") {
+        return std_string_substr(v, 0, len(v) - 1)
+    }
+    return v
+}
+
+def _build_url(base_url, path) {
+    let b = _trim_slash(base_url)
+    let p = str(default(path, ""))
+    if (len(p) > 0 && std_string_substr(p, 0, 1) != "/") { p = "/" + p }
+    return b + p
+}
+
+def get(client, path) {
+    let c = default(client, create_client({}))
+    let url = _build_url(c["base_url"], path)
+    return _http["request_with_retry"]("GET", url, null, c["retries"], 200, null)
+}
+
+def post(client, path, body_obj) {
+    let c = default(client, create_client({}))
+    let url = _build_url(c["base_url"], path)
+    return _http["request_with_retry"]("POST", url, body_obj, c["retries"], 200, null)
+}
+
+def verify_access_token(token, secret) {
+    return _auth["verify_token"](token, secret)
+}
+
+def paginate(items, page, page_size) {
+    let arr = default(items, [])
+    let p = int(default(page, 1))
+    let ps = int(default(page_size, 10))
+    if (p < 1) { p = 1 }
+    if (ps < 1) { ps = 1 }
+    let start = (p - 1) * ps
+    let stop = start + ps
+    let out = []
+    let i = start
+    while (i < len(arr) && i < stop) {
+        push(out, arr[i])
+        i = i + 1
+    }
+    return _ok({
+        "items": out,
+        "page": p,
+        "page_size": ps,
+        "total": len(arr),
+        "has_more": stop < len(arr)
+    })
+}

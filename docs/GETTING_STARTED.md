@@ -1,5 +1,7 @@
 # Getting started
 
+> **Portable layout, `KERN_HOME`, and native Kargo:** see **[getting-started.md](getting-started.md)** for the current end-user flow. This page focuses on building from source (CMake, vcpkg, Raylib).
+
 ## Community
 
 **Discord:** [discord.gg/JBa4RfT2tE](https://discord.gg/JBa4RfT2tE) — official Kern server for help, language discussion, and tooling.

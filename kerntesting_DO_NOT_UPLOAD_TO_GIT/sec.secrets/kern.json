@@ -1,0 +1,10 @@
+{
+  "name": "sec.secrets",
+  "version": "1.0.1",
+  "main": "src/index.kn",
+  "description": "Secret loading, encryption, and rotation helpers.",
+  "dependencies": {
+    "sec.crypto": "^1.0.0",
+    "sys.config": "^1.0.0"
+  }
+}

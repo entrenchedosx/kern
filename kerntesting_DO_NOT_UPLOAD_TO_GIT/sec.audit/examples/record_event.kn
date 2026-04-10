@@ -1,0 +1,3 @@
+let audit = import("sec.audit")
+let r = audit["audit"](null, "svc:billing", "charge.create", "payment:pay_1", "ok", { "amount": 1200 }, "audit-key", "./audit.log")
+print(json_stringify(r, 2))

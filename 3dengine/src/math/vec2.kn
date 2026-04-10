@@ -1,0 +1,45 @@
+// 3dengine vec2 math
+
+def make(x, y) { return {"x": float(default(x, 0.0)), "y": float(default(y, 0.0))} }
+def zero() { return {"x": 0.0, "y": 0.0} }
+def one() { return {"x": 1.0, "y": 1.0} }
+
+def add(a, b) {
+    return {"x": float(default(a["x"], 0.0)) + float(default(b["x"], 0.0)), "y": float(default(a["y"], 0.0)) + float(default(b["y"], 0.0))}
+}
+
+def sub(a, b) {
+    return {"x": float(default(a["x"], 0.0)) - float(default(b["x"], 0.0)), "y": float(default(a["y"], 0.0)) - float(default(b["y"], 0.0))}
+}
+
+def scale(v, s) {
+    let k = float(default(s, 1.0))
+    return {"x": float(default(v["x"], 0.0)) * k, "y": float(default(v["y"], 0.0)) * k}
+}
+
+def dot(a, b) {
+    return float(default(a["x"], 0.0)) * float(default(b["x"], 0.0)) + float(default(a["y"], 0.0)) * float(default(b["y"], 0.0))
+}
+
+def length_sq(v) {
+    let x = float(default(v["x"], 0.0))
+    let y = float(default(v["y"], 0.0))
+    return x * x + y * y
+}
+
+def length(v) { return sqrt(length_sq(v)) }
+
+def normalize(v) {
+    let m2 = length_sq(v)
+    if (m2 <= 0.0000000001) { return zero() }
+    let inv = 1.0 / sqrt(m2)
+    return {"x": float(default(v["x"], 0.0)) * inv, "y": float(default(v["y"], 0.0)) * inv}
+}
+
+def lerp(a, b, t) {
+    let k = float(default(t, 0.0))
+    return {"x": float(default(a["x"], 0.0)) + (float(default(b["x"], 0.0)) - float(default(a["x"], 0.0))) * k, "y": float(default(a["y"], 0.0)) + (float(default(b["y"], 0.0)) - float(default(a["y"], 0.0))) * k}
+}
+
+def distance(a, b) { return length(sub(a, b)) }
+def distance_sq(a, b) { return length_sq(sub(a, b)) }

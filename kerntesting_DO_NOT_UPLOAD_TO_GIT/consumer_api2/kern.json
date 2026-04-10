@@ -1,0 +1,8 @@
+{
+  "name": "consumer-api2-app",
+  "version": "1.0.0",
+  "main": "main.kn",
+  "dependencies": {
+    "sys.log": "^1.0.0"
+  }
+}

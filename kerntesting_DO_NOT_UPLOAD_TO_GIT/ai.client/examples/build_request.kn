@@ -1,0 +1,4 @@
+let ai = import("ai.client")
+let c = ai["create_client"]({ "provider": "openai", "model": "gpt-4o-mini", "endpoint": "https://api.example/v1/chat" })
+let req = ai["build_chat_request"](c, [{ "role": "user", "content": "summarize this text" }], { "temperature": 0.3 })
+print(json_stringify(req, 2))

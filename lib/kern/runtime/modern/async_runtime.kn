@@ -36,7 +36,8 @@ def status(rt, id) {
     return id["state"]
 }
 
-def result(rt, id) {
+// Not named "result" — that would resolve via LOAD_GLOBAL and collide with user globals.
+def async_task_result(rt, id) {
     if (id == null) {
         _async_fail("ASYNC-TASK-NOT-FOUND",
             "result called with null task handle",
@@ -46,5 +47,5 @@ def result(rt, id) {
 }
 
 def await_task(rt, events_bus, ctx, id, timeout_ms) {
-    return result(rt, id)
+    return async_task_result(rt, id)
 }

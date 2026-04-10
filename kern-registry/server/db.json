@@ -39,20 +39,20 @@
         }
       }
     },
-    "ursina": {
-      "name": "ursina",
-      "description": "Production-grade game framework foundation for Kern (Phase 1).",
+    "3dengine": {
+      "name": "3dengine",
+      "description": "Production-grade 3D engine framework for Kern (Phase 1).",
       "trusted": false,
       "latest": "0.1.0",
       "versions": {
         "0.1.0": {
-          "name": "ursina",
+          "name": "3dengine",
           "version": "0.1.0",
           "main": "src/index.kn",
           "dependencies": {},
           "trusted": false,
           "dist": {
-            "tarball": "http://127.0.0.1:4873/api/v1/files/ursina/0.1.0/ursina-0.1.0.tgz",
+            "tarball": "http://127.0.0.1:4873/api/v1/files/3dengine/0.1.0/3dengine-0.1.0.tgz",
             "shasum": "sha256-85ea2c62f90e4d201de6886c64d11ee043fba4585e4555ac18a0789dc5d4f66a"
           }
         }

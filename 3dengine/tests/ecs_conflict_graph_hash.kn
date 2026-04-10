@@ -1,0 +1,43 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let pass = lambda (world, dt) => { return null }
+
+let w1 = ecs["world_create"]()
+if (!ecs["world_register_system"](w1, "POST_SIMULATION", "h.a", pass, [], {"write_mask": ["transform"]})) { panic("ecs_conflict_graph_hash: register h.a failed") }
+if (!ecs["world_register_system"](w1, "POST_SIMULATION", "h.b", pass, ["h.a"], {"write_mask": ["registry"]})) { panic("ecs_conflict_graph_hash: register h.b failed") }
+let r1 = ecs["world_scheduler_conflict_graph_hash"](w1)
+let r2 = ecs["world_scheduler_conflict_graph_hash"](w1)
+let h1 = str(default(r1["hash"], ""))
+let h2 = str(default(r2["hash"], ""))
+if (len(h1) == 0 || len(h2) == 0) { panic("ecs_conflict_graph_hash: hash should not be empty") }
+if (h1 != h2) { panic("ecs_conflict_graph_hash: hash should be stable for unchanged world") }
+let s1 = default(r1["stage_hashes"], {})
+let s2 = default(r2["stage_hashes"], {})
+let b1 = default(r1["batch_hashes"], {})
+let b2 = default(r2["batch_hashes"], {})
+if (len(keys(s1)) == 0 || len(keys(s2)) == 0) { panic("ecs_conflict_graph_hash: stage_hashes should not be empty") }
+if (str(default(s1["POST_SIMULATION"], "")) == "") { panic("ecs_conflict_graph_hash: missing POST_SIMULATION stage hash") }
+if (str(default(s1["POST_SIMULATION"], "")) != str(default(s2["POST_SIMULATION"], ""))) { panic("ecs_conflict_graph_hash: stage hash should be stable for unchanged world") }
+if (len(default(b1["POST_SIMULATION"], [])) == 0) { panic("ecs_conflict_graph_hash: missing POST_SIMULATION batch hashes") }
+if (json_stringify(default(b1["POST_SIMULATION"], [])) != json_stringify(default(b2["POST_SIMULATION"], []))) { panic("ecs_conflict_graph_hash: batch hashes should be stable for unchanged world") }
+
+let n1 = default(r1["normalized"], {})
+if (len(keys(default(n1["nodes"], {}))) == 0) { panic("ecs_conflict_graph_hash: normalized nodes missing") }
+if (len(default(n1["edges"], [])) == 0) { panic("ecs_conflict_graph_hash: normalized edges missing") }
+
+let w2 = ecs["world_create"]()
+if (!ecs["world_register_system"](w2, "POST_SIMULATION", "h.a", pass, [], {"write_mask": ["transform"]})) { panic("ecs_conflict_graph_hash: register h.a on world2 failed") }
+if (!ecs["world_register_system"](w2, "POST_SIMULATION", "h.b", pass, ["h.a"], {"write_mask": ["registry"]})) { panic("ecs_conflict_graph_hash: register h.b on world2 failed") }
+if (!ecs["world_register_system"](w2, "POST_SIMULATION", "h.c", pass, [], {"write_mask": ["velocity"]})) { panic("ecs_conflict_graph_hash: register h.c on world2 failed") }
+let r3 = ecs["world_scheduler_conflict_graph_hash"](w2)
+let h3 = str(default(r3["hash"], ""))
+if (h1 == h3) { panic("ecs_conflict_graph_hash: hash should change when graph changes") }
+let s3 = default(r3["stage_hashes"], {})
+let b3 = default(r3["batch_hashes"], {})
+if (str(default(s1["POST_SIMULATION"], "")) == str(default(s3["POST_SIMULATION"], ""))) { panic("ecs_conflict_graph_hash: POST_SIMULATION stage hash should change when stage changes") }
+if (json_stringify(default(b1["POST_SIMULATION"], [])) == json_stringify(default(b3["POST_SIMULATION"], []))) { panic("ecs_conflict_graph_hash: POST_SIMULATION batch hashes should change when stage changes") }
+
+print("ecs_conflict_graph_hash: ok")

@@ -6,7 +6,11 @@
 
 | Topic | Document |
 |--------|----------|
-| Build & install | [GETTING_STARTED.md](GETTING_STARTED.md) |
+| **Start here (portable + KERN_HOME)** | [getting-started.md](getting-started.md) |
+| Build & install (detailed) | [GETTING_STARTED.md](GETTING_STARTED.md) |
+| Kargo (native) | [kargo-guide.md](kargo-guide.md) |
+| Examples | [examples.md](examples.md) |
+| Language overview | [language-guide.md](language-guide.md) |
 | Run tests | [TESTING.md](TESTING.md) |
 | `std.v1.*` modules | [STDLIB_STD_V1.md](STDLIB_STD_V1.md) |
 | Diagnostics & errors | [ERROR_CODES.md](ERROR_CODES.md), [TROUBLESHOOTING.md](TROUBLESHOOTING.md) |

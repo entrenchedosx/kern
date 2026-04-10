@@ -1,0 +1,10 @@
+^D:\SIMPLE_PROGRAMMING_LANGUAGE\BUILD-PLAN\CMAKEFILES\1537AFCBCE4433D4503133ACDE057ED7\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/simple_programming_language -BD:/simple_programming_language/build-plan --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file D:/simple_programming_language/build-plan/Kern.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

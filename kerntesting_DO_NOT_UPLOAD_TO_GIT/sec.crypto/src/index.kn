@@ -1,0 +1,78 @@
+// sec.crypto - hashing, lightweight encryption/decryption, and token helpers
+// Note: encrypt/decrypt here are convenience helpers (XOR + base64), not modern AEAD.
+
+def normalize_key(key) {
+    let k = trim(str(default(key, "")))
+    if (k == "") { return "kern-sec-crypto-default-key" }
+    return k
+}
+
+def hash_sha256(input) { return sha256(str(input)) }
+def hash_sha1(input) { return sha1(str(input)) }
+def hash_fnv64(input) { return hash_fnv(str(input)) }
+
+def hash_password(password, salt) {
+    return sha256(str(default(salt, "")) + ":" + str(default(password, "")))
+}
+
+def verify_password(password, salt, expected_hash) {
+    return hash_password(password, salt) == str(default(expected_hash, ""))
+}
+
+def _xor_bytes(data_bytes, key_bytes) {
+    let out = []
+    let key_len = len(key_bytes)
+    if (key_len == 0) { return data_bytes }
+    let i = 0
+    while (i < len(data_bytes)) {
+        let d = int(data_bytes[i])
+        let k = int(key_bytes[i % key_len])
+        push(out, d ^ k)
+        i = i + 1
+    }
+    return out
+}
+
+def encrypt_xor_base64(plaintext, key) {
+    let p = string_to_bytes(str(default(plaintext, "")))
+    let k = string_to_bytes(normalize_key(key))
+    let x = _xor_bytes(p, k)
+    let raw = bytes_to_string(x)
+    return base64_encode(raw)
+}
+
+def decrypt_xor_base64(ciphertext_b64, key) {
+    try {
+        let raw = base64_decode(str(default(ciphertext_b64, "")))
+        let c = string_to_bytes(raw)
+        let k = string_to_bytes(normalize_key(key))
+        let p = _xor_bytes(c, k)
+        return bytes_to_string(p)
+    } catch (e) {
+        return null
+    }
+}
+
+def random_token(length) {
+    let target = int(default(length, 32))
+    if (target < 8) { target = 8 }
+    let out = ""
+    while (len(out) < target) {
+        out = out + replace(uuid(), "-", "")
+    }
+    return std_string_substr(out, 0, target)
+}
+
+def nonce() {
+    return random_token(24)
+}
+
+def sign_message(message, secret) {
+    let payload = str(default(message, ""))
+    let key = normalize_key(secret)
+    return sha256(key + "." + payload)
+}
+
+def verify_signature(message, secret, signature) {
+    return sign_message(message, secret) == str(default(signature, ""))
+}

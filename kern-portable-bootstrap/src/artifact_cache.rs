@@ -1,4 +1,4 @@
-//! Per-release artifact cache under `.kern/cache/artifacts/<tag>/`.
+//! Per-release artifact cache under `kern-*/cache/artifacts/<tag>/`.
 
 use crate::error::{path_ctx, PortableError, Result};
 use crate::github::ReleaseInfo;
@@ -12,6 +12,7 @@ use time::OffsetDateTime;
 
 pub const ASSET_KERN_CORE: &str = "kern-core.exe";
 pub const ASSET_RUNTIME_ZIP: &str = "kern-runtime.zip";
+pub const ASSET_KARGO_EXE: &str = "kargo.exe";
 
 pub const SCHEMA_V2: u32 = 2;
 
@@ -29,7 +30,7 @@ pub struct IntegrityManifestV2 {
 pub struct ArtifactTriple<'a> {
     pub kern_core: &'a Path,
     pub runtime_zip: &'a Path,
-    pub kargo_tgz: &'a Path,
+    pub kargo_exe: &'a Path,
 }
 
 pub fn utc_now_rfc3339() -> Result<String> {
@@ -45,7 +46,7 @@ pub fn write_integrity_manifest_v2_atomic(
 ) -> Result<()> {
     let kern_core_sha256 = sha256_verify::hash_file(triple.kern_core)?;
     let runtime_sha256 = sha256_verify::hash_file(triple.runtime_zip)?;
-    let kargo_sha256 = sha256_verify::hash_file(triple.kargo_tgz)?;
+    let kargo_sha256 = sha256_verify::hash_file(triple.kargo_exe)?;
 
     let manifest = IntegrityManifestV2 {
         schema: SCHEMA_V2,
@@ -75,7 +76,7 @@ pub fn write_integrity_manifest_v2_atomic(
 pub fn verify_tag_dir_consistent(
     tag_dir: &Path,
     kern_sums: &str,
-    kargo_sums: &str,
+    _kargo_sums_unused: &str,
     kargo_basename: &str,
 ) -> Result<()> {
     if !tag_dir.is_dir() {
@@ -92,7 +93,7 @@ pub fn verify_tag_dir_consistent(
                 .map_err(|e| PortableError::msg(format!("integrity.json v2: {}", e)))?;
             verify_hash_file(&tag_dir.join(ASSET_KERN_CORE), &m.kern_core_sha256)?;
             verify_hash_file(&tag_dir.join(ASSET_RUNTIME_ZIP), &m.runtime_sha256)?;
-            verify_hash_file(&tag_dir.join(kargo_basename), &m.kargo_sha256)?;
+            verify_hash_file(&tag_dir.join(kargo_basename), &m.kargo_sha256)?; // field = native kargo.exe hash
             return Ok(());
         }
 
@@ -119,7 +120,7 @@ pub fn verify_tag_dir_consistent(
 
     verify_present_or_ok(tag_dir, ASSET_KERN_CORE, kern_sums)?;
     verify_present_or_ok(tag_dir, ASSET_RUNTIME_ZIP, kern_sums)?;
-    verify_present_or_ok(tag_dir, kargo_basename, kargo_sums)?;
+    verify_present_or_ok(tag_dir, kargo_basename, kern_sums)?;
     Ok(())
 }
 
@@ -155,22 +156,6 @@ fn verify_hash_file(path: &Path, expected: &str) -> Result<()> {
     Ok(())
 }
 
-/// Delete the entire tag cache directory (after printing a short message).
-fn find_kargo_tarball_in(tag_dir: &Path) -> Result<std::path::PathBuf> {
-    let rd = fs::read_dir(tag_dir).map_err(|e| path_ctx(tag_dir, e))?;
-    let mut found = None;
-    for e in rd.flatten() {
-        let p = e.path();
-        if let Some(n) = p.file_name().and_then(|s| s.to_str()) {
-            if n.starts_with("kargo-") && n.ends_with(".tar.gz") {
-                found = Some(p);
-                break;
-            }
-        }
-    }
-    found.ok_or_else(|| PortableError::msg("no kargo-*.tar.gz in artifact cache dir"))
-}
-
 /// Offline check: `integrity.json` vs files on disk (for `doctor`, no GitHub SUMS required).
 pub fn verify_cached_artifacts_offline(tag_dir: &Path) -> Result<()> {
     let manifest_path = tag_dir.join("integrity.json");
@@ -184,8 +169,7 @@ pub fn verify_cached_artifacts_offline(tag_dir: &Path) -> Result<()> {
             .map_err(|e| PortableError::msg(format!("integrity v2: {}", e)))?;
         verify_hash_file(&tag_dir.join(ASSET_KERN_CORE), &m.kern_core_sha256)?;
         verify_hash_file(&tag_dir.join(ASSET_RUNTIME_ZIP), &m.runtime_sha256)?;
-        let kargo_path = find_kargo_tarball_in(tag_dir)?;
-        verify_hash_file(&kargo_path, &m.kargo_sha256)?;
+        verify_hash_file(&tag_dir.join(ASSET_KARGO_EXE), &m.kargo_sha256)?;
         return Ok(());
     }
     if let Some(obj) = val.as_object() {

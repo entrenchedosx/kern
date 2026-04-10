@@ -1,0 +1,76 @@
+// 3dengine backend abstraction over g2d / game
+
+let _g2d = import("g2d")
+let _game = import("game")
+
+def _use_g2d() { return _g2d != null }
+def _use_game() { return !_use_g2d() && _game != null }
+
+def interface_contract() {
+    return {"window_surface": ["is_open", "close", "width", "height", "backend"], "renderer_facade_2d": ["set_target_fps", "clear", "rect", "text", "present", "delta_time"], "note": "window provides surface/context; renderer facade is replaceable in future phases"}
+}
+
+def create(config) {
+    let cfg = default(config, {})
+    let title = str(default(cfg["title"], "3dengine"))
+    let width = int(default(cfg["width"], 1280))
+    let height = int(default(cfg["height"], 720))
+    let out = {}
+
+    if (_use_g2d()) {
+        _g2d.createWindow(width, height, title)
+        out["ok"] = true
+        out["backend"] = "g2d"
+        out["surface"] = {"kind": "window_surface", "backend": "g2d"}
+        out["renderer"] = {"kind": "renderer_2d_facade", "backend": "g2d"}
+        out["contract"] = interface_contract()
+        out["set_target_fps"] = lambda (fps) => { _g2d.setTargetFps(int(default(fps, 60))) }
+        out["clear"] = lambda (r, g, b, a) => { _g2d.clear(int(default(r, 0)), int(default(g, 0)), int(default(b, 0)), int(default(a, 255))) }
+        out["rect"] = lambda (x, y, w, h, r, g, b, a) => { _g2d.fillRect(int(default(x, 0)), int(default(y, 0)), int(default(w, 1)), int(default(h, 1)), int(default(r, 255)), int(default(g, 255)), int(default(b, 255)), int(default(a, 255))) }
+        out["text"] = lambda (s, x, y, size, r, g, b) => { _g2d.text(str(default(s, "")), int(default(x, 0)), int(default(y, 0)), int(default(size, 20)), int(default(r, 255)), int(default(g, 255)), int(default(b, 255))) }
+        out["present"] = lambda () => { _g2d.present() }
+        out["is_open"] = lambda () => { return _g2d.isOpen() }
+        out["delta_time"] = lambda () => { return float(_g2d.delta_time()) }
+        out["close"] = lambda () => { _g2d.closeWindow() }
+        out["width"] = lambda () => { return int(_g2d.width()) }
+        out["height"] = lambda () => { return int(_g2d.height()) }
+        return out
+    }
+
+    if (_use_game()) {
+        _game.window_create(width, height, title)
+        out["ok"] = true
+        out["backend"] = "game"
+        out["surface"] = {"kind": "window_surface", "backend": "game"}
+        out["renderer"] = {"kind": "renderer_2d_facade", "backend": "game"}
+        out["contract"] = interface_contract()
+        out["set_target_fps"] = lambda (fps) => { _game.set_target_fps(int(default(fps, 60))) }
+        out["clear"] = lambda (r, g, b, a) => { _game.clear(int(default(r, 0)), int(default(g, 0)), int(default(b, 0))) }
+        out["rect"] = lambda (x, y, w, h, r, g, b, a) => { _game.draw_rect(int(default(x, 0)), int(default(y, 0)), int(default(w, 1)), int(default(h, 1)), int(default(r, 255)), int(default(g, 255)), int(default(b, 255)), int(default(a, 255))) }
+        out["text"] = lambda (s, x, y, size, r, g, b) => { _game.draw_text(str(default(s, "")), int(default(x, 0)), int(default(y, 0)), int(default(size, 20)), int(default(r, 255)), int(default(g, 255)), int(default(b, 255))) }
+        out["present"] = lambda () => { _game.present() }
+        out["is_open"] = lambda () => { return _game.window_open() }
+        out["delta_time"] = lambda () => { return float(_game.delta_time()) }
+        out["close"] = lambda () => { _game.window_close() }
+        out["width"] = lambda () => { return int(_game.screen_width()) }
+        out["height"] = lambda () => { return int(_game.screen_height()) }
+        return out
+    }
+
+    out["ok"] = false
+    out["backend"] = "none"
+    out["surface"] = {"kind": "window_surface", "backend": "none"}
+    out["renderer"] = {"kind": "renderer_2d_facade", "backend": "none"}
+    out["contract"] = interface_contract()
+    out["set_target_fps"] = lambda (fps) => { return null }
+    out["clear"] = lambda (r, g, b, a) => { return null }
+    out["rect"] = lambda (x, y, w, h, r, g, b, a) => { return null }
+    out["text"] = lambda (s, x, y, size, r, g, b) => { return null }
+    out["present"] = lambda () => { return null }
+    out["is_open"] = lambda () => { return false }
+    out["delta_time"] = lambda () => { return 0.0166666667 }
+    out["close"] = lambda () => { return null }
+    out["width"] = lambda () => { return width }
+    out["height"] = lambda () => { return height }
+    return out
+}

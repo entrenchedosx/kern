@@ -1,0 +1,35 @@
+let u = import("src/index.kn")
+let ecs = u["ecs"]
+def v3(x, y, z) { return {"x": float(default(x, 0.0)), "y": float(default(y, 0.0)), "z": float(default(z, 0.0))} }
+
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let w = ecs["world_create"]()
+let L = ecs["world_get_lighting"](w)
+let amb = default(L["ambient"], {})
+let dir = default(default(L["directional"], {})["direction"], {})
+if (float(default(amb["x"], 0.0)) == 0.0 && float(default(amb["y"], 0.0)) == 0.0 && float(default(amb["z"], 0.0)) == 0.0) {
+    panic("ecs_render_lighting: default ambient unexpected")
+}
+if (float(default(dir["y"], 0.0)) >= 0.0) { panic("ecs_render_lighting: default directional should point down (y < 0)") }
+
+let e = ecs["world_create_entity"](w)
+ecs["world_add_transform"](w, e, ecs["transform_make"](v3(0, 0, 0), null, null))
+ecs["world_add_mesh"](w, e, ecs["mesh_make_quad"]())
+ecs["world_add_material"](w, e, ecs["material_make"](v3(0.5, 0.5, 0.5), "m.lit", null))
+
+ecs["world_run_render_prep"](w)
+let h0 = str(default(ecs["world_render_stats"](w)["lighting_hash"], ""))
+if (len(h0) < 8) { panic("ecs_render_lighting: lighting_hash missing or too short after prep") }
+
+ecs["world_set_lighting"](w, {"ambient": v3(0.4, 0.41, 0.42)})
+ecs["world_run_render_prep"](w)
+let h1 = str(default(ecs["world_render_stats"](w)["lighting_hash"], ""))
+if (h1 == h0) { panic("ecs_render_lighting: hash should change when lighting changes") }
+
+let _ = ecs["world_render"](w, {"rect": lambda (x, y, ww, hh, r, g, b, a) => { return null }})
+let h2 = str(default(ecs["world_render_stats"](w)["lighting_hash"], ""))
+if (h2 != h1) { panic("ecs_render_lighting: lighting_hash should match after render") }
+
+print("ecs_render_lighting: ok")

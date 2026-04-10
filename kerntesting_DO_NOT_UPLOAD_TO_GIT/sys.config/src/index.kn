@@ -1,0 +1,77 @@
+// sys.config - layered configuration helpers
+
+def _ok(value) { return { "ok": true, "value": value, "error": "", "code": "ok" } }
+def _err(code, message) { return { "ok": false, "value": null, "error": str(default(message, "")), "code": str(default(code, "error")) } }
+
+def _parse_json_safe(raw) {
+    try { return json_parse(str(default(raw, ""))) } catch (e) { return null }
+}
+
+def merge_shallow(base_obj, override_obj) {
+    let out = default(base_obj, {})
+    let over = default(override_obj, {})
+    for k in keys(over) {
+        out[k] = over[k]
+    }
+    return out
+}
+
+def read_json_file(path) {
+    require("filesystem.read")
+    let p = str(default(path, ""))
+    if (p == "") { return _err("path.empty", "path is required") }
+    if (!fileExists(p)) { return _err("file.missing", "file does not exist: " + p) }
+    let raw = read_file(p)
+    let parsed = _parse_json_safe(raw)
+    if (parsed == null) { return _err("json.invalid", "file is not valid json: " + p) }
+    return _ok(parsed)
+}
+
+def from_env(prefix, keys_list) {
+    require("env.access")
+    let p = str(default(prefix, ""))
+    let out = {}
+    for k in default(keys_list, []) {
+        let key_name = str(k)
+        let v = env_get(p + key_name)
+        if (v != null) { out[key_name] = v }
+    }
+    return out
+}
+
+def load(defaults_obj, file_path, env_prefix, env_keys) {
+    let cfg = default(defaults_obj, {})
+    let fp = str(default(file_path, ""))
+    if (fp != "" && fileExists(fp)) {
+        let rf = read_json_file(fp)
+        if (!rf["ok"]) { return rf }
+        cfg = merge_shallow(cfg, rf["value"])
+    }
+    let ep = str(default(env_prefix, ""))
+    if (ep != "" && len(default(env_keys, [])) > 0) {
+        let env_part = from_env(ep, env_keys)
+        cfg = merge_shallow(cfg, env_part)
+    }
+    return _ok(cfg)
+}
+
+def get(config_obj, key_name, fallback) {
+    let cfg = default(config_obj, {})
+    let k = str(default(key_name, ""))
+    if (k == "") { return fallback }
+    if (!has(cfg, k)) { return fallback }
+    return cfg[k]
+}
+
+def require_keys(config_obj, key_list) {
+    let cfg = default(config_obj, {})
+    let missing = []
+    for k in default(key_list, []) {
+        let ks = str(k)
+        if (!has(cfg, ks) || cfg[ks] == null || str(cfg[ks]) == "") {
+            push(missing, ks)
+        }
+    }
+    if (len(missing) > 0) { return _err("config.missing_keys", json_stringify(missing)) }
+    return _ok(true)
+}

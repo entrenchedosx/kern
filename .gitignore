@@ -1,6 +1,8 @@
 # Build
 kern-bootstrap/target/
 kern-portable-bootstrap/target/
+# Standalone installer crate + nested repo (github.com/entrenchedosx/kern-installer-src)
+kern-installer-src/
 release-staging-*/
 build/
 BUILD/
@@ -86,3 +88,7 @@ kern.lock
 .kern-last-analysis.json
 .kern-fix-backups/
 project_tree_full.txt
+
+# Optional local legacy release drops (not source of truth; see release-assets/README.md)
+release-assets/**
+!release-assets/README.md

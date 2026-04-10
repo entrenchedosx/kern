@@ -1,0 +1,5 @@
+let cfgm = import("sys.config")
+let result = cfgm["load"]({ "PORT": 8080, "HOST": "127.0.0.1" }, "./app.config.json", "", [])
+if (!result["ok"]) { panic("config load failed: " + result["error"]) }
+let cfg = result["value"]
+print("HOST=" + str(cfg["HOST"]) + " PORT=" + str(cfg["PORT"]))

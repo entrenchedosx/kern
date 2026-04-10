@@ -1,0 +1,46 @@
+// ai.prompts - prompt templating and guards
+
+let _ai = import("ai.client")
+
+def _ok(value) { return { "ok": true, "value": value, "error": "", "code": "ok" } }
+def _err(code, message) { return { "ok": false, "value": null, "error": str(default(message, "")), "code": str(default(code, "error")) } }
+
+def render(template_text, vars_obj) {
+    let out = str(default(template_text, ""))
+    let vars = default(vars_obj, {})
+    for k in keys(vars) {
+        out = replace(out, "{{" + str(k) + "}}", str(vars[k]))
+    }
+    return out
+}
+
+def build_messages(system_prompt, user_prompt) {
+    return [
+        { "role": "system", "content": str(default(system_prompt, "")) },
+        { "role": "user", "content": str(default(user_prompt, "")) }
+    ]
+}
+
+def extract_json(text) {
+    let t = trim(str(default(text, "")))
+    if (t == "") { return _err("text.empty", "no text to parse") }
+    try {
+        return _ok(json_parse(t))
+    } catch (e) {
+        return _err("json.invalid", "model output was not valid json")
+    }
+}
+
+def ensure_max_chars(text, max_chars) {
+    let t = str(default(text, ""))
+    let m = int(default(max_chars, 2000))
+    if (m < 1) { m = 1 }
+    if (len(t) <= m) { return _ok(t) }
+    return _err("text.too_long", "output exceeded max chars")
+}
+
+def run_template(client, template_text, vars_obj, opts) {
+    let prompt = render(template_text, vars_obj)
+    let messages = build_messages(str(default(default(opts, {})["system"], "You are a concise assistant.")), prompt)
+    return _ai["chat_complete"](client, messages, default(opts, {}), null)
+}

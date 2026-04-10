@@ -1,0 +1,78 @@
+// sec.perm - capability helpers that wrap Kern's runtime permission model
+
+def grant(permission_or_group) {
+    return require(str(permission_or_group))
+}
+
+def grant_many(permission_list) {
+    if (permission_list == null) { return false }
+    let ok = true
+    for p in permission_list {
+        if (!grant(p)) { ok = false }
+    }
+    return ok
+}
+
+def active() {
+    return permissions_active()
+}
+
+def granted_permissions() {
+    let a = active()
+    if (has(a, "granted")) { return a["granted"] }
+    return []
+}
+
+def granted_groups() {
+    let a = active()
+    if (has(a, "groups")) { return a["groups"] }
+    return []
+}
+
+def is_granted(permission_id) {
+    let target = str(permission_id)
+    let gp = granted_permissions()
+    for p in gp {
+        if (str(p) == target) { return true }
+    }
+    return false
+}
+
+def any_granted(permission_list) {
+    if (permission_list == null) { return false }
+    for p in permission_list {
+        if (is_granted(p)) { return true }
+    }
+    return false
+}
+
+def all_granted(permission_list) {
+    if (permission_list == null) { return false }
+    for p in permission_list {
+        if (!is_granted(p)) { return false }
+    }
+    return true
+}
+
+def ensure(permission_or_group) {
+    if (is_granted(permission_or_group)) { return true }
+    return grant(permission_or_group)
+}
+
+def describe() {
+    let a = active()
+    let out = {
+        "granted_count": len(granted_permissions()),
+        "groups_count": len(granted_groups()),
+        "granted": granted_permissions(),
+        "groups": granted_groups()
+    }
+    if (has(a, "granted_with_source")) {
+        out["granted_with_source"] = a["granted_with_source"]
+    }
+    return out
+}
+
+def unsafe_hint() {
+    return "Use sec.perm.ensure(\"...\") before unsafe { ... } blocks to keep capability intent explicit."
+}

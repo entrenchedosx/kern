@@ -1,0 +1,14 @@
+{
+  "name": "web.rest",
+  "description": "REST client utilities with base URL, auth, and pagination helpers.",
+  "trusted": false,
+  "latest": "1.0.1",
+  "versions": {
+    "1.0.0": {
+      "manifest": "versions/1.0.0.json"
+    },
+    "1.0.1": {
+      "manifest": "versions/1.0.1.json"
+    }
+  }
+}

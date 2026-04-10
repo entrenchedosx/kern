@@ -8,7 +8,7 @@ def bind(action, key_name) {
 
 def key_for(action) {
     let a = str(action)
-    if (!has_key(_bindings, a)) { return null }
+    if (!has(_bindings, a)) { return null }
     return _bindings[a]
 }
 

@@ -11,7 +11,7 @@ Use this before tagging a public release. Pair with [RELEASE.md](../RELEASE.md) 
 
 ## Build & test (local or CI)
 
-- [ ] **Release build:** `cmake --build … --config Release --target kern kernc kern-scan`
+- [ ] **Release build:** `cmake --build … --config Release --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize kargo` (Windows portable zip: `powershell -File scripts/package-windows-kern-github-release-zip.ps1` after `npm ci --prefix kern-registry --omit=dev` if refreshing the bootstrapper asset locally)
 - [ ] **Smoke:** `kern --version`, `kern --help`, `kern examples/basic/01_hello_world.kn`
 - [ ] **Scan:** `kern --scan --registry-only` exits **0**
 - [ ] **Tests:** `kern test tests/coverage` (or full `scripts/release_go_no_go.ps1` for maintainers)
@@ -21,7 +21,7 @@ Use this before tagging a public release. Pair with [RELEASE.md](../RELEASE.md) 
 
 - [ ] **Tag:** `git tag -a vX.Y.Z -m "Release vX.Y.Z"` and push `vX.Y.Z`
 - [ ] **Release notes:** copy the new **CHANGELOG** section into the GitHub Release description
-- [ ] **Artifacts:** confirm [release workflow](../.github/workflows/release.yml) attached **Windows** zip (`kern-windows-x64-v*.zip`), **Windows NSIS installer** (`kern-windows-x64-v*-installer.exe`), **Linux** tarball (`kern-linux-x64-v*.tar.gz`), **macOS** tarball (`kern-macos-v*.tar.gz`), and **Kargo** bundle (`kargo-v*.tar.gz` + checksums + manifest)
+- [ ] **Artifacts:** confirm [release workflow](../.github/workflows/release.yml) attached **Windows** zip (`kern-windows-x64-v*.zip`), **Windows NSIS installer** (`kern-windows-x64-v*-installer.exe`), **Linux** tarball (`kern-linux-x64-v*.tar.gz`), **macOS** tarballs (`kern-macos-arm64-v*.tar.gz`, `kern-macos-x64-v*.tar.gz`), optional **legacy Node Kargo** bundle (`kargo-v*.tar.gz` + checksums + manifest), and **portable env** files (`kern-core.exe`, `kern-runtime.zip`, `kern-portable.exe`, **`kargo.exe`** — see [RELEASE.md](../RELEASE.md) Option A2)
 
 ## Post-release
 

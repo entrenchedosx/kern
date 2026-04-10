@@ -1,0 +1,4 @@
+let rest = import("web.rest")
+let client = rest["create_client"]({ "base_url": "https://httpbin.org", "retries": 2 })
+let r = rest["get"](client, "/get")
+print(json_stringify(r, 2))

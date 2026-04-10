@@ -1,0 +1,120 @@
+// 3dengine prelude (Phase 1 convenience exports)
+
+let VERSION = "0.1.0"
+
+def v2(x, y) { return {"x": float(default(x, 0.0)), "y": float(default(y, 0.0))} }
+def v3(x, y, z) { return {"x": float(default(x, 0.0)), "y": float(default(y, 0.0)), "z": float(default(z, 0.0))} }
+
+def now() { return float(monotonic_time()) }
+def fixed_dt(hz) {
+    let h = float(default(hz, 60.0))
+    if (h <= 0.0) { return 1.0 / 60.0 }
+    return 1.0 / h
+}
+
+let _g2d = import("g2d")
+let _game = import("game")
+
+def _use_g2d() { return _g2d != null }
+def _use_game() { return !_use_g2d() && _game != null }
+
+def create_window(title, width, height) {
+    let t = str(default(title, "3dengine"))
+    let w = int(default(width, 1280))
+    let h = int(default(height, 720))
+    if (_use_g2d()) {
+        _g2d.createWindow(w, h, t)
+        return {"ok": true, "backend": "g2d"}
+    }
+    if (_use_game()) {
+        _game.window_create(w, h, t)
+        return {"ok": true, "backend": "game"}
+    }
+    return {"ok": false, "backend": "none"}
+}
+
+def run(config, on_fixed, on_frame) {
+    let c = default(config, {})
+    let title = str(default(c["title"], "3dengine"))
+    let width = int(default(c["width"], 1280))
+    let height = int(default(c["height"], 720))
+    let target_fps = int(default(c["target_fps"], 60))
+    let fixed_hz = float(default(c["fixed_hz"], 60.0))
+    let max_frame_dt = float(default(c["max_frame_dt"], 0.25))
+    let max_fixed_steps = int(default(c["max_fixed_steps"], 8))
+    let time_scale = float(default(c["time_scale"], 1.0))
+    if (time_scale < 0.0) { time_scale = 0.0 }
+    let clear_color = default(c["clear_color"], {"r": 20, "g": 24, "b": 34, "a": 255})
+    let opened = create_window(title, width, height)
+    if (!opened["ok"]) {
+        print("3dengine/prelude: graphics backend unavailable (need g2d or game)")
+        return {"ok": false, "reason": "no_backend"}
+    }
+
+    let set_target = lambda (fps) => {
+        if (_use_g2d()) { _g2d.setTargetFps(int(default(fps, 60))) }
+        if (_use_game()) { _game.set_target_fps(int(default(fps, 60))) }
+    }
+    let is_open = lambda () => {
+        if (_use_g2d()) { return _g2d.isOpen() }
+        if (_use_game()) { return _game.window_open() }
+        return false
+    }
+    let clear = lambda () => {
+        if (_use_g2d()) {
+            _g2d.clear(int(default(clear_color["r"], 0)), int(default(clear_color["g"], 0)), int(default(clear_color["b"], 0)), int(default(clear_color["a"], 255)))
+        } else {
+            if (_use_game()) {
+                _game.clear(int(default(clear_color["r"], 0)), int(default(clear_color["g"], 0)), int(default(clear_color["b"], 0)))
+            }
+        }
+    }
+    let present = lambda () => {
+        if (_use_g2d()) { _g2d.present() }
+        if (_use_game()) { _game.present() }
+    }
+    let close = lambda () => {
+        if (_use_g2d()) { _g2d.closeWindow() }
+        if (_use_game()) { _game.window_close() }
+    }
+    let rect = lambda (x, y, w, h, r, g, b, a) => {
+        if (_use_g2d()) { _g2d.fillRect(int(default(x, 0)), int(default(y, 0)), int(default(w, 1)), int(default(h, 1)), int(default(r, 255)), int(default(g, 255)), int(default(b, 255)), int(default(a, 255))) }
+        if (_use_game()) { _game.draw_rect(int(default(x, 0)), int(default(y, 0)), int(default(w, 1)), int(default(h, 1)), int(default(r, 255)), int(default(g, 255)), int(default(b, 255)), int(default(a, 255))) }
+    }
+
+    set_target(target_fps)
+    let state = {"running": true, "gfx": {"rect": rect}, "user": {}, "time": {"frame": 0, "sim_frame": 0, "sim_time": 0.0, "raw_dt": 0.0, "fixed_dt": fixed_dt(fixed_hz), "frame_dt": 0.0, "alpha": 0.0, "time_scale": time_scale}}
+    let prev = now()
+    let acc = 0.0
+    let step = state["time"]["fixed_dt"]
+    while (state["running"] && is_open()) {
+        let nt = now()
+        let raw_dt = nt - prev
+        prev = nt
+        if (raw_dt < 0.0) { raw_dt = 0.0 }
+        if (raw_dt > max_frame_dt) { raw_dt = max_frame_dt }
+        let dt = raw_dt * float(default(state["time"]["time_scale"], 1.0))
+        state["time"]["raw_dt"] = raw_dt
+        acc = acc + dt
+        state["time"]["frame_dt"] = dt
+        let steps = 0
+        while (acc >= step && steps < max_fixed_steps) {
+            if (on_fixed != null) { on_fixed(state, step) }
+            acc = acc - step
+            state["time"]["sim_time"] = state["time"]["sim_time"] + step
+            state["time"]["sim_frame"] = int(default(state["time"]["sim_frame"], 0)) + 1
+            steps = steps + 1
+        }
+        if (steps >= max_fixed_steps && acc >= step) { acc = 0.0 }
+        state["time"]["alpha"] = step > 0.0 ? (acc / step) : 0.0
+        clear()
+        if (on_frame != null) { on_frame(state, dt, state["time"]["alpha"]) }
+        present()
+        state["time"]["frame"] = int(state["time"]["frame"]) + 1
+    }
+
+    close()
+    return {"ok": true, "backend": opened["backend"], "frames": state["time"]["frame"]}
+}
+
+def version() { return VERSION }

@@ -1,0 +1,13 @@
+{
+  "name": "web.httpplus",
+  "version": "1.0.1",
+  "main": "src/index.kn",
+  "dependencies": {
+    "sys.log": "^1.0.0"
+  },
+  "trusted": false,
+  "dist": {
+    "tarball": "https://github.com/entrenchedosx/kern/releases/download/web.httpplus-v1.0.1/web.httpplus-1.0.1.tgz",
+    "shasum": "sha256-7a2b80da142df5e42bc231e22032cb6816cc76b4ef6f175fae54716281d82655"
+  }
+}

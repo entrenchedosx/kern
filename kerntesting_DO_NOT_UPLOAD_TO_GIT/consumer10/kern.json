@@ -1,0 +1,10 @@
+{
+  "name": "consumer10-app",
+  "version": "1.0.0",
+  "main": "app.kn",
+  "dependencies": {
+    "ai.prompts": "^1.0.0",
+    "sec.audit": "^1.0.0",
+    "sys.tasks": "^1.0.0"
+  }
+}

@@ -1,0 +1,60 @@
+// Integration demo using multiple downloadable stdlibs together.
+// This demonstrates a realistic "secure AI webhook processor" workflow.
+
+let cfgm = import("sys.config")
+let slog = import("sys.log")
+let tasks = import("sys.tasks")
+let secrets = import("sec.secrets")
+let audit = import("sec.audit")
+let rest = import("web.rest")
+let ai = import("ai.client")
+let prompts = import("ai.prompts")
+
+let cfg_res = cfgm["load"]({
+    "WEBHOOK_TARGET": "https://httpbin.org/post",
+    "MODEL": "demo-model"
+}, "", "APP_", ["WEBHOOK_TARGET", "MODEL"])
+if (!cfg_res["ok"]) { panic(cfg_res["error"]) }
+let cfg = cfg_res["value"]
+
+let lg = slog["create_logger"]({
+    "name": "integration.demo",
+    "level": "info",
+    "format": "text",
+    "redact_keys": ["api_key", "token", "secret"]
+})
+slog["info"](lg, "config loaded", { "model": cfg["MODEL"] })
+
+let idem = tasks["idempotency_key"]("hook.process", { "event": "invoice.paid", "id": "evt_123" })
+slog["info"](lg, "idempotency generated", { "idempotency_key": idem })
+
+let store_res = secrets["save_store"]("./demo.secrets.json", { "AI_API_KEY": "example-key" }, "master-demo")
+if (!store_res["ok"]) { panic(store_res["error"]) }
+let loaded_res = secrets["load_store"]("./demo.secrets.json", "master-demo")
+if (!loaded_res["ok"]) { panic(loaded_res["error"]) }
+
+let client = ai["create_client"]({
+    "provider": "custom",
+    "endpoint": cfg["WEBHOOK_TARGET"],
+    "api_key": loaded_res["value"]["AI_API_KEY"],
+    "model": cfg["MODEL"],
+    "retries": 2
+})
+
+let user_prompt = prompts["render"]("Summarize webhook {{event}} for {{team}}", {
+    "event": "invoice.paid",
+    "team": "finance-ops"
+})
+let req = ai["build_chat_request"](client, prompts["build_messages"]("Be concise.", user_prompt), { "temperature": 0.1 })
+slog["info"](lg, "ai payload prepared", { "provider": req["provider"], "model": req["model"] })
+
+let p = rest["paginate"]([1,2,3,4,5,6,7], 2, 3)
+slog["info"](lg, "pagination sample", { "page_count": len(p["value"]["items"]) })
+
+let a = audit["audit"](lg, "svc:integration-demo", "demo.run", "stdlib_stack_demo", "ok", {
+    "idempotency_key": idem,
+    "model": cfg["MODEL"]
+}, "audit-demo-secret", "./demo.audit.log")
+if (!a["ok"]) { panic(a["error"]) }
+
+print("stdlib_stack_demo: done")

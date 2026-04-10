@@ -1,6 +1,6 @@
 # On version tag (v*): build Windows + Linux + macOS with Raylib (g2d/g3d); attach archives to GitHub Release.
 # Windows also builds an NSIS installer (kern-windows-x64-v*-installer.exe) from the same fresh Release binaries as the zip.
-# Also ships a Node-based Kargo bundle (tar.gz + SHA256SUMS + kargo-release.json). See kargo/scripts/package-release.sh.
+# Also ships a Node-based Kargo bundle (optional; tar.gz + SHA256SUMS) for legacy users. Native `kargo.exe` is built with CMake and included in the portable bundle.
 # workflow_dispatch: build + artifacts only (no release unless ref is a tag).
 name: Release
 
@@ -66,7 +66,7 @@ jobs:
 
       - name: Build
         shell: cmd
-        run: cmake --build build --config Release --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize --parallel 4
+        run: cmake --build build --config Release --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize kargo --parallel 4
 
       - name: Verify
         shell: cmd
@@ -124,6 +124,37 @@ jobs:
           $h = (Get-FileHash $out -Algorithm SHA256).Hash.ToLowerInvariant()
           "${h} *${bn}" | Set-Content -Encoding ascii kern-SHA256.partial-windows
 
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Portable env assets (kern-core.exe, kern-runtime.zip, kern-portable.exe, kargo.exe)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path portable-out | Out-Null
+          Copy-Item build/Release/kern.exe "portable-out/kern-core.exe"
+          Copy-Item build/Release/kargo.exe "portable-out/kargo.exe"
+          $rtRoot = "portable-runtime-stage"
+          New-Item -ItemType Directory -Force -Path "$rtRoot/kern-registry" | Out-Null
+          Copy-Item kern-registry/cli "$rtRoot/kern-registry/" -Recurse -Force
+          Copy-Item kern-registry/node_modules "$rtRoot/kern-registry/" -Recurse -Force
+          Copy-Item kern-registry/package.json, kern-registry/package-lock.json "$rtRoot/kern-registry/" -Force
+          New-Item -ItemType Directory -Force -Path "$rtRoot/lib/kern" | Out-Null
+          Copy-Item lib/kern/* "$rtRoot/lib/kern/" -Recurse -Force
+          Compress-Archive -Path $rtRoot -DestinationPath "portable-out/kern-runtime.zip" -Force
+          Remove-Item -Recurse -Force $rtRoot
+          cargo build --release --manifest-path kern-portable-bootstrap/Cargo.toml
+          Copy-Item "kern-portable-bootstrap/target/release/kern-portable.exe" "portable-out/kern-portable.exe"
+
+      - name: SHA256 fragment (portable bundle)
+        shell: pwsh
+        run: |
+          $lines = @()
+          foreach ($f in @("portable-out/kern-core.exe", "portable-out/kern-runtime.zip", "portable-out/kern-portable.exe", "portable-out/kargo.exe")) {
+            $bn = Split-Path $f -Leaf
+            $h = (Get-FileHash $f -Algorithm SHA256).Hash.ToLowerInvariant()
+            $lines += "${h} *${bn}"
+          }
+          $lines | Set-Content -Encoding ascii kern-SHA256.partial-portable
+
       - name: Install NSIS
         run: choco install nsis -y
 
@@ -140,6 +171,11 @@ jobs:
             ${{ steps.zip.outputs.zip_path }}
             ${{ steps.nsis.outputs.installer_path }}
             kern-SHA256.partial-windows
+            portable-out/kern-core.exe
+            portable-out/kern-runtime.zip
+            portable-out/kern-portable.exe
+            portable-out/kargo.exe
+            kern-SHA256.partial-portable
 
   linux:
     runs-on: ubuntu-latest
@@ -171,7 +207,7 @@ jobs:
           cmake -B build -DCMAKE_BUILD_TYPE=Release \
             -DKERN_BUILD_GAME=ON \
             -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF
-          cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize
+          cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize kargo
 
       - name: Verify
         env:
@@ -231,48 +267,72 @@ jobs:
           mkdocs build --strict
           python tools/postprocess_site.py
 
+  # Apple Silicon + Intel slices: bootstrapper picks kern-macos-arm64-v* vs kern-macos-x64-v* by host CPU; legacy kern-macos-v* remains a fallback for old releases.
   macos:
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cpu: arm64
+            build_dir: build
+            cmake_extra: "-DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF"
+            pkg_suffix: macos-arm64
+            artifact_prefix: kern-macos-arm64-v
+            partial_file: kern-SHA256.partial-macos-arm64
+            full_test: true
+          - cpu: x64
+            build_dir: build-x64
+            cmake_extra: "-DCMAKE_OSX_ARCHITECTURES=x86_64 -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF"
+            pkg_suffix: macos-x64
+            artifact_prefix: kern-macos-x64-v
+            partial_file: kern-SHA256.partial-macos-x64
+            full_test: false
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache FetchContent (Raylib under build/_deps)
+      - name: Cache FetchContent (Raylib under ${{ matrix.build_dir }}/_deps)
         uses: actions/cache@v4
         with:
-          path: build/_deps
-          key: release-macos-fetchdeps-${{ hashFiles('CMakeLists.txt') }}
+          path: ${{ matrix.build_dir }}/_deps
+          key: release-macos-${{ matrix.cpu }}-fetchdeps-${{ hashFiles('CMakeLists.txt') }}
 
       - name: Configure & build (Release, graphics)
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release \
+          cmake -B "${{ matrix.build_dir }}" -DCMAKE_BUILD_TYPE=Release \
             -DKERN_BUILD_GAME=ON \
-            -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF
-          cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize
+            ${{ matrix.cmake_extra }}
+          cmake --build "${{ matrix.build_dir }}" --parallel 4 --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize kargo
 
       - name: Verify
         env:
           KERN_ENFORCE_PERMISSIONS: "0"
         run: |
-          ./build/kern --version | grep -F "graphics: g2d+g3d+game (Raylib linked)"
-          ./build/kern --scan --registry-only
-          ./build/kern tests/std_v1_builtins_smoke.kn
-          ./build/kern examples/basic/01_hello_world.kn
+          BD="${{ matrix.build_dir }}"
+          ./"$BD/kern" --version | grep -F "graphics: g2d+g3d+game (Raylib linked)"
+          ./"$BD/kern" --scan --registry-only
+          ./"$BD/kern" tests/std_v1_builtins_smoke.kn
+          ./"$BD/kern" examples/basic/01_hello_world.kn
 
       - name: Stable suite (contract, golden, coverage)
+        if: matrix.full_test
         env:
           KERN_COVERAGE_SKIP_GRAPHICS: "1"
-        run: pwsh -NoProfile -File ./tests/run_stable.ps1
+        run: pwsh -NoProfile -File ./tests/run_stable.ps1 -BuildDir "${{ matrix.build_dir }}"
 
       - name: Package tarball
         id: tgz
         run: |
+          set -euo pipefail
           ver=$(tr -d ' \t\r\n' < KERN_VERSION.txt)
-          out="kern-macos-v${ver}.tar.gz"
-          mkdir -p "pkg/kern-${ver}-macos"
-          chmod +x build/kern build/kernc build/kern-scan build/kern_game build/kern_repl build/kern_lsp build/kern_contract_humanize
-          cp build/kern build/kernc build/kern-scan build/kern_game build/kern_repl build/kern_lsp build/kern_contract_humanize "pkg/kern-${ver}-macos/"
-          cp LICENSE README.md KERN_VERSION.txt "pkg/kern-${ver}-macos/" 2>/dev/null || true
-          tar -czvf "$out" -C pkg "kern-${ver}-macos"
+          out="${{ matrix.artifact_prefix }}${ver}.tar.gz"
+          pkgdir="kern-${ver}-${{ matrix.pkg_suffix }}"
+          mkdir -p "pkg/$pkgdir"
+          BD="${{ matrix.build_dir }}"
+          chmod +x "$BD/kern" "$BD/kernc" "$BD/kern-scan" "$BD/kern_game" "$BD/kern_repl" "$BD/kern_lsp" "$BD/kern_contract_humanize"
+          cp "$BD/kern" "$BD/kernc" "$BD/kern-scan" "$BD/kern_game" "$BD/kern_repl" "$BD/kern_lsp" "$BD/kern_contract_humanize" "pkg/$pkgdir/"
+          cp LICENSE README.md KERN_VERSION.txt "pkg/$pkgdir/" 2>/dev/null || true
+          tar -czvf "$out" -C pkg "$pkgdir"
           echo "tgz_path=$out" >> "$GITHUB_OUTPUT"
 
       - name: SHA256 fragment (Kern macOS archive)
@@ -280,14 +340,14 @@ jobs:
           out="${{ steps.tgz.outputs.tgz_path }}"
           bn=$(basename "$out")
           h=$(shasum -a 256 "$out" | awk '{print $1}')
-          echo "$h *$bn" > kern-SHA256.partial-macos
+          echo "$h *$bn" > "${{ matrix.partial_file }}"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: kern-release-macos
+          name: kern-release-macos-${{ matrix.cpu }}
           path: |
             ${{ steps.tgz.outputs.tgz_path }}
-            kern-SHA256.partial-macos
+            ${{ matrix.partial_file }}
 
   kargo-dist:
     runs-on: ubuntu-latest
@@ -392,6 +452,16 @@ jobs:
           if compgen -G "kern-SHA256.partial-*" > /dev/null; then
             cat kern-SHA256.partial-* > kern-SHA256SUMS
           fi
+          if [[ ! -f kern-SHA256SUMS ]]; then
+            echo "kern-SHA256SUMS missing (no kern-SHA256.partial-* fragments)"
+            exit 1
+          fi
+          for needle in kargo.exe kern-core.exe kern-runtime.zip kern-portable.exe; do
+            if ! grep -q "$needle" kern-SHA256SUMS; then
+              echo "kern-SHA256SUMS missing required entry for $needle"
+              exit 1
+            fi
+          done
           shopt -s nullglob
           kb=(kern-bootstrap-*)
           kb_filtered=()

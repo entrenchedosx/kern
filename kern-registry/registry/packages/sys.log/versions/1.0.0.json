@@ -1,0 +1,11 @@
+{
+  "name": "sys.log",
+  "version": "1.0.0",
+  "main": "src/index.kn",
+  "dependencies": {},
+  "trusted": false,
+  "dist": {
+    "tarball": "../../../dist/sys.log/sys.log-1.0.0.tgz",
+    "shasum": "sha256-767f60c05494a818238018663c148af3a945fa756e17d74c3a588b16ab916e30"
+  }
+}

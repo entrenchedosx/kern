@@ -1,0 +1,68 @@
+// sys.tasks - lightweight scheduling and retry helpers
+
+let _log = import("sys.log")
+
+def _ok(value) { return { "ok": true, "value": value, "error": "", "code": "ok" } }
+def _err(code, message) { return { "ok": false, "value": null, "error": str(default(message, "")), "code": str(default(code, "error")) } }
+
+def backoff_ms(attempt, base_ms, max_ms) {
+    let a = int(default(attempt, 1))
+    if (a < 1) { a = 1 }
+    let base = int(default(base_ms, 200))
+    if (base < 1) { base = 1 }
+    let cap = int(default(max_ms, 5000))
+    if (cap < base) { cap = base }
+    let factor = 1
+    let i = 1
+    while (i < a) { factor = factor * 2; i = i + 1 }
+    let ms = base * factor
+    if (ms > cap) { ms = cap }
+    return ms
+}
+
+def run_retry_plan(task_name, max_attempts, base_ms, max_ms) {
+    let n = int(default(max_attempts, 3))
+    if (n < 1) { n = 1 }
+    let plan = []
+    let i = 1
+    while (i <= n) {
+        push(plan, { "attempt": i, "delay_ms": backoff_ms(i, base_ms, max_ms) })
+        i = i + 1
+    }
+    return _ok({ "task": str(default(task_name, "task")), "attempts": plan })
+}
+
+def idempotency_key(namespace, payload) {
+    let ns = str(default(namespace, "task"))
+    let body = json_stringify(default(payload, {}))
+    return ns + "-" + sha256(ns + "|" + body)
+}
+
+def next_run_after(seconds_from_now) {
+    let s = int(default(seconds_from_now, 0))
+    if (s < 0) { s = 0 }
+    return int(time()) + s
+}
+
+def schedule_window(start_ts, every_seconds, count) {
+    let start = int(default(start_ts, int(time())))
+    let every = int(default(every_seconds, 60))
+    let c = int(default(count, 1))
+    if (every < 1) { every = 1 }
+    if (c < 1) { c = 1 }
+    let out = []
+    let i = 0
+    while (i < c) {
+        push(out, start + (every * i))
+        i = i + 1
+    }
+    return out
+}
+
+def log_plan(logger, plan_result) {
+    let lg = default(logger, _log["create_logger"]({ "name": "sys.tasks", "level": "info" }))
+    if (!default(plan_result, {})["ok"]) {
+        return _log["error"](lg, "retry plan failed", { "error": default(plan_result, {})["error"] })
+    }
+    return _log["info"](lg, "retry plan created", { "attempt_count": len(plan_result["value"]["attempts"]) })
+}

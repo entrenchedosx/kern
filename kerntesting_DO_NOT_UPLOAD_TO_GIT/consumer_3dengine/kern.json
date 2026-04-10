@@ -1,0 +1,8 @@
+{
+  "name": "consumer-3dengine",
+  "version": "0.0.1",
+  "description": "Install verification target for 3dengine package publish.",
+  "dependencies": {
+    "3dengine": "*"
+  }
+}

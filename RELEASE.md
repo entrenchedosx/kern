@@ -19,21 +19,21 @@ This guide is for **users** who want to run Kern (run scripts, use the REPL) and
 
 The Windows portable build is intended to be self-contained: no extra runtime installs are required. Graphics support (when included) is bundled as part of the distribution.
 
-### Option A2: Project-local `.kern/` (Windows, no global install)
+### Option A2: Project-local `kern-<version>/` (Windows, no global install)
 
-GitHub Releases also ship **portable-env** artifacts built by CI:
+GitHub Releases ship **portable-env** artifacts built by CI:
 
 | Asset | Role |
 |--------|------|
-| `kern-portable.exe` | Tiny bootstrapper: `kern-portable init` downloads `kern-core.exe`, `kern-runtime.zip`, and the same release’s `kargo-*.tar.gz`, lays out `./.kern/` (`bin/kern.exe`, `kargo.cmd`, `runtime/`, bundled Node if needed), then **`kern-portable <args>`** forwards to `.kern/bin/kern.exe`. |
+| `kern-portable.exe` | Bootstrapper: `kern-portable init` downloads `kern-core.exe`, `kern-runtime.zip`, and **`kargo.exe`**, lays out **`kern-<tag>/`** with **`kern.exe`** and **`kargo.exe` at the folder root** (no `bin/`), plus `lib/`, `runtime/`, `packages/`, `cache/`, `config/`. **`kern-portable <args>`** runs `kern.exe` and sets **`KERN_HOME`** for the child. |
 | `kern-core.exe` | Copy of the full `kern` compiler (same as in the big zip). |
-| `kern-runtime.zip` | `kern-registry` tree (CLI + `node_modules`) extracted under `.kern/runtime/kern-registry/`. |
+| `kern-runtime.zip` | `kern-registry` + `lib/kern` trees extracted under `runtime/kern-registry/` and `lib/kern/`. |
 
-**Note:** The bootstrapper’s `init` is **not** the same as the compiler’s `kern init` (which scaffolds `kern.json`). After `kern-portable init`, use `.kern/bin/kern.exe init` if you need the project scaffold. On Windows there is no Unix `exec`; the bootstrapper **spawns** the local `kern.exe` and exits with its status.
+**Note:** The bootstrapper’s `init` is **not** the same as the compiler’s `kern init` (which scaffolds `kern.json`). After `kern-portable init`, use `kern-<tag>\kern.exe init` if you need the project scaffold. On Windows there is no Unix `exec`; the bootstrapper **spawns** the local `kern.exe` and exits with its status.
 
 #### Portable Kern environments (Windows)
 
-Kern supports fully isolated, per-project environments under `.kern/`.
+Kern supports fully isolated, per-project environments under **`kern-<version>/`**.
 
 **Initialize**
 
@@ -51,11 +51,11 @@ kern-portable upgrade
 
 **Layout**
 
-After init, `.kern/` contains `bin/kern.exe`, `bin/kargo.cmd`, `runtime/`, `packages/`, `cache/`, and config. Dependencies stay inside the project.
+After init, `kern-<version>/` contains `kern.exe`, `kargo.exe`, `lib/`, `runtime/`, `packages/`, `cache/`, `config/`, and optional `Scripts/` activation helpers. Project-local **native Kargo** uses `kargo.json` in the working directory.
 
 **Security**
 
-Downloads are verified with SHA256. Official releases **must** ship **`kern-SHA256SUMS`** and **`kargo-SHA256SUMS`**; installs fail if verification fails or those files are missing.
+Downloads are verified with SHA256. Official releases **must** ship **`kern-SHA256SUMS`** listing `kern-core.exe`, `kern-runtime.zip`, `kern-portable.exe`, and **`kargo.exe`** (merged from `kern-SHA256.partial-portable` where used).
 
 **Portability**
 
@@ -67,13 +67,13 @@ Installs use temp staging and rollback on failure; upgrades can preserve your pa
 
 **Delegation**
 
-Windows does not support true process replacement; the bootstrapper runs `.kern/bin/kern.exe` as a child with inherited stdin/stdout/stderr and exits with its status.
+The bootstrapper resolves `kern.exe` via **`KERN_HOME`**, a **unique** `./kern-*/kern.exe` in the current directory, or the project’s single installed `kern-*` folder. It does **not** walk parents looking for `.kern/bin`.
 
 **Naming**
 
-- **`kern-portable.exe`** (bootstrapper) vs **`.kern/bin/kern.exe`** (full compiler copied from **`kern-core.exe`** on the GitHub release). Invoking **`kern-portable`** in a project delegates to the local core; **`kern-core.exe`** is the release artifact name only.
+- **`kern-portable.exe`** (bootstrapper) vs **`kern-<tag>/kern.exe`** (full compiler copied from **`kern-core.exe`**). **`kern-core.exe`** is the release artifact name only.
 
-**Requirements for `kern-portable init`:** network access to GitHub (and optionally nodejs.org if Node is not already installed). The release must include **`kargo-<tag>.tar.gz`** (published by the same release workflow) so Kargo can be unpacked into `.kern/kargo/`.
+**Requirements for `kern-portable init`:** network access to GitHub. The release must include **`kargo.exe`** beside the other portable assets.
 
 **First run (Windows):** The first time you start `kern.exe` for your user account, Kern self-registers under **HKCU** (no admin): **`.kn`** → **KernFile**, type name **“Kern Script”**, **Content Type** `text/x-kern`, **DefaultIcon** from **`<exe_dir>\\kern_logo.ico`** when present else **`kern.exe,0`**, **open** command **`\"path\\to\\kern.exe\" \"%1\"`**, optional context menu **Edit with Kern**, then **`SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, …)`** (plus a flush notify). It writes **`%APPDATA%\\kern\\setup_done.flag`** so later launches only stat that file and skip. Run **`kern --repair-association`** to re-apply if something breaks. Set **`KERN_SKIP_FILE_ASSOCIATION`** to any value (e.g. in CI) to disable auto setup. Set **`KERN_RESTART_EXPLORER_AFTER_ASSOC`** to force **Explorer restart** after association (brief desktop blink; last resort for stubborn icon cache). Errors go to **`%APPDATA%\\kern\\setup.log`**; Kern keeps running.
 

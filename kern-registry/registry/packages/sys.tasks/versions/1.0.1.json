@@ -1,0 +1,13 @@
+{
+  "name": "sys.tasks",
+  "version": "1.0.1",
+  "main": "src/index.kn",
+  "dependencies": {
+    "sys.log": "^1.0.0"
+  },
+  "trusted": false,
+  "dist": {
+    "tarball": "https://github.com/entrenchedosx/kern/releases/download/sys.tasks-v1.0.1/sys.tasks-1.0.1.tgz",
+    "shasum": "sha256-c439d4c907982653af14f389b83b5cae2f516ba6f41c44bfc29ab0afc2580582"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "sys.log",
+  "version": "1.0.1",
+  "main": "src/index.kn",
+  "description": "Structured logging with levels, redaction, and JSON/text output for Kern apps.",
+  "dependencies": {}
+}

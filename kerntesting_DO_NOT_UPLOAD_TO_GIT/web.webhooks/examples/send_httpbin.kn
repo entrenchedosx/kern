@@ -1,0 +1,3 @@
+let hooks = import("web.webhooks")
+let r = hooks["send"]("https://httpbin.org/post", "invoice.paid", { "invoice_id": "inv_1", "amount": 1000 }, "whsec_test", null)
+print(json_stringify(r, 2))

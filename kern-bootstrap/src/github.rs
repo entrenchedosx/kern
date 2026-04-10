@@ -25,7 +25,10 @@ fn client_headers(token: Option<&str>) -> reqwest::header::HeaderMap {
         ACCEPT,
         HeaderValue::from_static("application/vnd.github+json"),
     );
-    h.insert(USER_AGENT, HeaderValue::from_static("kern-bootstrap/0.1"));
+    h.insert(
+        USER_AGENT,
+        HeaderValue::from_static(concat!("kern-bootstrap/", env!("KERN_BOOTSTRAP_VER"))),
+    );
     h.insert("X-GitHub-Api-Version", HeaderValue::from_static("2022-11-28"));
     if let Some(t) = token.filter(|s| !s.is_empty()) {
         if let Ok(v) = HeaderValue::try_from(format!("Bearer {}", t)) {

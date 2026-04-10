@@ -1,0 +1,9 @@
+{
+  "name": "ai.prompts",
+  "version": "1.0.1",
+  "main": "src/index.kn",
+  "description": "Prompt template, rendering, and guarded AI invocation helpers.",
+  "dependencies": {
+    "ai.client": "^1.0.0"
+  }
+}

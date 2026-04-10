@@ -1,0 +1,14 @@
+{
+  "name": "web.rest",
+  "version": "1.0.0",
+  "main": "src/index.kn",
+  "dependencies": {
+    "web.httpplus": "^1.0.0",
+    "sec.auth": "^1.0.0"
+  },
+  "trusted": false,
+  "dist": {
+    "tarball": "../../../dist/web.rest/web.rest-1.0.0.tgz",
+    "shasum": "sha256-27d442b6cd0bc967531d271452ce12c55347ecbc143930eca3ff862d9f2fbf20"
+  }
+}

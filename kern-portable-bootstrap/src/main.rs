@@ -1,4 +1,4 @@
-//! CLI entry: `kern-portable init` or delegate to `.kern/bin/kern.exe`.
+//! CLI entry: `kern-portable init` or delegate to `kern-*/kern.exe`.
 
 use std::path::PathBuf;
 
@@ -103,7 +103,7 @@ fn run() -> kern_portable_bootstrap::Result<()> {
     }
 
     let mut repo = std::env::var("KERN_PORTABLE_REPO")
-        .unwrap_or_else(|_| "entrenchedosx/kern".to_string());
+        .unwrap_or_else(|_| "entrenchedosx/kern-installer-src".to_string());
     let default_rel =
         std::env::var("KERN_PORTABLE_RELEASE").unwrap_or_else(|_| "latest".to_string());
     let token = std::env::var("GITHUB_TOKEN").ok();
@@ -196,7 +196,10 @@ fn print_help() {
            [--latest] [--nightly] [--version X.Y.Z]\n\
          kern-portable upgrade [--project DIR] [--repo O/R] [--release SPEC] ...\n\
          kern-portable doctor [--project DIR] [--fix]\n\
-         kern-portable <args>...   # runs .kern/bin/kern.exe with same args\n\n\
-         Env: KERN_PORTABLE_REPO, KERN_PORTABLE_RELEASE, GITHUB_TOKEN, KERN_ROOT_CACHE"
+         kern-portable <args>...   # runs kern-*/kern.exe with same args (sets KERN_HOME)\n\n\
+         After init:  . .\\kern-NN\\Scripts\\Activate.ps1   (PowerShell; NN = folder created)\n\
+                 or:   kern-NN\\Scripts\\activate.bat       (cmd)\n\
+         Sets KERN_HOME and PATH.  kern-deactivate / deactivate-kern.cmd to undo.\n\n\
+         Env: KERN_PORTABLE_REPO, KERN_PORTABLE_RELEASE, GITHUB_TOKEN, KERN_HOME"
     );
 }

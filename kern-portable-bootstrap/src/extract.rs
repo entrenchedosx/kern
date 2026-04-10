@@ -4,6 +4,32 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
+/// Zip external attributes use standard file-type bits (see `zip` crate `unix_mode()`).
+const S_IFMT: u32 = 0o170000;
+const S_IFDIR: u32 = 0o0040000;
+
+/// `Compress-Archive` / Windows zips often mark dirs via DOS directory bit, not a trailing `/`.
+fn zip_entry_is_dir(file: &zip::read::ZipFile<'_>) -> bool {
+    if file.is_dir() {
+        return true;
+    }
+    file.unix_mode()
+        .map(|m| (m & S_IFMT) == S_IFDIR)
+        .unwrap_or(false)
+}
+
+/// If a parent path was wrongly created as an empty file, remove it so `create_dir_all` can succeed (Windows 183).
+fn create_dir_all_with_file_shadow_fix(path: &Path) -> Result<()> {
+    let mut acc = PathBuf::new();
+    for c in path.components() {
+        acc.push(c);
+        if acc.exists() && acc.is_file() {
+            std::fs::remove_file(&acc).map_err(|e| path_ctx(&acc, e))?;
+        }
+    }
+    std::fs::create_dir_all(path).map_err(|e| path_ctx(path, e))
+}
+
 fn safe_rel_path(path: &Path) -> Result<PathBuf> {
     let mut out = PathBuf::new();
     for c in path.components() {
@@ -59,11 +85,14 @@ pub fn extract_zip(archive: &Path, dest: &Path) -> Result<()> {
         let name = Path::new(file.name());
         let rel = safe_rel_path(name)?;
         let out = dest.join(rel);
-        if file.name().ends_with('/') {
-            std::fs::create_dir_all(&out).map_err(|e| path_ctx(&out, e))?;
+        if zip_entry_is_dir(&file) {
+            create_dir_all_with_file_shadow_fix(&out)?;
         } else {
             if let Some(p) = out.parent() {
-                std::fs::create_dir_all(p).map_err(|e| path_ctx(&p.to_path_buf(), e))?;
+                create_dir_all_with_file_shadow_fix(p)?;
+            }
+            if out.exists() && out.is_dir() {
+                std::fs::remove_dir_all(&out).map_err(|e| path_ctx(&out, e))?;
             }
             let mut buf: Vec<u8> = Vec::new();
             file

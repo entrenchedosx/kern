@@ -1,0 +1,13 @@
+{
+  "name": "sys.tasks",
+  "version": "1.0.0",
+  "main": "src/index.kn",
+  "dependencies": {
+    "sys.log": "^1.0.0"
+  },
+  "trusted": false,
+  "dist": {
+    "tarball": "../../../dist/sys.tasks/sys.tasks-1.0.0.tgz",
+    "shasum": "sha256-0b08f2c4b0a140e6aeb687ad638178f1e9018eaf2ac6d5d292fce217dd42699d"
+  }
+}

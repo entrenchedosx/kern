@@ -1,0 +1,73 @@
+// ai.client - provider-neutral request/response helpers
+
+let _http = import("web.httpplus")
+let _cfg = import("sys.config")
+let _log = import("sys.log")
+
+def _ok(value) { return { "ok": true, "value": value, "error": "", "code": "ok" } }
+def _err(code, message) { return { "ok": false, "value": null, "error": str(default(message, "")), "code": str(default(code, "error")) } }
+
+def create_client(opts) {
+    let o = default(opts, {})
+    return {
+        "provider": str(default(o["provider"], "custom")),
+        "endpoint": str(default(o["endpoint"], "")),
+        "api_key": str(default(o["api_key"], "")),
+        "model": str(default(o["model"], "default-model")),
+        "timeout_ms": int(default(o["timeout_ms"], 30000)),
+        "retries": int(default(o["retries"], 2))
+    }
+}
+
+def from_env(prefix) {
+    let p = str(default(prefix, "AI_"))
+    let env = _cfg["from_env"](p, ["PROVIDER", "ENDPOINT", "API_KEY", "MODEL"])
+    return create_client({
+        "provider": default(env["PROVIDER"], "custom"),
+        "endpoint": default(env["ENDPOINT"], ""),
+        "api_key": default(env["API_KEY"], ""),
+        "model": default(env["MODEL"], "default-model")
+    })
+}
+
+def build_chat_request(client, messages, opts) {
+    let c = default(client, create_client({}))
+    let o = default(opts, {})
+    return {
+        "provider": c["provider"],
+        "model": str(default(o["model"], c["model"])),
+        "messages": default(messages, []),
+        "temperature": default(o["temperature"], 0.2),
+        "max_tokens": default(o["max_tokens"], 512)
+    }
+}
+
+def normalize_response(provider, raw_text, parsed_json) {
+    let p = str(default(provider, "custom"))
+    let body = default(parsed_json, {})
+    let text = str(default(raw_text, ""))
+    if (text == "" && has(body, "text")) { text = str(body["text"]) }
+    if (text == "" && has(body, "output")) { text = str(body["output"]) }
+    return _ok({
+        "provider": p,
+        "text": text,
+        "raw": body,
+        "usage": default(body["usage"], {})
+    })
+}
+
+def chat_complete(client, messages, opts, logger) {
+    let c = default(client, create_client({}))
+    if (str(default(c["endpoint"], "")) == "") { return _err("endpoint.empty", "client endpoint is required") }
+    let lg = default(logger, _log["create_logger"]({ "name": "ai.client", "level": "info" }))
+    let req = build_chat_request(c, messages, opts)
+    _log["info"](lg, "ai request", { "provider": c["provider"], "model": req["model"] })
+    let rr = _http["request_with_retry"]("POST", c["endpoint"], req, c["retries"], 300, lg)
+    if (!rr["ok"]) {
+        _log["error"](lg, "ai request failed", { "error": rr["error"] })
+        return rr
+    }
+    let parsed = null
+    try { parsed = json_parse(rr["value"]) } catch (e) { parsed = { "text": rr["value"] } }
+    return normalize_response(c["provider"], rr["value"], parsed)
+}

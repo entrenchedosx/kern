@@ -1,10 +1,11 @@
-//! `kern-portable doctor` — sanity checks for `.kern/`.
+//! `kern-portable doctor` — sanity checks for `kern-*/` layout.
 
 use crate::artifact_cache;
 use crate::error::{path_ctx, PortableError, Result};
-use crate::paths::{find_kern_env_dir_with_cache, kern_root_cache_doctor_line};
+use crate::install::find_installed_env_root;
+use crate::paths::{kern_exe_from_cwd_kern_dirs, kern_exe_from_home_env, kern_home_doctor_line};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn normalize_version_output(s: &str) -> String {
@@ -15,29 +16,41 @@ fn normalize_version_output(s: &str) -> String {
         .join(" ")
 }
 
+fn resolve_env_root(project_root: &Path) -> Result<PathBuf> {
+    let cwd = std::env::current_dir().unwrap_or_else(|_| project_root.to_path_buf());
+    if let Some(exe) = kern_exe_from_home_env() {
+        return exe
+            .parent()
+            .map(|p| p.to_path_buf())
+            .ok_or_else(|| PortableError::msg("invalid KERN_HOME"));
+    }
+    if let Ok(exe) = kern_exe_from_cwd_kern_dirs(&cwd) {
+        return exe
+            .parent()
+            .map(|p| p.to_path_buf())
+            .ok_or_else(|| PortableError::msg("invalid kern.exe path"));
+    }
+    find_installed_env_root(project_root)
+}
+
 pub fn run_doctor(project_root: &Path, fix: bool) -> Result<()> {
     if !cfg!(windows) {
         return Err(PortableError::msg("doctor is only supported on Windows."));
     }
 
-    let cwd = std::env::current_dir().unwrap_or_else(|_| project_root.to_path_buf());
-    let Some(env_dir) = find_kern_env_dir_with_cache(&cwd) else {
-        eprintln!("[FAIL] No .kern environment found (walk from cwd).");
-        std::process::exit(2);
-    };
+    let env_dir = resolve_env_root(project_root)?;
 
-    println!("{}", kern_root_cache_doctor_line());
+    println!("{}", kern_home_doctor_line());
 
-    let bin = env_dir.join("bin");
-    let kern_exe = bin.join("kern.exe");
-    let kargo_cmd = bin.join("kargo.cmd");
+    let kern_exe = env_dir.join("kern.exe");
+    let kargo_exe = env_dir.join("kargo.exe");
     let runtime = env_dir.join("runtime");
     let cfg = env_dir.join("config.toml");
 
     let mut failed = false;
 
     if kern_exe.is_file() {
-        println!("[OK]   .kern/bin/kern.exe exists");
+        println!("[OK]   kern.exe at environment root");
         let st = Command::new(&kern_exe)
             .arg("--version")
             .stdin(std::process::Stdio::null())
@@ -45,10 +58,10 @@ pub fn run_doctor(project_root: &Path, fix: bool) -> Result<()> {
             .map_err(|e| PortableError::msg(format!("kern --version: {}", e)))?;
         let inner_ver = if st.status.success() {
             let t = normalize_version_output(&String::from_utf8_lossy(&st.stdout));
-            println!("[OK]   .kern/bin/kern.exe --version: {}", t);
+            println!("[OK]   kern.exe --version: {}", t);
             Some(t)
         } else {
-            println!("[FAIL] .kern/bin/kern.exe --version failed");
+            println!("[FAIL] kern.exe --version failed");
             failed = true;
             None
         };
@@ -74,7 +87,7 @@ pub fn run_doctor(project_root: &Path, fix: bool) -> Result<()> {
                             println!("[OK]   delegation: version strings match (bootstrapper vs core)");
                         } else {
                             println!(
-                                "[WARN] delegation: bootstrapper vs core --version differ (expected if using kern-portable.exe → .kern/bin/kern.exe)"
+                                "[WARN] delegation: bootstrapper vs core --version differ"
                             );
                             println!("       bootstrapper: {}", outer);
                             println!("       core:         {}", inn);
@@ -86,17 +99,15 @@ pub fn run_doctor(project_root: &Path, fix: bool) -> Result<()> {
             }
         }
     } else {
-        println!("[FAIL] missing .kern/bin/kern.exe");
+        println!("[FAIL] missing kern.exe at environment root");
         failed = true;
     }
 
-    if kargo_cmd.is_file() {
-        println!("[OK]   .kern/bin/kargo.cmd exists");
-        let st = Command::new(&kargo_cmd)
+    if kargo_exe.is_file() {
+        println!("[OK]   kargo.exe at environment root");
+        let st = Command::new(&kargo_exe)
             .arg("--version")
             .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
             .output();
         match st {
             Ok(o) if o.status.success() => {
@@ -105,20 +116,25 @@ pub fn run_doctor(project_root: &Path, fix: bool) -> Result<()> {
                     String::from_utf8_lossy(&o.stdout).trim()
                 );
             }
-            Ok(_) => {
-                println!("[WARN] kargo --version non-zero (check Node under .kern/tools/nodejs)");
-            }
-            Err(e) => println!("[WARN] could not run kargo.cmd: {}", e),
+            Ok(_) => println!("[WARN] kargo --version non-zero"),
+            Err(e) => println!("[WARN] could not run kargo.exe: {}", e),
         }
     } else {
-        println!("[FAIL] missing .kern/bin/kargo.cmd");
+        println!("[FAIL] missing kargo.exe");
         failed = true;
     }
 
     if runtime.is_dir() && runtime.read_dir().map(|d| d.count() > 0).unwrap_or(false) {
-        println!("[OK]   .kern/runtime is non-empty");
+        println!("[OK]   runtime/ is non-empty");
     } else {
-        println!("[WARN] .kern/runtime missing or empty");
+        println!("[WARN] runtime/ missing or empty");
+    }
+
+    let lib_kern = env_dir.join("lib").join("kern");
+    if lib_kern.is_dir() {
+        println!("[OK]   lib/kern present");
+    } else {
+        println!("[WARN] lib/kern missing (stdlib may not resolve)");
     }
 
     if cfg.is_file() {
@@ -168,12 +184,12 @@ pub fn run_doctor(project_root: &Path, fix: bool) -> Result<()> {
 fn check_optional_cache_integrity(env_dir: &Path, fix: bool) {
     let base = env_dir.join("cache").join("artifacts");
     if !base.is_dir() {
-        println!("[OK]   .kern/cache/artifacts (nothing to verify yet)");
+        println!("[OK]   cache/artifacts (nothing to verify yet)");
         return;
     }
 
     let Ok(rd) = fs::read_dir(&base) else {
-        println!("[WARN] could not read .kern/cache/artifacts");
+        println!("[WARN] could not read cache/artifacts");
         return;
     };
 
@@ -198,10 +214,7 @@ fn check_optional_cache_integrity(env_dir: &Path, fix: bool) {
                 }
             }
             Err(e) => {
-                println!(
-                    "[WARN] cache [{}]: {}",
-                    tag_label, e
-                );
+                println!("[WARN] cache [{}]: {}", tag_label, e);
                 if fix {
                     if let Err(rem) = fs::remove_dir_all(&tag_dir) {
                         println!("[WARN] could not remove {}: {}", tag_dir.display(), rem);
@@ -220,6 +233,6 @@ fn check_optional_cache_integrity(env_dir: &Path, fix: bool) {
         }
     }
     if !any_manifest {
-        println!("[WARN] .kern/cache/artifacts has no integrity.json yet (created after verified installs)");
+        println!("[WARN] cache/artifacts has no integrity.json yet (created after verified installs)");
     }
 }

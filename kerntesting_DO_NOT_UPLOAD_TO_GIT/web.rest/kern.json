@@ -1,0 +1,10 @@
+{
+  "name": "web.rest",
+  "version": "1.0.1",
+  "main": "src/index.kn",
+  "description": "REST client utilities with base URL, auth, and pagination helpers.",
+  "dependencies": {
+    "web.httpplus": "^1.0.0",
+    "sec.auth": "^1.0.0"
+  }
+}

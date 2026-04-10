@@ -1,0 +1,15 @@
+{
+  "name": "ai.client",
+  "version": "1.0.1",
+  "main": "src/index.kn",
+  "dependencies": {
+    "web.httpplus": "^1.0.0",
+    "sys.config": "^1.0.0",
+    "sys.log": "^1.0.0"
+  },
+  "trusted": false,
+  "dist": {
+    "tarball": "https://github.com/entrenchedosx/kern/releases/download/ai.client-v1.0.1/ai.client-1.0.1.tgz",
+    "shasum": "sha256-f307766beda01e21d83b67d0d12094b5d427da7d4a459ad0ec3f3c4362eb2cb2"
+  }
+}

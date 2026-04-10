@@ -1,15 +1,19 @@
-//! Version for User-Agent; optional alignment with repo KERN_VERSION.txt.
+//! Version for User-Agent; optional alignment with monorepo `KERN_VERSION.txt` or crate version.
+//! (UAC admin manifest is applied only in the `kern-installer-src` workspace `kern-portable` binary.)
 
 use std::env;
 use std::path::PathBuf;
 
 fn main() {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
-    let kver_path = manifest_dir.join("..").join("KERN_VERSION.txt");
+    let kver_path = manifest_dir.join("KERN_VERSION.txt");
     println!("cargo:rerun-if-changed={}", kver_path.display());
+    let kver_alt = manifest_dir.join("../KERN_VERSION.txt");
+    println!("cargo:rerun-if-changed={}", kver_alt.display());
 
     let ver = std::fs::read_to_string(&kver_path)
         .ok()
+        .or_else(|| std::fs::read_to_string(&kver_alt).ok())
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| env::var("CARGO_PKG_VERSION").expect("CARGO_PKG_VERSION"));

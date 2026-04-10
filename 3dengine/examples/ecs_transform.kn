@@ -1,0 +1,39 @@
+let u = import("3dengine")
+let app = u["app"]
+let ecs = u["ecs"]
+let vec3 = u["vec3"]
+
+let on_fixed = lambda (s, fixed_dt) => {
+    if (!has(s["user"], "ecs_world")) {
+        let w = ecs["world_create"]()
+        let a = ecs["world_create_entity"](w)
+        let b = ecs["world_create_entity"](w)
+        ecs["world_add_transform"](w, a, ecs["transform_make"](vec3["make"](260, 240, 0), null, null))
+        ecs["world_add_transform"](w, b, ecs["transform_make"](vec3["make"](80, 0, 0), null, null))
+        ecs["world_add_mesh"](w, a, ecs["mesh_make_cube"]())
+        ecs["world_add_material"](w, a, ecs["material_make"](vec3["make"](0.45, 0.75, 1.0), "m.anchor", null))
+        ecs["world_add_mesh"](w, b, ecs["mesh_make_quad"]())
+        ecs["world_add_material"](w, b, ecs["material_make"](vec3["make"](1.0, 0.66, 0.4), "m.child", null))
+        ecs["world_set_parent"](w, b, a)
+        ecs["world_add_velocity"](w, a, ecs["velocity_make"](vec3["make"](40, 0, 0)))
+        ecs["world_set_camera"](w, ecs["camera_make"](vec3["make"](0, 0, 0), 1.0, "orthographic"))
+        s["user"]["ecs_world"] = w
+        s["user"]["anchor"] = a
+        s["user"]["child"] = b
+    }
+    ecs["world_run_fixed_pipeline"](s["user"]["ecs_world"], fixed_dt)
+}
+
+let on_frame = lambda (s, dt, alpha) => {
+    if (!has(s["user"], "ecs_world")) { return null }
+    let w = s["user"]["ecs_world"]
+    ecs["world_run_render_prep"](w)
+    let draws = ecs["world_render"](w, s["gfx"])
+    let stats = ecs["world_render_stats"](w)
+    let cam = ecs["world_get_camera"](w)
+    s["gfx"]["text"]("ECS phase 3.2 camera render bridge", 20, 20, 22, 255, 255, 255)
+    s["gfx"]["text"]("cmd=" + str(stats["command_count"]) + " draws=" + str(draws) + " entities=" + str(stats["rendered_entities"]), 20, 48, 18, 190, 220, 255)
+    s["gfx"]["text"]("cam=(" + str(int(default(cam["position"]["x"], 0))) + "," + str(int(default(cam["position"]["y"], 0))) + ") zoom=" + str(cam["zoom"]), 20, 72, 16, 170, 200, 240)
+}
+
+app.run({"title": "3dengine: ecs transform", "width": 960, "height": 540, "target_fps": 60, "fixed_hz": 60.0, "max_fixed_steps": 8}, on_fixed, on_frame)

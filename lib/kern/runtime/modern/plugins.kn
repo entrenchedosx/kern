@@ -20,7 +20,7 @@ def load(registry, name, ctx) {
     if (has(registry, lkey) && registry[lkey] == true) {
         return true
     }
-    if (has_key(p, "on_load")) { p["on_load"](ctx) }
+    if (has(p, "on_load")) { p["on_load"](ctx) }
     registry[lkey] = true
     return true
 }
@@ -32,7 +32,7 @@ def unload(registry, name, ctx) {
     if (!has(registry, pkey)) { return false }
     let p = registry[pkey]
     if (has(registry, lkey) && registry[lkey] == true) {
-        if (has_key(p, "on_unload")) { p["on_unload"](ctx) }
+        if (has(p, "on_unload")) { p["on_unload"](ctx) }
         registry[lkey] = false
     }
     return true

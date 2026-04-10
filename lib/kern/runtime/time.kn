@@ -16,7 +16,7 @@ def sleep_until(target_ms) {
 def every(interval_ms, state, key, f) {
     let k = str(key)
     let n = now_ms()
-    if (!has_key(state, k)) {
+    if (!has(state, k)) {
         state[k] = n
         return false
     }

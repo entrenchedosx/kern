@@ -4,13 +4,13 @@ let _listeners = {}
 
 def on(node, event_name, handler) {
     let id = str(node["id"]) + ":" + str(event_name)
-    if (!has_key(_listeners, id)) { _listeners[id] = [] }
+    if (!has(_listeners, id)) { _listeners[id] = [] }
     push(_listeners[id], handler)
 }
 
 def emit(node, event_name, evt) {
     let id = str(node["id"]) + ":" + str(event_name)
-    if (!has_key(_listeners, id)) { return 0 }
+    if (!has(_listeners, id)) { return 0 }
     let fns = _listeners[id]
     let i = 0
     while (i < len(fns)) {

@@ -25,6 +25,9 @@ using EmbeddedModuleProvider = std::function<bool(const std::string& requestPath
 void setEmbeddedModuleProvider(EmbeddedModuleProvider provider);
 void clearEmbeddedModuleProvider();
 
+/// Clears in-flight import markers before each REPL evaluation (avoids stuck state after errors).
+void replClearImportLoadingAtReplLineStart();
+
 } // namespace kern
 
 #endif

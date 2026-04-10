@@ -62,7 +62,7 @@ jobs:
 
       - name: Build toolchain (incl. Raylib / g2d+g3d)
         shell: cmd
-        run: cmake --build build --config Release --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize --parallel 4
+        run: cmake --build build --config Release --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize kargo --parallel 4
 
       # GitHub windows-latest is headless (no OpenGL window). Skip coverage/g3d runs that init GLFW.
       - name: Smoke tests (.kn)

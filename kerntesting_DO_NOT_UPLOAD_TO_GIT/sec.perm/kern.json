@@ -1,0 +1,7 @@
+{
+  "name": "sec.perm",
+  "version": "1.0.0",
+  "main": "src/index.kn",
+  "description": "Permission and capability helpers aligned with Kern unsafe model.",
+  "dependencies": {}
+}

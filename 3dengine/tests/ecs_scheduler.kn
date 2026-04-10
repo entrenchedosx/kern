@@ -1,0 +1,37 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let w = ecs["world_create"]()
+w["scheduler_log"] = []
+
+let first = lambda (world, dt) => { world["scheduler_log"] = push(default(world["scheduler_log"], []), "custom.first") }
+let second = lambda (world, dt) => { world["scheduler_log"] = push(default(world["scheduler_log"], []), "custom.second") }
+
+let stages = ecs["world_stage_order"](w)
+if (len(stages) < 6) { panic("ecs_scheduler: stage order should be formalized") }
+if (!ecs["world_register_system"](w, "POST_SIMULATION", "custom.second", second, ["custom.first"])) { panic("ecs_scheduler: register custom.second failed") }
+if (!ecs["world_register_system"](w, "POST_SIMULATION", "custom.first", first, ["simulation"])) { panic("ecs_scheduler: register custom.first failed") }
+if (ecs["world_register_system"](w, "BAD_STAGE", "custom.bad", first, [])) { panic("ecs_scheduler: invalid stage registration should fail") }
+
+let order = ecs["world_system_order"](w)
+let s_first = -1
+let s_second = -1
+let i = 0
+while (i < len(order)) {
+    let n = str(default(order[i], ""))
+    if (n == "custom.first") { s_first = i }
+    if (n == "custom.second") { s_second = i }
+    i = i + 1
+}
+if (s_first < 0 || s_second < 0) { panic("ecs_scheduler: custom systems missing from resolved order") }
+if (s_second <= s_first) { panic("ecs_scheduler: dependency order not respected") }
+
+ecs["world_run_fixed_pipeline"](w, 1.0 / 60.0)
+let log = default(w["scheduler_log"], [])
+if (len(log) != 2) { panic("ecs_scheduler: expected both custom systems to execute") }
+if (str(default(log[0], "")) != "custom.first") { panic("ecs_scheduler: first custom system order mismatch") }
+if (str(default(log[1], "")) != "custom.second") { panic("ecs_scheduler: second custom system order mismatch") }
+
+print("ecs_scheduler: ok")
