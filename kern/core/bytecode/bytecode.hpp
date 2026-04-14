@@ -1,5 +1,8 @@
 /* *
  * kern Bytecode - Instruction set for the VM
+ * 
+ * This file defines the stable bytecode format for KERN releases.
+ * For binary format specification, see bytecode_header.hpp
  */
 
 #ifndef KERN_BYTECODE_HPP
@@ -10,6 +13,8 @@
 #include <utility>
 #include <variant>
 #include <vector>
+
+#include "bytecode_header.hpp"
 
 namespace kern {
 

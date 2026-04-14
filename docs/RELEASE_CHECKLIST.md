@@ -22,6 +22,7 @@ Use this before tagging a public release. Pair with [RELEASE.md](../RELEASE.md) 
 - [ ] **Tag:** `git tag -a vX.Y.Z -m "Release vX.Y.Z"` and push `vX.Y.Z`
 - [ ] **Release notes:** copy the new **CHANGELOG** section into the GitHub Release description
 - [ ] **Artifacts:** confirm [release workflow](../.github/workflows/release.yml) attached **Windows** zip (`kern-windows-x64-v*.zip`), **Windows NSIS installer** (`kern-windows-x64-v*-installer.exe`), **Linux** tarball (`kern-linux-x64-v*.tar.gz`), **macOS** tarballs (`kern-macos-arm64-v*.tar.gz`, `kern-macos-x64-v*.tar.gz`), optional **legacy Node Kargo** bundle (`kargo-v*.tar.gz` + checksums + manifest), and **portable env** files (`kern-core.exe`, `kern-runtime.zip`, `kern-portable.exe`, **`kargo.exe`** — see [RELEASE.md](../RELEASE.md) Option A2)
+- [ ] **Portable mirror:** with **`KERN_INSTALLER_SRC_TOKEN`** set on the **kern** repo (PAT: Contents write on **entrenchedosx/kern-installer-src**), the same workflow uploads the portable quartet + **`kern-SHA256SUMS`** to **[kern-installer-src releases](https://github.com/entrenchedosx/kern-installer-src/releases)** for the same tag. Without the secret, mirror is skipped (set token or upload those files manually there).
 
 ## Post-release
 

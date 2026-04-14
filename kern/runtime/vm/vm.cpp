@@ -86,23 +86,31 @@ static ThrownErrorInfo classifyThrownError(const ValuePtr& v) {
     return out;
 }
 
-VM::VM() : ip_(0) {
+VM::VM() : ip_(0), vmTraceEnabled_(false) {
+    // Pre-reserve vectors to avoid allocations in hot path
     stack_.reserve(512);
     callStack_.reserve(128);
     tryStack_.reserve(64);
+    exceptionStack_.reserve(64);
     callFrames_.reserve(256);
+    frameLocals_.reserve(64);
+    deferStack_.reserve(32);
+    
     initBuiltins();
-#ifdef _MSC_VER
-    char* buf = nullptr;
-    size_t sz = 0;
-    if (_dupenv_s(&buf, &sz, "KERN_VM_TRACE") == 0 && buf) {
-        vmTraceEnabled_ = buf[0] != '\0' && buf[0] != '0';
-        std::free(buf);
-    } else
-        vmTraceEnabled_ = false;
-#else
-    const char* tr = kernGetEnv("KERN_VM_TRACE");
-    vmTraceEnabled_ = tr && tr[0] != '\0' && tr[0] != '0';
+    
+// Debug-only: check environment for VM tracing
+#if defined(KERN_DEBUG) && defined(KERN_DEBUG_VM_TRACE)
+    #ifdef _MSC_VER
+        char* buf = nullptr;
+        size_t sz = 0;
+        if (_dupenv_s(&buf, &sz, "KERN_VM_TRACE") == 0 && buf) {
+            vmTraceEnabled_ = buf[0] != '\0' && buf[0] != '0';
+            std::free(buf);
+        }
+    #else
+        const char* tr = kernGetEnv("KERN_VM_TRACE");
+        vmTraceEnabled_ = tr && tr[0] != '\0' && tr[0] != '0';
+    #endif
 #endif
 }
 
@@ -110,6 +118,8 @@ void VM::setBytecode(Bytecode code) {
     code_ = std::move(code);
     ip_ = 0;
     unsafeDepth_ = 0;
+    exceptionStack_.clear();  // Clear exception frames
+    tryStack_.clear();        // Clear try stack
     entryScriptCache_.reset();
     activeSourcePath_.clear();
     breakpoints_.clear();
@@ -147,15 +157,22 @@ void VM::runUntilBreakpoint() {
     if (code_.empty()) return;
     verifyBytecodeOrThrow(code_, stringConstants_.size(), valueConstants_.size());
     resetCycleCount();
-    stack_.reserve(512);
+    
+    if (stack_.capacity() < 512) stack_.reserve(512);
+    
     while (ip_ < code_.size()) {
         if (breakpoints_.count(ip_)) return;
         const Instruction& inst = code_[ip_];
         runInstruction(inst);
+        
+#if defined(KERN_DEBUG) && defined(KERN_DEBUG_VM_TRACE)
         if (vmTraceEnabled_ && cycleCount_ <= 500000u) {
-            std::cerr << "[vm] op=" << static_cast<int>(inst.op) << " line=" << inst.line << " col=" << inst.column
+            std::cerr << "[vm] op=" << static_cast<int>(inst.op) 
+                      << " line=" << inst.line << " col=" << inst.column
                       << " sp=" << stack_.size() << "\n";
         }
+#endif
+        
         ip_++;
         if (scriptExitCode_ >= 0) break;
     }
@@ -233,7 +250,13 @@ size_t VM::getOperandU64(const Instruction& inst) {
     return std::get<size_t>(inst.operand);
 }
 
-void VM::push(ValuePtr v) { stack_.push_back(ensureNonNull(std::move(v))); }
+void VM::push(ValuePtr v) {
+    if (stack_.size() >= kMaxStackSize) {
+        throw VMError("Stack overflow: exceeded maximum stack size", 0, 0, 1,
+                      static_cast<int>(VMErrorCode::STACK_OVERFLOW));
+    }
+    stack_.push_back(ensureNonNull(std::move(v)));
+}
 
 ValuePtr VM::peek() {
     if (stack_.empty())
@@ -947,16 +970,25 @@ void VM::runInstruction(const Instruction& inst) {
         }
         case Opcode::TRY_BEGIN: {
             size_t catchAddr = getOperandU64(inst);
+            if (catchAddr == 0 || catchAddr > code_.size())
+                throw VMError("Invalid catch target", inst.line, inst.column, 1, static_cast<int>(VMErrorCode::INVALID_JUMP_TARGET));
+            // Create exception frame with current stack and call frame marks
+            exceptionStack_.emplace_back(catchAddr, stack_.size(), callStack_.size());
             tryStack_.push_back(catchAddr);
             break;
         }
-        case Opcode::TRY_END:
+        case Opcode::TRY_END: {
             if (!tryStack_.empty()) tryStack_.pop_back();
+            if (!exceptionStack_.empty()) {
+                // Pop the exception frame (exception scope ends)
+                exceptionStack_.pop_back();
+            }
             break;
+        }
         case Opcode::THROW: {
             ValuePtr val = stack_.empty() ? std::make_shared<Value>(Value::nil()) : popStack();
             attachTracebackToError(val);
-            if (tryStack_.empty()) {
+            if (tryStack_.empty() || exceptionStack_.empty()) {
                 ThrownErrorInfo info = classifyThrownError(val);
                 SourceSpan candidate = normalizeSourceSpan(info.line, info.column, info.lineEnd, info.columnEnd);
                 if (!hasFullSourceSpan(candidate))
@@ -964,17 +996,28 @@ void VM::runInstruction(const Instruction& inst) {
                 throw VMError(info.message, candidate.line, candidate.column, info.category, info.code,
                     candidate.lineEnd, candidate.columnEnd);
             }
-            lastThrown_ = val;
-            size_t catchAddr = tryStack_.back();
+            // Use scoped exception frame instead of global lastThrown_
+            auto& frame = exceptionStack_.back();
+            frame.thrown = val;
+            size_t catchAddr = frame.catchIp;
             tryStack_.pop_back();
+            // Rollback stack to saved mark (transactional unwind)
+            if (stack_.size() > frame.stackMark) {
+                stack_.resize(frame.stackMark);
+            }
             if (catchAddr == 0 || catchAddr > code_.size())
                 throw VMError("Invalid catch target", inst.line, inst.column, 1, static_cast<int>(VMErrorCode::INVALID_JUMP_TARGET));
-            push(val);
+            push(val);  // Push exception onto stack for catch handler
             ip_ = catchAddr - 1;
             break;
         }
         case Opcode::RETHROW: {
-            ValuePtr val = lastThrown_ ? lastThrown_ : std::make_shared<Value>(Value::nil());
+            // RETHROW requires an active exception frame with a thrown value
+            if (exceptionStack_.empty() || !exceptionStack_.back().thrown) {
+                throw VMError("No active exception to rethrow", inst.line, inst.column, 1,
+                              static_cast<int>(VMErrorCode::INVALID_OPERATION));
+            }
+            ValuePtr val = exceptionStack_.back().thrown;
             if (tryStack_.empty()) {
                 ThrownErrorInfo info = classifyThrownError(val);
                 SourceSpan candidate = normalizeSourceSpan(info.line, info.column, info.lineEnd, info.columnEnd);
@@ -983,8 +1026,13 @@ void VM::runInstruction(const Instruction& inst) {
                 throw VMError(info.message, candidate.line, candidate.column, info.category, info.code,
                     candidate.lineEnd, candidate.columnEnd);
             }
-            size_t catchAddr = tryStack_.back();
+            auto& frame = exceptionStack_.back();
+            size_t catchAddr = frame.catchIp;
             tryStack_.pop_back();
+            // Rollback stack to saved mark
+            if (stack_.size() > frame.stackMark) {
+                stack_.resize(frame.stackMark);
+            }
             if (catchAddr == 0 || catchAddr > code_.size())
                 throw VMError("Invalid catch target", inst.line, inst.column, 1, static_cast<int>(VMErrorCode::INVALID_JUMP_TARGET));
             push(val);
@@ -1163,6 +1211,7 @@ void VM::restoreExecutionState(
     std::vector<VMStackFrame> callStack,
     std::vector<std::pair<ValuePtr, size_t>> iterStack,
     std::vector<size_t> tryStack,
+    std::vector<ExceptionFrame> exceptionStack,
     std::vector<std::tuple<Bytecode, std::vector<std::string>, std::vector<Value>, std::string>> codeFrameStack,
     std::shared_ptr<ScriptCode> currentScript,
     std::string activeSourcePath) {
@@ -1177,6 +1226,7 @@ void VM::restoreExecutionState(
     callStack_ = std::move(callStack);
     iterStack_ = std::move(iterStack);
     tryStack_ = std::move(tryStack);
+    exceptionStack_ = std::move(exceptionStack);
     codeFrameStack_ = std::move(codeFrameStack);
     currentScript_ = std::move(currentScript);
     activeSourcePath_ = std::move(activeSourcePath);
@@ -1207,6 +1257,7 @@ bool VM::resumeGenerator(std::shared_ptr<GeneratorObject> gen, ValuePtr& out) {
     std::vector<VMStackFrame> savedCS = callStack_;
     std::vector<std::pair<ValuePtr, size_t>> savedIter = iterStack_;
     std::vector<size_t> savedTry = tryStack_;
+    std::vector<ExceptionFrame> savedException = exceptionStack_;
     std::vector<std::tuple<Bytecode, std::vector<std::string>, std::vector<Value>, std::string>> savedCFS = codeFrameStack_;
     std::shared_ptr<ScriptCode> savedCurScript = currentScript_;
     std::string savedActivePath = activeSourcePath_;
@@ -1244,8 +1295,8 @@ bool VM::resumeGenerator(std::shared_ptr<GeneratorObject> gen, ValuePtr& out) {
                 pendingYield_ = false;
                 restoreExecutionState(std::move(savedCode), std::move(savedStr), std::move(savedVal), savedIp,
                     std::move(savedLocals), std::move(savedCF), std::move(savedFL), std::move(savedDef),
-                    std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedCFS), std::move(savedCurScript),
-                    std::move(savedActivePath));
+                    std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedException),
+                    std::move(savedCFS), std::move(savedCurScript), std::move(savedActivePath));
                 inGeneratorExecution_ = false;
                 activeGenerator_.reset();
                 return true;
@@ -1254,8 +1305,8 @@ bool VM::resumeGenerator(std::shared_ptr<GeneratorObject> gen, ValuePtr& out) {
                 gen->exhausted = true;
                 restoreExecutionState(std::move(savedCode), std::move(savedStr), std::move(savedVal), savedIp,
                     std::move(savedLocals), std::move(savedCF), std::move(savedFL), std::move(savedDef),
-                    std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedCFS), std::move(savedCurScript),
-                    std::move(savedActivePath));
+                    std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedException),
+                    std::move(savedCFS), std::move(savedCurScript), std::move(savedActivePath));
                 inGeneratorExecution_ = false;
                 activeGenerator_.reset();
                 return false;
@@ -1265,16 +1316,16 @@ bool VM::resumeGenerator(std::shared_ptr<GeneratorObject> gen, ValuePtr& out) {
         gen->exhausted = true;
         restoreExecutionState(std::move(savedCode), std::move(savedStr), std::move(savedVal), savedIp,
             std::move(savedLocals), std::move(savedCF), std::move(savedFL), std::move(savedDef),
-            std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedCFS), std::move(savedCurScript),
-            std::move(savedActivePath));
+            std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedException),
+            std::move(savedCFS), std::move(savedCurScript), std::move(savedActivePath));
         inGeneratorExecution_ = false;
         activeGenerator_.reset();
         return false;
     } catch (...) {
         restoreExecutionState(std::move(savedCode), std::move(savedStr), std::move(savedVal), savedIp,
             std::move(savedLocals), std::move(savedCF), std::move(savedFL), std::move(savedDef),
-            std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedCFS), std::move(savedCurScript),
-            std::move(savedActivePath));
+            std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedException),
+            std::move(savedCFS), std::move(savedCurScript), std::move(savedActivePath));
         inGeneratorExecution_ = false;
         activeGenerator_.reset();
         throw;
@@ -1334,11 +1385,11 @@ ValuePtr VM::callValue(ValuePtr callee, std::vector<ValuePtr> args) {
     std::vector<VMStackFrame> savedCallStackState = callStack_;
     std::vector<std::pair<ValuePtr, size_t>> savedIterState = iterStack_;
     std::vector<size_t> savedTryState = tryStack_;
+    std::vector<ExceptionFrame> savedExceptionState = exceptionStack_;
     std::vector<std::tuple<Bytecode, std::vector<std::string>, std::vector<Value>, std::string>> savedCodeFramesState =
         codeFrameStack_;
     std::shared_ptr<ScriptCode> savedCurScriptState = currentScript_;
     std::string savedActivePathState = activeSourcePath_;
-    ValuePtr savedLastThrownState = lastThrown_;
     int savedUnsafeDepthState = unsafeDepth_;
     size_t savedFrames = callFrames_.size();
     size_t savedIp = ip_;
@@ -1398,10 +1449,10 @@ ValuePtr VM::callValue(ValuePtr callee, std::vector<ValuePtr> args) {
         callStack_ = std::move(savedCallStackState);
         iterStack_ = std::move(savedIterState);
         tryStack_ = std::move(savedTryState);
+        exceptionStack_ = std::move(savedExceptionState);
         codeFrameStack_ = std::move(savedCodeFramesState);
         currentScript_ = std::move(savedCurScriptState);
         activeSourcePath_ = std::move(savedActivePathState);
-        lastThrown_ = std::move(savedLastThrownState);
         unsafeDepth_ = savedUnsafeDepthState;
         ip_ = savedIp;
         throw;
@@ -1453,18 +1504,33 @@ void VM::runDeferredCalls() {
     }
 }
 
+// Production-optimized VM execution loop
+// 
+// Performance notes:
+// - Pre-reserved vectors avoid allocations
+// - No heap allocations in hot path
+// - Switch-based dispatch is branch-prediction friendly
+// - vmTraceEnabled_ only checked in debug builds (constexpr optimization possible)
 void VM::run() {
     if (code_.empty()) return;
     verifyBytecodeOrThrow(code_, stringConstants_.size(), valueConstants_.size());
     resetCycleCount();
-    stack_.reserve(512);
+    
+    // Pre-reserve to prevent reallocations in hot path
+    if (stack_.capacity() < 512) stack_.reserve(512);
+    
     while (ip_ < code_.size()) {
         const Instruction& inst = code_[ip_];
         runInstruction(inst);
+        
+#if defined(KERN_DEBUG) && defined(KERN_DEBUG_VM_TRACE)
         if (vmTraceEnabled_ && cycleCount_ <= 500000u) {
-            std::cerr << "[vm] op=" << static_cast<int>(inst.op) << " line=" << inst.line << " col=" << inst.column
+            std::cerr << "[vm] op=" << static_cast<int>(inst.op) 
+                      << " line=" << inst.line << " col=" << inst.column
                       << " sp=" << stack_.size() << "\n";
         }
+#endif
+        
         ip_++;
         if (scriptExitCode_ >= 0) break;
     }

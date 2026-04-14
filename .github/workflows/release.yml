@@ -1,6 +1,7 @@
 # On version tag (v*): build Windows + Linux + macOS with Raylib (g2d/g3d); attach archives to GitHub Release.
 # Windows also builds an NSIS installer (kern-windows-x64-v*-installer.exe) from the same fresh Release binaries as the zip.
 # Also ships a Node-based Kargo bundle (optional; tar.gz + SHA256SUMS) for legacy users. Native `kargo.exe` is built with CMake and included in the portable bundle.
+# Optional: job `publish-installer-src-portable` mirrors the portable quartet + kern-SHA256SUMS to entrenchedosx/kern-installer-src when secret KERN_INSTALLER_SRC_TOKEN is set.
 # workflow_dispatch: build + artifacts only (no release unless ref is a tag).
 name: Release
 
@@ -481,3 +482,54 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Portable Windows quartet + checksums: canonical home is entrenchedosx/kern-installer-src (see RELEASE.md).
+  publish-installer-src-portable:
+    name: Mirror portable assets to kern-installer-src
+    needs: [windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: kern-release-windows
+          path: win-art
+
+      - name: Upload portable bundle to entrenchedosx/kern-installer-src
+        env:
+          INSTALLER_TOKEN: ${{ secrets.KERN_INSTALLER_SRC_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${INSTALLER_TOKEN:-}" ]; then
+            echo "::notice::KERN_INSTALLER_SRC_TOKEN not set — skipping mirror to kern-installer-src. Add a fine-grained PAT (Contents: write) on entrenchedosx/kern-installer-src to publish the portable bundle there automatically."
+            exit 0
+          fi
+          cd win-art
+          pick() {
+            local n="$1"
+            local p
+            p=$(find . -name "$n" -type f | head -1)
+            if [ -z "$p" ]; then
+              echo "::error::could not find $n under win-art"
+              find . -type f | head -50 || true
+              exit 1
+            fi
+            echo "$p"
+          }
+          KERN_CORE=$(pick kern-core.exe)
+          RUNTIME=$(pick kern-runtime.zip)
+          PORTABLE=$(pick kern-portable.exe)
+          KARGO=$(pick kargo.exe)
+          PARTIAL=$(pick kern-SHA256.partial-portable)
+          cp -f "$PARTIAL" kern-SHA256SUMS
+          export GH_TOKEN="$INSTALLER_TOKEN"
+          if ! gh release view "$TAG" --repo entrenchedosx/kern-installer-src >/dev/null 2>&1; then
+            gh release create "$TAG" --repo entrenchedosx/kern-installer-src \
+              --title "Portable $TAG" \
+              --notes "Windows portable bundle (mirrored from [entrenchedosx/kern $TAG](https://github.com/entrenchedosx/kern/releases/tag/$TAG))."
+          fi
+          gh release upload "$TAG" --repo entrenchedosx/kern-installer-src --clobber \
+            "$KERN_CORE" "$RUNTIME" "$PORTABLE" "$KARGO" kern-SHA256SUMS

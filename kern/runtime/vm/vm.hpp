@@ -45,6 +45,22 @@ struct VMStackFrame {
 /* * Max frames copied for stack_trace / errors / attachTracebackToError (avoids huge strings and O(n) work on deep stacks).*/
 inline constexpr size_t kMaxCallStackSnapshotFrames = 256;
 
+/* * Maximum operand stack size to prevent DoS via unbounded growth.*/
+inline constexpr size_t kMaxStackSize = 65536;  // 64k values
+
+/* * Exception frame for scoped exception handling - replaces global lastThrown_.
+ * Each TRY_BEGIN pushes a frame; THROW uses the top frame for unwind.
+ * TRY_END pops the frame (exception scope complete).*/
+struct ExceptionFrame {
+    size_t catchIp;        // Where to jump on exception
+    size_t stackMark;      // Saved stack size for rollback (pointer, not snapshot)
+    size_t frameMark;      // Saved call frame depth
+    ValuePtr thrown;       // The exception value (null if no active exception)
+    
+    ExceptionFrame(size_t ip, size_t stack, size_t frame) 
+        : catchIp(ip), stackMark(stack), frameMark(frame), thrown(nullptr) {}
+};
+
 class VMError : public std::runtime_error {
 public:
     int line = 0;
@@ -158,7 +174,7 @@ private:
     std::unordered_map<size_t, BuiltinFn> builtins_;
     std::vector<BuiltinFn> builtinsVec_;  // fast path for builtin indices 0..255
     std::vector<size_t> tryStack_;
-    ValuePtr lastThrown_;  // set when THROW jumps to catch; used by RETHROW
+    std::vector<ExceptionFrame> exceptionStack_;  // Scoped exception frames - replaces global lastThrown_
     std::vector<std::pair<ValuePtr, size_t>> iterStack_;
     std::vector<std::vector<std::pair<ValuePtr, std::vector<ValuePtr>>>> deferStack_;
     std::shared_ptr<ScriptCode> currentScript_;  // set during runSubScript so BUILD_FUNC can attach it
@@ -180,6 +196,7 @@ private:
         std::vector<VMStackFrame> callStack,
         std::vector<std::pair<ValuePtr, size_t>> iterStack,
         std::vector<size_t> tryStack,
+        std::vector<ExceptionFrame> exceptionStack,
         std::vector<std::tuple<Bytecode, std::vector<std::string>, std::vector<Value>, std::string>> codeFrameStack,
         std::shared_ptr<ScriptCode> currentScript,
         std::string activeSourcePath);

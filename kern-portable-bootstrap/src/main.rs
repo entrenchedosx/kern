@@ -200,6 +200,7 @@ fn print_help() {
          After init:  . .\\kern-NN\\Scripts\\Activate.ps1   (PowerShell; NN = folder created)\n\
                  or:   kern-NN\\Scripts\\activate.bat       (cmd)\n\
          Sets KERN_HOME and PATH.  kern-deactivate / deactivate-kern.cmd to undo.\n\n\
+         Default repo: entrenchedosx/kern-installer-src (falls back to entrenchedosx/kern).\n\
          Env: KERN_PORTABLE_REPO, KERN_PORTABLE_RELEASE, GITHUB_TOKEN, KERN_HOME"
     );
 }

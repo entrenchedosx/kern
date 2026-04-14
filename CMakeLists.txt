@@ -2,6 +2,17 @@ cmake_minimum_required(VERSION 3.14)
 if(POLICY CMP0091)
   cmake_policy(SET CMP0091 NEW)
 endif()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# KERN PRODUCTION BUILD SYSTEM
+# ═══════════════════════════════════════════════════════════════════════════════
+# Build types:
+#   Release (default): Optimized, stripped, no debug
+#   Debug: Full debug info, asserts enabled, trace logging
+#   Safe: Performance with runtime checks (balanced)
+#   MinSizeRel: Size-optimized release
+# ═══════════════════════════════════════════════════════════════════════════════
+
 # Default vcpkg triplet on Windows/MSVC so Raylib matches KERN_PREFER_STATIC_RAYLIB (/MT) and standalone EXEs.
 # Override with -DVCPKG_TARGET_TRIPLET=... at configure time if needed.
 if(WIN32 AND MSVC)
@@ -9,17 +20,91 @@ if(WIN32 AND MSVC)
     set(VCPKG_TARGET_TRIPLET "x64-windows-static" CACHE STRING "vcpkg triplet (static Raylib for Kern)")
   endif()
 endif()
-project(Kern LANGUAGES CXX)
+
+project(Kern LANGUAGES CXX VERSION 1.0.0)
 enable_language(C)
 
 include(cmake/kern_paths.cmake)
 
-set(CMAKE_CXX_STANDARD 17)
-if(MSVC)
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:10485760")
-  # Large translation units (e.g. main.cpp + builtins.hpp) exceed default COFF section limit without /bigobj.
-  add_compile_options(/bigobj)
+# ═══════════════════════════════════════════════════════════════════════════════
+# BUILD CONFIGURATION
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Set default build type if not specified
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type (Release/Debug/Safe/MinSizeRel)" FORCE)
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Release" "Debug" "Safe" "MinSizeRel")
 endif()
+
+# Custom "Safe" build type - performance with runtime checks
+set(CMAKE_CXX_FLAGS_SAFE "-O2 -DNDEBUG -DKERN_SAFE_MODE=1" CACHE STRING "CXX flags for Safe mode")
+set(CMAKE_C_FLAGS_SAFE "-O2 -DNDEBUG -DKERN_SAFE_MODE=1" CACHE STRING "C flags for Safe mode")
+set(CMAKE_EXE_LINKER_FLAGS_SAFE "" CACHE STRING "Linker flags for Safe mode")
+
+# Standard required
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# COMPILER FLAGS BY BUILD TYPE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+if(MSVC)
+  # MSVC flags
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:10485760")
+  add_compile_options(/bigobj)  # Large translation units
+  
+  # Release: Full optimization, no debug
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /Ob2 /Oi /Ot /Oy /GL /DNDEBUG")
+  set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /O2 /Ob2 /Oi /Ot /Oy /GL /DNDEBUG")
+  set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /LTCG /OPT:REF /OPT:ICF")
+  
+  # Debug: Full debug info, no optimization
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Od /Zi /RTC1 /DDEBUG /DKERN_DEBUG=1")
+  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /Od /Zi /RTC1 /DDEBUG /DKERN_DEBUG=1")
+  
+  # Safe: Balanced optimization with checks
+  set(CMAKE_CXX_FLAGS_SAFE "/O2 /Zi /Gy /DKERN_SAFE_MODE=1 /DNDEBUG")
+  set(CMAKE_C_FLAGS_SAFE "/O2 /Zi /Gy /DKERN_SAFE_MODE=1 /DNDEBUG")
+else()
+  # GCC/Clang flags
+  # Release
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG -fomit-frame-pointer -ffunction-sections -fdata-sections")
+  set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -DNDEBUG -fomit-frame-pointer -ffunction-sections -fdata-sections")
+  set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -Wl,--gc-sections -Wl,-O1 -s")
+  
+  # Debug
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g3 -DDEBUG -DKERN_DEBUG=1 -fno-omit-frame-pointer")
+  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0 -g3 -DDEBUG -DKERN_DEBUG=1 -fno-omit-frame-pointer")
+  
+  # Safe
+  set(CMAKE_CXX_FLAGS_SAFE "-O2 -g -DKERN_SAFE_MODE=1 -DNDEBUG -fstack-protector-strong")
+  set(CMAKE_C_FLAGS_SAFE "-O2 -g -DKERN_SAFE_MODE=1 -DNDEBUG -fstack-protector-strong")
+  
+  # LTO for release builds if available
+  include(CheckIPOSupported)
+  check_ipo_supported(RESULT lto_supported OUTPUT lto_error)
+  if(lto_supported)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+  endif()
+endif()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# BUILD OPTIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+option(KERN_BUILD_GAME "Build kern_game and g2d into kern/kern_repl (requires Raylib)" ON)
+option(KERN_PREFER_STATIC_RAYLIB "Prefer static Raylib so kern.exe has no raylib.dll dependency" ON)
+option(KERN_AUTO_FETCH_RAYLIB "Auto-download/build Raylib when not found locally" ON)
+option(KERN_BUILD_DOC_FRAMEWORK_DEMO "Build modular document runtime framework demo" OFF)
+option(KERN_DISTRIBUTION_STATIC_CRT "Build the Kern toolchain with a static MSVC runtime (/MT) for portable drops" ON)
+option(KERN_WERROR "Treat compiler warnings as errors (GCC/Clang, Debug configs only)" OFF)
+option(KERN_ENABLE_LTO "Enable Link Time Optimization for Release builds" ON)
+
+# Debug-only features
+option(KERN_DEBUG_VM_TRACE "Enable VM instruction tracing in debug builds" OFF)
+option(KERN_DEBUG_MEMORY "Enable memory debugging in debug builds" OFF)
 
 # First-party targets: elevated diagnostics (third-party includes kept quiet on MSVC via /external:W0).
 function(kern_apply_strict_warnings target)

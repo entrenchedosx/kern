@@ -1,5 +1,5 @@
 //! Version for User-Agent; optional alignment with monorepo `KERN_VERSION.txt` or crate version.
-//! (UAC admin manifest is applied only in the `kern-installer-src` workspace `kern-portable` binary.)
+//! (UAC admin manifest is applied to the `kern-portable` binary in the main Kern repo workspace.)
 
 use std::env;
 use std::path::PathBuf;

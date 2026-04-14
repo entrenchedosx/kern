@@ -112,7 +112,7 @@ Installer capabilities:
 
 ### Portable Windows environment (`kern-portable`)
 
-Run **`kern-portable.exe`** from a release (with `kern-core.exe`, `kern-runtime.zip`, and checksums). It creates a self-contained **`kern-NN/`** folder (two-digit name, e.g. `kern-07`) with **`kern.exe`** and **`kargo.exe`** at the root (no extra `bin/` layer), plus `lib/`, `runtime/`, `packages/`, `cache/`, `config/`, and **`config/env.json`** recording the install root.
+Run **`kern-portable.exe`** from a release. By default it pulls **`kern-core.exe`**, **`kern-runtime.zip`**, **`kargo.exe`**, and checksums from **[entrenchedosx/kern-installer-src releases](https://github.com/entrenchedosx/kern-installer-src/releases)** (falling back to **entrenchedosx/kern** if needed). It creates a self-contained **`kern-NN/`** folder (two-digit name, e.g. `kern-07`) with **`kern.exe`** and **`kargo.exe`** at the root (no extra `bin/` layer), plus `lib/`, `runtime/`, `packages/`, `cache/`, `config/`, and **`config/env.json`** recording the install root.
 
 Details: **[docs/getting-started.md](docs/getting-started.md)** — use **`KERN_HOME`** or the activation scripts under `kern-*/Scripts/` so tools agree on the same root.
 

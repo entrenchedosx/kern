@@ -23,7 +23,7 @@ The VM resolves the toolchain layout in this order:
 
 ## Windows: portable install
 
-From a project directory (requires a GitHub release that ships `kern-core.exe`, `kern-runtime.zip`, `kern-portable.exe`, and **`kargo.exe`** with matching `kern-SHA256SUMS`):
+From a project directory: **`kern-portable init`** downloads from **[entrenchedosx/kern-installer-src releases](https://github.com/entrenchedosx/kern-installer-src/releases)** by default (same tag as you request, e.g. `--latest`). Those releases ship `kern-core.exe`, `kern-runtime.zip`, `kern-portable.exe`, **`kargo.exe`**, and **`kern-SHA256SUMS`**. If that repo has no matching release, the bootstrapper falls back to **[entrenchedosx/kern](https://github.com/entrenchedosx/kern/releases)**. Override with `KERN_PORTABLE_REPO` or `--repo owner/name` if needed.
 
 ```powershell
 .\kern-portable.exe init --latest

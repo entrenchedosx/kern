@@ -5,13 +5,14 @@ use serde_json::Value;
 
 const GH_API: &str = "https://api.github.com";
 
-/// Standalone installer repo (may have no releases until published).
-pub const PRIMARY_INSTALLER_REPO: &str = "entrenchedosx/kern-installer-src";
-/// Main Kern repo; compiler/runtime/kargo assets are published here.
-pub const FALLBACK_RELEASE_REPO: &str = "entrenchedosx/kern";
+/// Canonical GitHub Releases repo for portable Windows payloads (`kern-core.exe`, `kern-runtime.zip`, `kargo.exe`, `kern-SHA256SUMS`).
+/// See <https://github.com/entrenchedosx/kern-installer-src/releases>.
+pub const PORTABLE_ASSETS_REPO: &str = "entrenchedosx/kern-installer-src";
+/// Main Kern repo; used if installer-src has no matching release (404) or no prerelease (`--nightly`).
+pub const FALLBACK_MAIN_KERN_REPO: &str = "entrenchedosx/kern";
 
-fn should_fallback_to_kern(repo: &str, err: &PortableError) -> bool {
-    if repo != PRIMARY_INSTALLER_REPO {
+fn should_fallback_to_main_kern(repo: &str, err: &PortableError) -> bool {
+    if repo != PORTABLE_ASSETS_REPO {
         return false;
     }
     match err {
@@ -69,7 +70,7 @@ fn client_headers(token: Option<&str>) -> reqwest::header::HeaderMap {
     h.insert(
         USER_AGENT,
         HeaderValue::from_static(concat!(
-            "kern-installer-src/",
+            "kern-portable/",
             env!("KERN_PORTABLE_CRATE_VER")
         )),
     );
@@ -85,12 +86,12 @@ fn client_headers(token: Option<&str>) -> reqwest::header::HeaderMap {
 pub fn fetch_release(repo: &str, want: &str, token: Option<&str>) -> Result<ReleaseInfo> {
     match fetch_release_direct(repo, want, token) {
         Ok(info) => Ok(info),
-        Err(e) if should_fallback_to_kern(repo, &e) => {
+        Err(e) if should_fallback_to_main_kern(repo, &e) => {
             eprintln!(
-                "note: {} is unavailable or has no matching release; using {}.",
-                PRIMARY_INSTALLER_REPO, FALLBACK_RELEASE_REPO
+                "note: {} has no matching release; trying {}.",
+                PORTABLE_ASSETS_REPO, FALLBACK_MAIN_KERN_REPO
             );
-            fetch_release_direct(FALLBACK_RELEASE_REPO, want, token)
+            fetch_release_direct(FALLBACK_MAIN_KERN_REPO, want, token)
         }
         Err(e) => Err(e),
     }
@@ -163,12 +164,12 @@ fn fetch_release_direct(repo: &str, want: &str, token: Option<&str>) -> Result<R
 pub fn fetch_latest_prerelease(repo: &str, token: Option<&str>) -> Result<ReleaseInfo> {
     match fetch_latest_prerelease_direct(repo, token) {
         Ok(info) => Ok(info),
-        Err(e) if should_fallback_to_kern(repo, &e) => {
+        Err(e) if should_fallback_to_main_kern(repo, &e) => {
             eprintln!(
-                "note: {} is unavailable or has no matching prerelease; using {}.",
-                PRIMARY_INSTALLER_REPO, FALLBACK_RELEASE_REPO
+                "note: {} has no matching prerelease; trying {}.",
+                PORTABLE_ASSETS_REPO, FALLBACK_MAIN_KERN_REPO
             );
-            fetch_latest_prerelease_direct(FALLBACK_RELEASE_REPO, token)
+            fetch_latest_prerelease_direct(FALLBACK_MAIN_KERN_REPO, token)
         }
         Err(e) => Err(e),
     }

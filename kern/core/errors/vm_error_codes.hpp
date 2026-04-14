@@ -26,12 +26,13 @@ enum class VMErrorCode : int {
 
     // vM/core
     STACK_UNDERFLOW = 3001,
+    STACK_OVERFLOW = 3011,
     STEP_LIMIT_EXCEEDED = 3002,
+    INVALID_OPERATION = 3012,
     RETURN_OUTSIDE_FUNCTION = 3003,
     INVALID_JUMP_TARGET = 3004,
     INVALID_BYTECODE = 3005,
     INVALID_CALL_TARGET = 3006,
-    INVALID_OPERATION = 3007,
     DIVISION_BY_ZERO = 3008,
     PERMISSION_DENIED = 3009,
     /** Abstract stack depth differs on merge at the same PC (control-flow inconsistency). */

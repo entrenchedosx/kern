@@ -4,7 +4,7 @@ version = "1.0.20"
 edition = "2021"
 license = "GPL-3.0"
 description = "Windows-first bootstrap: project kern-<version>/ env, delegate to local kern.exe (KERN_HOME)"
-repository = "https://github.com/entrenchedosx/kern-installer-src"
+repository = "https://github.com/entrenchedosx/kern"
 
 [[bin]]
 name = "kern-portable"

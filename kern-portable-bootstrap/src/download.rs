@@ -23,7 +23,7 @@ pub fn download_to_file(url: &str, dest: &Path, token: Option<&str>) -> Result<(
     }
     req = req.header(
         reqwest::header::USER_AGENT,
-        concat!("kern-installer-src/", env!("KERN_PORTABLE_CRATE_VER")),
+        concat!("kern-portable/", env!("KERN_PORTABLE_CRATE_VER")),
     );
 
     let resp = req

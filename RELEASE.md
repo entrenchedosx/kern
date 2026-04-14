@@ -21,6 +21,12 @@ The Windows portable build is intended to be self-contained: no extra runtime in
 
 ### Option A2: Project-local `kern-<version>/` (Windows, no global install)
 
+**Canonical host for the portable file set** (`kern-core.exe`, `kern-runtime.zip`, `kern-portable.exe`, `kargo.exe`, `kern-SHA256SUMS`): **[entrenchedosx/kern-installer-src — Releases](https://github.com/entrenchedosx/kern-installer-src/releases)**. The bootstrapper in this repo defaults to that GitHub repo; CI on **entrenchedosx/kern** mirrors those five files there on each version tag when the secret **`KERN_INSTALLER_SRC_TOKEN`** is set (fine-grained PAT with **Contents: write** on `kern-installer-src`).
+
+The main **kern** release may also attach the same portable artifacts for convenience; **`kern-portable init`** falls back to **entrenchedosx/kern** if **kern-installer-src** has no matching release.
+
+**If the `kern-installer-src` repository has its own release workflow** (e.g. one that rebuilds `kern-portable.exe` and pulls assets from **kern**), avoid running both on the same tag in a conflicting way: either rely on **kern**’s mirror job as the single publisher of the portable bundle to **kern-installer-src**, or keep only the installer-src workflow and do not set `KERN_INSTALLER_SRC_TOKEN` on **kern**.
+
 GitHub Releases ship **portable-env** artifacts built by CI:
 
 | Asset | Role |
