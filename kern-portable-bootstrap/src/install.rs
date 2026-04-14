@@ -50,7 +50,7 @@ fn kern_env_dirs(project_root: &Path) -> Result<Vec<PathBuf>> {
         }
         let name = e.file_name();
         let name = name.to_string_lossy();
-        if name.starts_with("kern-") && p.join("kern.exe").is_file() {
+        if name.starts_with("kern-") && p.join("kernc.exe").is_file() {
             hits.push(p);
         }
     }
@@ -251,7 +251,7 @@ function global:kern-deactivate {
     Remove-Item Function:kern-deactivate -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host "KERN_HOME = $KernEnvRoot — kern.exe and kargo.exe on PATH. kern-deactivate to undo." -ForegroundColor Cyan
+Write-Host "KERN_HOME = $KernEnvRoot — kernc.exe and kargo.exe on PATH. kern-deactivate to undo." -ForegroundColor Cyan
 "#,
     )
     .map_err(|e| path_ctx(&activate_ps1, e))?;

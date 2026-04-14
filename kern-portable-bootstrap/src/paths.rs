@@ -1,11 +1,11 @@
-//! Resolve `kern.exe` for delegation: `KERN_HOME`, then `./kern-*/kern.exe` in cwd (deterministic pick).
+//! Resolve `kernc.exe` for delegation: `KERN_HOME`, then `./kern-*/kernc.exe` in cwd (deterministic pick).
 
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 pub const KERN_HOME_ENV: &str = "KERN_HOME";
-const KERN_EXE: &str = "kern.exe";
+const KERN_EXE: &str = "kernc.exe";
 
 fn exe_in_env_root(root: &Path) -> PathBuf {
     root.join(KERN_EXE)
