@@ -1,0 +1,25 @@
+// messagebox_direct.kn - Use interop.ffi_call directly
+// Run with: kern --unsafe --ffi messagebox_direct.kn
+
+print("=== MESSAGEBOX DIRECT FFI ===")
+print("")
+
+let interop = import("interop")
+print("Interop loaded: " + interop)
+print("")
+
+unsafe {
+    print("Allowing user32.dll...")
+    interop.ffi_allow_library("user32.dll")
+    
+    print("Calling MessageBoxA via ffi_call...")
+    
+    // ffi_call with args array
+    let args = [0, "Hello from Kern FFI!", "Kern Demo", 0]
+    let result = interop.ffi_call("user32.dll", "MessageBoxA", "i32", "win64", args)
+    
+    print("Result: " + result)
+}
+
+print("")
+print("=== DONE ===")

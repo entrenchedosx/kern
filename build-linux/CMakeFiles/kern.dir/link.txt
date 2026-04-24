@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -O3 -DNDEBUG -fomit-frame-pointer -ffunction-sections -fdata-sections -flto=auto -fno-fat-lto-objects  -Wl,--gc-sections -Wl,-O1 -s CMakeFiles/kern.dir/kern/tools/main.cpp.o -o kern  libkern_core.a libkern_env_lib.a 

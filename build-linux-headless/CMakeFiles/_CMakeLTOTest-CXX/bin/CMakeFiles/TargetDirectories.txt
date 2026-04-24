@@ -1,0 +1,4 @@
+/mnt/d/simple_programming_language/build-linux-headless/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/foo.dir
+/mnt/d/simple_programming_language/build-linux-headless/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/boo.dir
+/mnt/d/simple_programming_language/build-linux-headless/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/edit_cache.dir
+/mnt/d/simple_programming_language/build-linux-headless/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/rebuild_cache.dir

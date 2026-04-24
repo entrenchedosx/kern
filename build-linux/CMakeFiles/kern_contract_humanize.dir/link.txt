@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -O3 -DNDEBUG -fomit-frame-pointer -ffunction-sections -fdata-sections -flto=auto -fno-fat-lto-objects  -Wl,--gc-sections -Wl,-O1 -s CMakeFiles/kern_contract_humanize.dir/src/tests/humanize_path_contract_test.cpp.o CMakeFiles/kern_contract_humanize.dir/kern/core/errors/errors.cpp.o -o kern_contract_humanize 

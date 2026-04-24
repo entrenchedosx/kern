@@ -1,0 +1,53 @@
+// Test: Entity to ECS mapping correctness
+// Verifies that Ursina Entities map properly to underlying ECS
+
+print("=== 3dengine Entity Mapping Test ===")
+
+let e = import("3dengine")
+let u = e["ursina"]
+
+let app = u["App"]()
+
+// Create multiple entities and verify they get unique IDs
+let ids = []
+let count = 5
+
+let i = 0
+while (i < count) {
+    let ent = u["Entity"](app, {
+        "model": "cube",
+        "position": [float(i), 0.0, 0.0]
+    })
+    push(ids, ent)
+    i = i + 1
+}
+
+print("Created " + str(len(ids)) + " entities")
+
+// Verify all IDs are unique and valid
+let seen = {}
+for id in ids {
+    if (id == null || id < 0) {
+        print("FAIL: Invalid entity id: " + str(id))
+        exit_code(1)
+    }
+    if (seen[str(id)]) {
+        print("FAIL: Duplicate entity id: " + str(id))
+        exit_code(1)
+    }
+    seen[str(id)] = true
+}
+
+print("All entity IDs unique and valid")
+
+// Verify entities belong to correct app
+// (Internal test - entity stores app reference)
+
+// Cleanup
+if (u["destroy"] != null) {
+    for id in ids {
+        u["destroy"](id)
+    }
+}
+
+print("=== Entity Mapping Test Passed ===")

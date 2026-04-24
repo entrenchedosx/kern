@@ -1,0 +1,152 @@
+// Cube Collector - A 3D Game in Kern
+// Collect yellow coins while avoiding red obstacles
+// Now with working 3dengine API!
+
+// REQUIRED: Import g3d for rendering backend
+let g = import("g3d")
+let e = import("3dengine")
+let u = e["ursina"]
+
+// Game state
+let score = 0
+let gameOver = false
+let playerSpeed = 5.0
+let spawnTimer = 0.0
+let spawnInterval = 2.0
+let player = null
+let coins = []
+let obstacles = []
+
+// Create the app
+print("Creating app...")
+let app = u["App"]()
+
+// Create player (green cube)
+print("Creating player...")
+player = u["Entity"](app, {"model": "cube", "color": [0.0, 1.0, 0.3], "position": [0.0, 0.5, 0.0], "scale": [0.8, 0.8, 0.8]})
+
+// Create ground
+print("Creating ground...")
+u["Entity"](app, {"model": "plane", "color": [0.2, 0.2, 0.3], "position": [0.0, 0.0, 0.0], "scale": [20.0, 1.0, 20.0]})
+
+// Spawn a coin at random position
+def spawnCoin() {
+    let x = random() * 16.0 - 8.0
+    let z = random() * 16.0 - 8.0
+    let coin = u["Entity"](app, {"model": "sphere", "color": [1.0, 0.9, 0.0], "position": [x, 0.5, z], "scale": [0.4, 0.4, 0.4]})
+    coins = coins + [coin]
+}
+
+// Spawn an obstacle
+def spawnObstacle() {
+    let x = random() * 16.0 - 8.0
+    let z = random() * 16.0 - 8.0
+    // Don't spawn too close to center
+    if (abs(x) < 2.0 && abs(z) < 2.0) {
+        return
+    }
+    let obstacle = u["Entity"](app, {"model": "cube", "color": [1.0, 0.2, 0.2], "position": [x, 0.5, z], "scale": [0.6, 0.6, 0.6]})
+    obstacles = obstacles + [obstacle]
+}
+
+// Check collision between two entities (simple distance check)
+def checkCollision(ent1, ent2, threshold) {
+    let pos1 = u["entity_get_position"](ent1)
+    let pos2 = u["entity_get_position"](ent2)
+    if (pos1 == null || pos2 == null) {
+        return false
+    }
+    let dx = pos1[0] - pos2[0]
+    let dz = pos1[2] - pos2[2]
+    let dist = sqrt(dx * dx + dz * dz)
+    return dist < threshold
+}
+
+// Remove entity from world
+def removeEntity(ent) {
+    u["destroy"](ent)
+}
+
+// Main update function - called every frame
+def update(dt) {
+    if (gameOver) {
+        // Check for restart
+        // Note: In full impl would check key
+        return
+    }
+    
+    // Player movement
+    let moveSpeed = playerSpeed * dt
+    let pos = u["entity_get_position"](player)
+    let newX = pos[0]
+    let newZ = pos[2]
+    
+    // Simple auto-movement for demo (no input yet)
+    // In full game: check u["input"]["is_key_down"]("w") etc.
+    
+    // Clamp to ground bounds
+    if (newX < -9.0) { newX = -9.0 }
+    if (newX > 9.0) { newX = 9.0 }
+    if (newZ < -9.0) { newZ = -9.0 }
+    if (newZ > 9.0) { newZ = 9.0 }
+    
+    u["entity_set_position"](player, [newX, 0.5, newZ])
+    
+    // Spawn timer
+    spawnTimer = spawnTimer + dt
+    if (spawnTimer > spawnInterval) {
+        spawnTimer = 0.0
+        spawnCoin()
+        if (random() > 0.5) {
+            spawnObstacle()
+        }
+        if (spawnInterval > 0.5) {
+            spawnInterval = spawnInterval - 0.05
+        }
+    }
+    
+    // Check coin collisions
+    let newCoins = []
+    for (let i = 0; i < len(coins); i = i + 1) {
+        if (checkCollision(player, coins[i], 0.8)) {
+            score = score + 10
+            removeEntity(coins[i])
+            print("Score: " + score)
+        } else {
+            newCoins = newCoins + [coins[i]]
+        }
+    }
+    coins = newCoins
+    
+    // Check obstacle collisions
+    for (let i = 0; i < len(obstacles); i = i + 1) {
+        if (checkCollision(player, obstacles[i], 0.7)) {
+            gameOver = true
+            print("GAME OVER! Score: " + score)
+        }
+    }
+    
+    // Animate coins (visual effect)
+    let t = float(time())
+    for (let i = 0; i < len(coins); i = i + 1) {
+        let coinPos = u["entity_get_position"](coins[i])
+        let newY = 0.5 + abs(sin(t * 3.0 + i)) * 0.3
+        u["entity_set_position"](coins[i], [coinPos[0], newY, coinPos[2]])
+    }
+}
+
+// Print instructions
+print("=== CUBE COLLECTOR ===")
+print("Collect YELLOW coins, avoid RED obstacles")
+print("Score: " + score)
+print("=====================")
+
+// Spawn initial coins
+for (let i = 0; i < 3; i = i + 1) {
+    spawnCoin()
+}
+
+// Register update function and run
+print("Starting game...")
+u["app_set_update"](app, update)
+u["run"](app)

@@ -1,0 +1,17 @@
+// check_g3d_methods.kn - Check available g3d methods
+let g3 = import("g3d")
+
+if (g3 == null) {
+    print("g3d module not available")
+} else {
+    print("=== G3D METHODS ===")
+    print("run exists: " + (g3["run"] != null))
+    print("windowShouldClose exists: " + (g3["windowShouldClose"] != null))
+    print("beginDrawing exists: " + (g3["beginDrawing"] != null))
+    print("endDrawing exists: " + (g3["endDrawing"] != null))
+    print("draw exists: " + (g3["draw"] != null))
+    print("clear exists: " + (g3["clear"] != null))
+    print("present exists: " + (g3["present"] != null))
+    print("isWindowReady exists: " + (g3["isWindowReady"] != null))
+    print("=== DONE ===")
+}

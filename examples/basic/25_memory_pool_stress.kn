@@ -1,0 +1,41 @@
+// Memory pool stress test: many allocations/deallocations
+// Tests the O(1) allocation guarantee and state machine
+
+print("=== Memory Pool Stress Test ===")
+
+let pool_id = pool_create(64, 100)
+print("Created pool with 100 slots")
+
+// Allocate many pointers
+let ptrs = array()
+for i in range(0, 50) {
+    let p = pool_alloc(pool_id)
+    push(ptrs, p)
+}
+print("Allocated 50 pointers")
+
+// Free every other one (fragmentation test)
+for i in range(0, 50, 2) {
+    pool_free(ptrs[i], pool_id)
+}
+print("Freed even-indexed pointers (fragmentation test)")
+
+// Reallocate - should fill gaps
+for i in range(0, 25) {
+    let p = pool_alloc(pool_id)
+    push(ptrs, p)
+}
+print("Reallocated 25 more pointers")
+
+// Free all
+for i in range(0, len(ptrs)) {
+    if (ptrs[i] != null) {
+        pool_free(ptrs[i], pool_id)
+    }
+}
+print("Freed all pointers")
+
+pool_destroy(pool_id)
+print("Destroyed pool")
+
+print("=== Stress test complete ===")

@@ -1,0 +1,155 @@
+================================================================================
+FULL ABSOLUTE PATH COMMANDS FOR 3DENGINE EXAMPLES
+================================================================================
+
+All commands use absolute paths - copy and paste directly into Command Prompt.
+
+================================================================================
+⚠️ BUILD FIRST (Required)
+================================================================================
+
+Open "x64 Native Tools Command Prompt for VS 2022" and run:
+
+    d:
+    cd d:\simple_programming_language
+    d:\simple_programming_language\BUILD_3DENGINE.bat
+
+Wait 2-5 minutes for build to complete.
+
+================================================================================
+MAIN EXAMPLE: 3DENGINE URSINA CUBE
+================================================================================
+
+FULL COMMAND:
+
+    d:\simple_programming_language\build-3dengine\Release\kern.exe d:\simple_programming_language\examples\graphics\3dengine_ursina_cube.kn
+
+================================================================================
+TEST EXAMPLES (Full Paths)
+================================================================================
+
+TEST 1: Basic Import
+
+    d:\simple_programming_language\build-3dengine\Release\kern.exe d:\simple_programming_language\tests\3dengine_import.kn
+
+TEST 2: Ursina Style API
+
+    d:\simple_programming_language\build-3dengine\Release\kern.exe d:\simple_programming_language\tests\3dengine_ursina_style.kn
+
+TEST 3: Entity Mapping
+
+    d:\simple_programming_language\build-3dengine\Release\kern.exe d:\simple_programming_language\tests\3dengine_entity_mapping.kn
+
+TEST 4: Determinism
+
+    d:\simple_programming_language\build-3dengine\Release\kern.exe d:\simple_programming_language\tests\3dengine_determinism.kn
+
+================================================================================
+GRAPHICS EXAMPLES (Full Paths)
+================================================================================
+
+3D Rotating Cube (g3d backend):
+
+    d:\simple_programming_language\build-3dengine\Release\kern.exe d:\simple_programming_language\examples\graphics\3d_rotating_cube.kn
+
+3D Camera Modes:
+
+    d:\simple_programming_language\build-3dengine\Release\kern.exe d:\simple_programming_language\examples\graphics\3d_camera_modes.kn
+
+3D Interactive Scene:
+
+    d:\simple_programming_language\build-3dengine\Release\kern.exe d:\simple_programming_language\examples\graphics\3d_interactive_scene.kn
+
+3D Textured Scene:
+
+    d:\simple_programming_language\build-3dengine\Release\kern.exe d:\simple_programming_language\examples\graphics\3d_textured_scene.kn
+
+================================================================================
+ONE-LINE INLINE TESTS (Full Paths)
+================================================================================
+
+Check Version:
+
+    d:\simple_programming_language\build-3dengine\Release\kern.exe -e "print(import(\"3dengine\")[\"VERSION\"])"
+
+Check Module Loaded:
+
+    d:\simple_programming_language\build-3dengine\Release\kern.exe -e "print(import(\"3dengine\"))"
+
+Check Ursina API:
+
+    d:\simple_programming_language\build-3dengine\Release\kern.exe -e "let e=import(\"3dengine\"); let u=e[\"ursina\"]; print(u)"
+
+Create App:
+
+    d:\simple_programming_language\build-3dengine\Release\kern.exe -e "let e=import(\"3dengine\"); let u=e[\"ursina\"]; print(u[\"App\"]())"
+
+Full Ursina Workflow:
+
+    d:\simple_programming_language\build-3dengine\Release\kern.exe -e "let e=import(\"3dengine\"); let u=e[\"ursina\"]; let app=u[\"App\"](); let cube=u[\"Entity\"](app,{\"model\":\"cube\",\"color\":[1,0,0]}); print(\"Created cube id: \"+cube)"
+
+================================================================================
+COPY-PASTE READY COMMANDS
+================================================================================
+
+Copy the entire line below and paste into Command Prompt:
+
+--- TEST ---
+d:\simple_programming_language\build-3dengine\Release\kern.exe d:\simple_programming_language\tests\3dengine_import.kn
+
+--- MAIN EXAMPLE ---
+d:\simple_programming_language\build-3dengine\Release\kern.exe d:\simple_programming_language\examples\graphics\3dengine_ursina_cube.kn
+
+--- VERSION CHECK ---
+d:\simple_programming_language\build-3dengine\Release\kern.exe -e "print(import(\"3dengine\")[\"VERSION\"])"
+
+--- URSINA API CHECK ---
+d:\simple_programming_language\build-3dengine\Release\kern.exe -e "let e=import(\"3dengine\"); let u=e[\"ursina\"]; let app=u[\"App\"](); print(app)"
+
+================================================================================
+DIRECTORY STRUCTURE (For Reference)
+================================================================================
+
+Project Root:
+    d:\simple_programming_language\
+
+Build Output (After compiling):
+    d:\simple_programming_language\build-3dengine\Release\kern.exe
+
+Source Files:
+    d:\simple_programming_language\kern\modules\3dengine\3dengine.cpp
+    d:\simple_programming_language\kern\modules\3dengine\ursina_api.cpp
+
+Integration:
+    d:\simple_programming_language\src\stdlib_modules.cpp
+
+Examples:
+    d:\simple_programming_language\examples\graphics\3dengine_ursina_cube.kn
+    d:\simple_programming_language\examples\graphics\3d_rotating_cube.kn
+
+Tests:
+    d:\simple_programming_language\tests\3dengine_import.kn
+    d:\simple_programming_language\tests\3dengine_ursina_style.kn
+
+Build Script:
+    d:\simple_programming_language\BUILD_3DENGINE.bat
+
+================================================================================
+WORKFLOW (Step by Step with Full Paths)
+================================================================================
+
+Step 1: Open x64 Native Tools Command Prompt for VS 2022
+
+Step 2: Navigate to project
+    d:
+    cd d:\simple_programming_language
+
+Step 3: Build
+    d:\simple_programming_language\BUILD_3DENGINE.bat
+
+Step 4: Wait for "BUILD SUCCESSFUL!" message
+
+Step 5: Run example with full path
+    d:\simple_programming_language\build-3dengine\Release\kern.exe d:\simple_programming_language\examples\graphics\3dengine_ursina_cube.kn
+
+================================================================================

@@ -1,0 +1,32 @@
+// DEBUG RENDER TEST - Minimal, with print statements
+
+print("=== DEBUG RENDER TEST ===")
+
+print("1. Importing g3d...")
+let g3d = import("g3d")
+print("   g3d imported: " + g3d)
+
+print("2. Importing 3dengine...")
+let e = import("3dengine")
+print("   3dengine imported: " + e)
+
+let u = e["ursina"]
+print("   ursina module: " + u)
+
+print("3. Creating app...")
+let app = u["App"]()
+print("   App created: " + app)
+
+print("4. Creating cube entity...")
+let cube = u["Entity"](app, {"model": "cube", "color": [1.0, 0.0, 0.0], "position": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0]})
+print("   Cube created: " + cube)
+
+print("5. Running app (this should open window)...")
+print("   If no window appears in 5 seconds, render loop is broken.")
+print("   === STARTING RENDER LOOP ===")
+
+u["run"](app)
+
+print("=== RENDER LOOP ENDED ===")
+print("If you saw a window, SUCCESS!")
+print("If no window appeared, check console output above for errors.")

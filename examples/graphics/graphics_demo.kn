@@ -19,7 +19,7 @@ if (g2d == null) {
             g2d.clear(20, 20, 20)
             g2d.fillRect(50, 50, 120, 80)
             g2d.drawCircle(260, 120, 40)
-            g2d.drawText("Test text", 50, 170)
+            g2d.drawText("testt", 50, 170)
             g2d.endFrame()
         }
         g2d.close()

@@ -1,0 +1,190 @@
+// 08_modules.kn - Importing and using modules
+
+print("=== Module Import Styles ===")
+
+// Style 1: Simple import
+// let math = import("math")
+// print("Sin: " + math.sin(90))
+
+// Style 2: Import and use
+// import("io") as io
+// io.print("Hello from io module")
+
+// Style 3: 'use' keyword (modern style)
+// use stdlib
+// use math
+// use io
+
+// Style 4: Selective import (if supported)
+// from math import sin, cos, sqrt
+// print(sin(90))
+
+print("")
+print("=== Creating Your Own Module ===")
+
+// In file: mymodule.kn
+// def helper(x) {
+//     return x * 2
+// }
+// 
+// let public_api = {
+//     double: helper,
+//     triple: def (x) { return x * 3 }
+// }
+// 
+// public_api  // Return the module object
+
+// Usage:
+// let mymod = import("mymodule")
+// print(mymod.double(5))   // 10
+// print(mymod.triple(5))   // 15
+
+print("")
+print("=== Module Patterns ===")
+
+// Pattern 1: Namespace pattern
+// let utils = {
+//     string: {
+//         capitalize: def (s) { /* ... */ },
+//         reverse: def (s) { /* ... */ }
+//     },
+//     array: {
+//         shuffle: def (a) { /* ... */ },
+//         unique: def (a) { /* ... */ }
+//     }
+// }
+
+// Usage: utils.string.capitalize("hello")
+
+// Pattern 2: Singleton pattern
+// let database = {
+//     data: {},
+//     get: def (key) { return data[key] },
+//     set: def (key, val) { data[key] = val }
+// }
+
+// Pattern 3: Factory pattern
+// def createLogger(name) {
+//     return {
+//         name: name,
+//         log: def (msg) {
+//             print("[" + name + "] " + msg)
+//         }
+//     }
+// }
+
+// let appLogger = createLogger("APP")
+// let dbLogger = createLogger("DB")
+// appLogger.log("Starting...")
+// dbLogger.log("Connecting...")
+
+print("")
+print("=== Built-in Modules ===")
+
+// Math module
+// use math
+// print("PI: " + math.pi)
+// print("E: " + math.e)
+// print("Sin 30: " + math.sin(30))
+// print("Cos 60: " + math.cos(60))
+// print("Sqrt 16: " + math.sqrt(16))
+// print("Pow 2^10: " + math.pow(2, 10))
+// print("Log 100: " + math.log(100))
+// print("Log10 1000: " + math.log10(1000))
+
+// Random module
+// use random
+// print("Random 0-1: " + random.random())
+// print("Random int 1-100: " + random.randint(1, 100))
+// print("Random choice: " + random.choice(["a", "b", "c"]))
+// random.seed(12345)  // Set seed for reproducibility
+
+// Time module
+// use time
+// let now = time.now()
+// print("Timestamp: " + now)
+// print("Formatted: " + time.format(now, "%Y-%m-%d %H:%M:%S"))
+// time.sleep(1)  // Sleep for 1 second
+
+// IO module
+// use io
+// io.print("Standard output")
+// io.writeFile("test.txt", "Hello, World!")
+// let content = io.readFile("test.txt")
+// io.deleteFile("test.txt")
+// let exists = io.fileExists("test.txt")
+
+// System module
+// use sys
+// print("OS: " + sys.os)
+// print("Platform: " + sys.platform)
+// print("Version: " + sys.version)
+// print("Args: " + sys.args)
+// sys.exit(0)  // Exit program
+
+// JSON module
+// use json
+// let data = {name: "Alice", age: 30}
+// let jsonStr = json.stringify(data)
+// print("JSON: " + jsonStr)
+// let parsed = json.parse(jsonStr)
+// print("Parsed: " + parsed)
+
+print("")
+print("=== Module Caching ===")
+
+// Modules are typically cached after first import
+// let mod1 = import("math")
+// let mod2 = import("math")
+// mod1 and mod2 are the same object
+
+print("")
+print("=== Conditional Import ===")
+
+// Try to import optional module
+try {
+    // let optional = import("optional_module")
+    print("Optional module loaded")
+} catch (e) {
+    print("Optional module not available, using fallback")
+    // Use fallback implementation
+}
+
+print("")
+print("=== Relative Imports ===")
+
+// In file: src/utils/helper.kn
+// import("../config") as config  // Import sibling module
+// import("../../common") as common  // Import from parent
+
+print("")
+print("=== Module Reloading (Development) ===")
+
+// Some systems support module reloading for development
+// reload("mymodule")  // Reload module during development
+
+print("")
+print("=== Complex Module Example ===")
+
+// A complete utility module structure
+// util/
+// ├── init.kn        # Main entry point
+// ├── string.kn      # String utilities
+// ├── array.kn       # Array utilities
+// ├── math.kn        # Extended math
+// └── io.kn          # I/O helpers
+
+// In util/init.kn:
+// let string = import("string")
+// let array = import("array")
+// let math = import("math")
+// let io = import("io")
+// 
+// {
+//     string: string,
+//     array: array,
+//     math: math,
+//     io: io
+// }
+
+print("Done!")

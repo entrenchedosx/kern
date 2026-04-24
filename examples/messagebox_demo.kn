@@ -1,0 +1,42 @@
+// messagebox_demo.kn - Shows a Windows message box via FFI
+// Run with: kern --unsafe --ffi messagebox_demo.kn
+
+print("=== MESSAGEBOX DEMO ===")
+print("")
+
+let interop = import("interop")
+print("Interop module loaded: " + interop)
+print("")
+print("Opening Windows message box via FFI...")
+print("(Click OK to continue)")
+print("")
+
+unsafe {
+    // Allow user32.dll for MessageBox
+    interop.ffi_allow_library("user32.dll")
+    
+    // Call MessageBoxA(HWND, text, caption, type)
+    // Returns: 1=OK, 2=Cancel, etc.
+    // Try without explicit param types - Kern may auto-detect
+    let result = interop.ffi_call("user32.dll", "MessageBoxA", "i32", "win64", [
+        0,                              // HWND (0 = no parent window)
+        "Hello from Kern FFI!",         // Message text
+        "Kern Unsafe Demo",             // Window caption
+        0                               // MB_OK = 0 (just OK button)
+    ])
+    
+    print("MessageBox returned: " + result)
+    if (result == 1) {
+        print("You clicked OK!")
+    }
+}
+
+print("")
+print("=== DEMO COMPLETE ===")
+print("")
+print("This worked because:")
+print("  1. --ffi flag enabled FFI support")
+print("  2. --unsafe flag allowed privileged operations")
+print("  3. unsafe { } block marked code as intentionally dangerous")
+print("  4. ffi_allow_library() loaded user32.dll")
+print("  5. ffi_call() invoked MessageBoxA from Windows")

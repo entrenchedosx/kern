@@ -1,0 +1,290 @@
+// platformer.kn - 2.5D Platformer game
+
+use g3d
+
+// Game config
+let GRAVITY = -9.8
+let JUMP_FORCE = 8
+let MOVE_SPEED = 5
+
+// Player state
+let player = {
+    entity: null,
+    velocity: (0, 0, 0),
+    onGround: false,
+    jumpCount: 0,
+    maxJumps: 2
+}
+
+// Level design
+let platforms = []
+let coins = []
+let score = 0
+
+// Create level
+def createLevel() {
+    // Ground
+    let ground = Entity(
+        model = "cube",
+        position = (0, -1, 0),
+        color = (100, 100, 100),
+        scale = (20, 1, 10)
+    )
+    platforms.append({entity: ground, bounds: (-10, 10, -1, 0, -5, 5)})
+    
+    // Platforms at various heights
+    let platformData = [
+        {x: -6, y: 1, z: 0, w: 3, h: 0.5, d: 2},
+        {x: -2, y: 2, z: 0, w: 2, h: 0.5, d: 2},
+        {x: 2, y: 3, z: 0, w: 2, h: 0.5, d: 2},
+        {x: 6, y: 2, z: 0, w: 3, h: 0.5, d: 2},
+        {x: 0, y: 5, z: 0, w: 2, h: 0.5, d: 2},  // High platform
+    ]
+    
+    for p in platformData {
+        let plat = Entity(
+            model = "cube",
+            position = (p.x, p.y, p.z),
+            color = (139, 90, 43),  // Wood color
+            scale = (p.w, p.h, p.d)
+        )
+        
+        let halfW = p.w / 2
+        let halfD = p.d / 2
+        platforms.append({
+            entity: plat,
+            bounds: (p.x - halfW, p.x + halfW, p.y, p.y + p.h, p.z - halfD, p.z + halfD)
+        })
+    }
+    
+    // Collectibles
+    let coinPositions = [
+        (-6, 2.5, 0),
+        (-2, 3.5, 0),
+        (2, 4.5, 0),
+        (6, 3.5, 0),
+        (0, 6.5, 0)
+    ]
+    
+    for pos in coinPositions {
+        let coin = Entity(
+            model = "sphere",
+            position = pos,
+            color = "yellow",
+            scale = 0.3
+        )
+        coins.append({entity: coin, collected: false, spinSpeed: 90})
+    }
+}
+
+def createPlayer() {
+    player.entity = Entity(
+        model = "capsule",  // Or cube as fallback
+        position = (-8, 2, 0),
+        color = (0, 150, 255),  // Blue
+        scale = (0.8, 1, 0.8)
+    )
+    player.velocity = (0, 0, 0)
+}
+
+// Physics
+def updatePhysics(dt) {
+    let pos = player.entity.position
+    let vel = player.velocity
+    
+    // Apply gravity
+    vel.y = vel.y + GRAVITY * dt
+    
+    // Update position
+    let newPos = (
+        pos.x + vel.x * dt,
+        pos.y + vel.y * dt,
+        pos.z + vel.z * dt
+    )
+    
+    // Platform collision detection
+    player.onGround = false
+    
+    for plat in platforms {
+        let b = plat.bounds
+        
+        // Check if player is within horizontal bounds
+        if (newPos.x > b[0] && newPos.x < b[1] &&
+            newPos.z > b[4] && newPos.z < b[5]) {
+            
+            // Check vertical collision (landing)
+            if (pos.y >= b[3] && newPos.y <= b[3]) {
+                newPos.y = b[3]
+                vel.y = 0
+                player.onGround = true
+                player.jumpCount = 0
+            }
+        }
+    }
+    
+    // Death plane (fall off world)
+    if (newPos.y < -10) {
+        respawn()
+    }
+    
+    // Apply position
+    player.entity.position = newPos
+    player.velocity = vel
+}
+
+// Input handling
+def handleInput(dt) {
+    let moveX = 0
+    
+    // Horizontal movement
+    if (input.held(input.Key.A) || input.held(input.Key.LEFT)) {
+        moveX = -1
+    }
+    if (input.held(input.Key.D) || input.held(input.Key.RIGHT)) {
+        moveX = 1
+    }
+    
+    player.velocity.x = moveX * MOVE_SPEED
+    
+    // Jump
+    if (input.pressed(input.Key.SPACE) || input.pressed(input.Key.W) || input.pressed(input.Key.UP)) {
+        if (player.onGround || player.jumpCount < player.maxJumps) {
+            player.velocity.y = JUMP_FORCE
+            player.jumpCount = player.jumpCount + 1
+            player.onGround = false
+        }
+    }
+}
+
+// Collectibles
+def updateCoins(dt) {
+    let playerPos = player.entity.position
+    
+    for coin in coins {
+        if (coin.collected) {
+            continue
+        }
+        
+        // Spin animation
+        coin.entity.rotation_y = coin.entity.rotation_y + coin.spinSpeed * dt
+        
+        // Collision check
+        let coinPos = coin.entity.position
+        let dist = sqrt(
+            (playerPos.x - coinPos.x) ^ 2 +
+            (playerPos.y - coinPos.y) ^ 2 +
+            (playerPos.z - coinPos.z) ^ 2
+        )
+        
+        if (dist < 1.0) {
+            coin.collected = true
+            coin.entity.hide()
+            score = score + 100
+            print("Score: " + score)
+        }
+    }
+}
+
+def sqrt(n) {
+    // Simple approximation
+    let x = n
+    let y = 1
+    for i in range(10) {
+        x = (x + y) / 2
+        y = n / x
+    }
+    return x
+}
+
+// Respawn
+def respawn() {
+    player.entity.position = (-8, 2, 0)
+    player.velocity = (0, 0, 0)
+    player.onGround = false
+    print("Respawned!")
+}
+
+// Camera follow
+def updateCamera(dt) {
+    let playerPos = player.entity.position
+    let camera = App.getMainCamera()
+    
+    // Smooth follow
+    let targetPos = (playerPos.x, playerPos.y + 5, playerPos.z + 10)
+    camera.position = lerpVec(camera.position, targetPos, 0.1)
+    camera.lookAt(playerPos)
+}
+
+def lerpVec(a, b, t) {
+    return (
+        lerp(a.x, b.x, t),
+        lerp(a.y, b.y, t),
+        lerp(a.z, b.z, t)
+    )
+}
+
+def lerp(a, b, t) {
+    return a + (b - a) * t
+}
+
+// Main update
+def update(dt) {
+    handleInput(dt)
+    updatePhysics(dt)
+    updateCoins(dt)
+    updateCamera(dt)
+    
+    // Win condition
+    let allCollected = true
+    for coin in coins {
+        if (!coin.collected) {
+            allCollected = false
+            break
+        }
+    }
+    
+    if (allCollected) {
+        print("YOU WIN! Final score: " + score)
+        // Could trigger win state here
+    }
+}
+
+// Main
+def main() {
+    App.configure(
+        title = "Platformer",
+        width = 1024,
+        height = 768,
+        backgroundColor = (135, 206, 235)  // Sky blue
+    )
+    
+    createLevel()
+    createPlayer()
+    
+    // Camera setup
+    let camera = Camera(
+        position = (-8, 7, 10),
+        lookAt = (-8, 2, 0)
+    )
+    
+    // Lighting
+    let sun = Light(
+        type = DIRECTIONAL,
+        position = (10, 20, 10),
+        color = (255, 255, 230)
+    )
+    App.ambientLight = 0.4
+    
+    print("=== PLATFORMER ===")
+    print("Controls:")
+    print("  A/D or Arrows - Move")
+    print("  W/Up/Space - Jump (double jump available)")
+    print("  Collect all coins to win!")
+    print("")
+    print("Score: " + score)
+    
+    App.onUpdate(update)
+    App.run()
+}
+
+main()

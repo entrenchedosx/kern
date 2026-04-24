@@ -1,0 +1,27 @@
+// ffi_int_only.kn - FFI with integers only (no strings)
+// Run with: kern --unsafe --ffi ffi_int_only.kn
+
+print("=== FFI INTEGER ONLY ===")
+print("")
+
+let interop = import("interop")
+
+unsafe {
+    print("Testing FFI with kernel32.dll...")
+    interop.ffi_allow_library("kernel32.dll")
+    
+    // GetTickCount() takes no args, returns u32
+    print("Calling GetTickCount()...")
+    let ticks = interop.ffi_call("kernel32.dll", "GetTickCount", "u32", "win64", [])
+    print("System uptime: " + ticks + " ms")
+    
+    // GetCurrentProcessId() takes no args, returns u32
+    print("Calling GetCurrentProcessId()...")
+    let pid = interop.ffi_call("kernel32.dll", "GetCurrentProcessId", "u32", "win64", [])
+    print("Process ID: " + pid)
+}
+
+print("")
+print("=== SUCCESS ===")
+print("FFI works with integer-only functions!")
+print("String arguments require extern def or pointer conversion.")

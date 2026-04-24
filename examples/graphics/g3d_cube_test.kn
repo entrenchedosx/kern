@@ -1,0 +1,57 @@
+// g3d_cube_test.kn - Ursina-style g3d test
+print("=== G3D CUBE RENDER TEST (Ursina API) ===")
+
+use g3d
+
+// Create window
+print("Creating window...")
+App.configure(
+    title = "G3D Cube Test",
+    width = 640,
+    height = 480
+)
+
+// Create entities
+print("Creating cube...")
+let cube = Entity(
+    model = "cube",
+    position = (0, 0, 0),
+    color = "red",
+    scale = 2.0
+)
+
+// Set up camera
+let camera = Camera(
+    position = (0, 3, -8),
+    lookAt = (0, 0, 0)
+)
+
+// Set up lighting
+let light = Light(
+    type = DIRECTIONAL,
+    position = (10, 20, 10),
+    color = (255, 255, 230)
+)
+
+App.ambientLight = 0.3
+
+print("Entities created")
+print("")
+print("Window should now be open with a red cube")
+print("Close window to exit...")
+print("")
+
+// Simple update loop
+let frame = 0
+def update(dt) {
+    frame = frame + 1
+    cube.rotation_y = cube.rotation_y + 30 * dt  // Spin
+    if (frame % 60 == 0) {
+        print("Frame: " + frame)
+    }
+}
+
+App.onUpdate(update)
+App.run()
+
+print("=== TEST COMPLETE ===")

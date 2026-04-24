@@ -1,0 +1,320 @@
+// 02_searching.kn - Search algorithms
+
+print("=== Search Algorithms ===")
+
+print("")
+print("=== Linear Search ===")
+
+def linearSearch(arr, target) {
+    for i in range(len(arr)) {
+        if (arr[i] == target) {
+            return i  // Found at index i
+        }
+    }
+    return -1  // Not found
+}
+
+let data = [10, 20, 80, 30, 60, 50, 110, 100, 130, 170]
+print("Array: " + data)
+
+let target1 = 110
+let result1 = linearSearch(data, target1)
+print("Linear search for " + target1 + ": index " + result1)
+
+let target2 = 200
+let result2 = linearSearch(data, target2)
+print("Linear search for " + target2 + ": index " + result2 + " (not found)")
+
+print("")
+print("=== Binary Search (requires sorted array) ===")
+
+def binarySearch(arr, target) {
+    let left = 0
+    let right = len(arr) - 1
+    
+    while (left <= right) {
+        let mid = left + (right - left) / 2
+        
+        if (arr[mid] == target) {
+            return mid
+        }
+        
+        if (arr[mid] < target) {
+            left = mid + 1
+        } else {
+            right = mid - 1
+        }
+    }
+    
+    return -1
+}
+
+let sortedData = [2, 3, 4, 10, 40, 50, 70, 80, 90, 100]
+print("Sorted array: " + sortedData)
+
+let target3 = 10
+let result3 = binarySearch(sortedData, target3)
+print("Binary search for " + target3 + ": index " + result3)
+
+let target4 = 5
+let result4 = binarySearch(sortedData, target4)
+print("Binary search for " + target4 + ": index " + result4 + " (not found)")
+
+print("")
+print("=== Jump Search ===")
+
+def jumpSearch(arr, target) {
+    let n = len(arr)
+    let step = sqrt(n)
+    let prev = 0
+    
+    while (arr[min(step, n) - 1] < target) {
+        prev = step
+        step = step + sqrt(n)
+        if (prev >= n) {
+            return -1
+        }
+    }
+    
+    while (arr[prev] < target) {
+        prev = prev + 1
+        if (prev == min(step, n)) {
+            return -1
+        }
+    }
+    
+    if (arr[prev] == target) {
+        return prev
+    }
+    
+    return -1
+}
+
+def min(a, b) {
+    return if (a < b) { a } else { b }
+}
+
+def sqrt(n) {
+    // Simple square root approximation
+    let x = n
+    let y = 1
+    let e = 0.000001
+    while (x - y > e) {
+        x = (x + y) / 2
+        y = n / x
+    }
+    return x
+}
+
+print("Jump search for " + target3 + ": index " + jumpSearch(sortedData, target3))
+
+print("")
+print("=== Interpolation Search ===")
+
+def interpolationSearch(arr, target) {
+    let low = 0
+    let high = len(arr) - 1
+    
+    while (low <= high && target >= arr[low] && target <= arr[high]) {
+        if (low == high) {
+            if (arr[low] == target) {
+                return low
+            }
+            return -1
+        }
+        
+        // Probing position
+        let pos = low + ((target - arr[low]) * (high - low)) / (arr[high] - arr[low])
+        
+        if (arr[pos] == target) {
+            return pos
+        }
+        
+        if (arr[pos] < target) {
+            low = pos + 1
+        } else {
+            high = pos - 1
+        }
+    }
+    
+    return -1
+}
+
+print("Interpolation search for " + target3 + ": index " + interpolationSearch(sortedData, target3))
+
+print("")
+print("=== Exponential Search ===")
+
+def exponentialSearch(arr, target) {
+    let n = len(arr)
+    
+    if (arr[0] == target) {
+        return 0
+    }
+    
+    let i = 1
+    while (i < n && arr[i] <= target) {
+        i = i * 2
+    }
+    
+    // Binary search in the found range
+    return binarySearchRange(arr, target, i / 2, min(i, n - 1))
+}
+
+def binarySearchRange(arr, target, left, right) {
+    while (left <= right) {
+        let mid = left + (right - left) / 2
+        
+        if (arr[mid] == target) {
+            return mid
+        }
+        
+        if (arr[mid] < target) {
+            left = mid + 1
+        } else {
+            right = mid - 1
+        }
+    }
+    
+    return -1
+}
+
+print("Exponential search for " + target3 + ": index " + exponentialSearch(sortedData, target3))
+
+print("")
+print("=== String Search (Naive) ===")
+
+def naiveStringSearch(text, pattern) {
+    let n = len(text)
+    let m = len(pattern)
+    let positions = []
+    
+    for i in range(n - m + 1) {
+        let j = 0
+        while (j < m && text[i + j] == pattern[j]) {
+            j = j + 1
+        }
+        if (j == m) {
+            positions.append(i)
+        }
+    }
+    
+    return positions
+}
+
+let text = "ABABDABACDABABCABAB"
+let pattern = "ABABCABAB"
+let matches = naiveStringSearch(text, pattern)
+print("Text: " + text)
+print("Pattern: " + pattern)
+print("Found at positions: " + matches)
+
+print("")
+print("=== Searching in 2D Arrays ===")
+
+let matrix = [
+    [10, 20, 30, 40],
+    [15, 25, 35, 45],
+    [27, 29, 37, 48],
+    [32, 33, 39, 50]
+]
+
+def search2D(matrix, target) {
+    let rows = len(matrix)
+    if (rows == 0) return [-1, -1]
+    let cols = len(matrix[0])
+    
+    // Start from top-right
+    let row = 0
+    let col = cols - 1
+    
+    while (row < rows && col >= 0) {
+        if (matrix[row][col] == target) {
+            return [row, col]
+        }
+        
+        if (matrix[row][col] > target) {
+            col = col - 1
+        } else {
+            row = row + 1
+        }
+    }
+    
+    return [-1, -1]
+}
+
+let target2D = 29
+let pos2D = search2D(matrix, target2D)
+print("Search for " + target2D + " in 2D array: position " + pos2D)
+
+print("")
+print("=== Find Min/Max ===")
+
+def findMin(arr) {
+    if (len(arr) == 0) return null
+    let min = arr[0]
+    for x in arr {
+        if (x < min) {
+            min = x
+        }
+    }
+    return min
+}
+
+def findMax(arr) {
+    if (len(arr) == 0) return null
+    let max = arr[0]
+    for x in arr {
+        if (x > max) {
+            max = x
+        }
+    }
+    return max
+}
+
+let testArr = [3, 1, 4, 1, 5, 9, 2, 6]
+print("Array: " + testArr)
+print("Min: " + findMin(testArr))
+print("Max: " + findMax(testArr))
+
+print("")
+print("=== Search in Rotated Sorted Array ===")
+
+def searchRotated(arr, target) {
+    let left = 0
+    let right = len(arr) - 1
+    
+    while (left <= right) {
+        let mid = left + (right - left) / 2
+        
+        if (arr[mid] == target) {
+            return mid
+        }
+        
+        // Check which half is sorted
+        if (arr[left] <= arr[mid]) {
+            // Left half is sorted
+            if (target >= arr[left] && target < arr[mid]) {
+                right = mid - 1
+            } else {
+                left = mid + 1
+            }
+        } else {
+            // Right half is sorted
+            if (target > arr[mid] && target <= arr[right]) {
+                left = mid + 1
+            } else {
+                right = mid - 1
+            }
+        }
+    }
+    
+    return -1
+}
+
+let rotated = [4, 5, 6, 7, 0, 1, 2]
+let targetRotated = 0
+print("Rotated array: " + rotated)
+print("Search for " + targetRotated + ": index " + searchRotated(rotated, targetRotated))
+
+print("Done!")

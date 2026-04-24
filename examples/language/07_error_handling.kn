@@ -1,0 +1,196 @@
+// 07_error_handling.kn - Error handling with try/catch
+
+print("=== Try/Catch Basics ===")
+
+// Basic try/catch
+try {
+    let result = 10 / 0
+    print("Result: " + result)
+} catch (err) {
+    print("Caught error: " + err)
+}
+
+print("Program continues after error...")
+
+print("")
+print("=== Different Error Types ===")
+
+// Division by zero
+try {
+    let x = 100 / 0
+} catch (e) {
+    print("Division by zero: " + e)
+}
+
+// Index out of bounds
+try {
+    let arr = [1, 2, 3]
+    let val = arr[100]
+} catch (e) {
+    print("Index error: " + e)
+}
+
+// Null pointer / undefined
+try {
+    let obj = null
+    let val = obj["key"]
+} catch (e) {
+    print("Null access: " + e)
+}
+
+print("")
+print("=== Finally Block ===")
+
+let resource = "open"
+try {
+    print("Using resource: " + resource)
+    // Simulate error
+    let error = true
+    if (error) {
+        throw "Something went wrong!"
+    }
+} catch (e) {
+    print("Error: " + e)
+} finally {
+    resource = "closed"
+    print("Resource cleaned up: " + resource)
+}
+
+print("")
+print("=== Throwing Custom Errors ===")
+
+def validateAge(age) {
+    if (age < 0) {
+        throw "Age cannot be negative"
+    }
+    if (age > 150) {
+        throw "Age is unrealistic"
+    }
+    return true
+}
+
+// Valid age
+try {
+    validateAge(25)
+    print("Age 25 is valid")
+} catch (e) {
+    print("Unexpected error: " + e)
+}
+
+// Invalid age - negative
+try {
+    validateAge(-5)
+} catch (e) {
+    print("Validation error: " + e)
+}
+
+// Invalid age - too high
+try {
+    validateAge(200)
+} catch (e) {
+    print("Validation error: " + e)
+}
+
+print("")
+print("=== Nested Try/Catch ===")
+
+try {
+    print("Outer try")
+    
+    try {
+        print("  Inner try")
+        throw "Inner error"
+    } catch (inner) {
+        print("  Inner catch: " + inner)
+        throw "Re-throwing..."
+    }
+    
+} catch (outer) {
+    print("Outer catch: " + outer)
+}
+
+print("")
+print("=== Error Recovery ===")
+
+def safeDivide(a, b, defaultValue) {
+    try {
+        return a / b
+    } catch (e) {
+        print("Warning: " + e + ", returning default")
+        return defaultValue
+    }
+}
+
+print("10 / 2 = " + safeDivide(10, 2, -1))
+print("10 / 0 = " + safeDivide(10, 0, -1))
+
+print("")
+print("=== Assert (if available) ===")
+
+// assert(true, "This should pass")
+// assert(false, "This should fail")  // Would throw
+
+print("")
+print("=== Error Handling Patterns ===")
+
+// Pattern 1: Fail fast
+// def process(data) {
+//     if (data == null) {
+//         throw "Data cannot be null"
+//     }
+//     if (len(data) == 0) {
+//         throw "Data cannot be empty"
+//     }
+//     // Process...
+// }
+
+// Pattern 2: Result type (using array)
+def safeParseNumber(str) {
+    try {
+        // let num = parseFloat(str)
+        // return [true, num]
+        return [true, 42]  // Placeholder
+    } catch (e) {
+        return [false, e]
+    }
+}
+
+let parseResult = safeParseNumber("123")
+if (parseResult[0]) {
+    print("Parsed: " + parseResult[1])
+} else {
+    print("Parse failed: " + parseResult[1])
+}
+
+let badResult = safeParseNumber("abc")
+if (badResult[0]) {
+    print("Parsed: " + badResult[1])
+} else {
+    print("Parse failed: " + badResult[1])
+}
+
+print("")
+print("=== Resource Management Pattern ===")
+
+def withFile(filename, mode, callback) {
+    // let file = open(filename, mode)
+    let file = {name: filename, mode: mode}  // Mock file
+    
+    try {
+        let result = callback(file)
+        return result
+    } catch (e) {
+        print("Error with file: " + e)
+        throw e
+    } finally {
+        // file.close()
+        print("File closed: " + file.name)
+    }
+}
+
+// Usage:
+// withFile("data.txt", "r", def (f) {
+//     return f.read()
+// })
+
+print("Done!")

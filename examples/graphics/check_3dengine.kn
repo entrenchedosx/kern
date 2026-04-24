@@ -1,0 +1,38 @@
+// check_3dengine.kn - List all available methods
+print("=== CHECKING 3DENGINE API ===")
+
+let engine = import("3dengine")
+print("3dengine module loaded")
+
+// Check if methods exist (not null)
+print("Checking methods:")
+let wc = engine["world_create"]
+print("  world_create exists: " + (wc != null))
+
+let ec = engine["entity_create"]
+print("  entity_create exists: " + (ec != null))
+
+let esm = engine["entity_set_model"]
+print("  entity_set_model exists: " + (esm != null))
+
+let esp = engine["entity_set_position"]
+print("  entity_set_position exists: " + (esp != null))
+
+let esc = engine["entity_set_color"]
+print("  entity_set_color exists: " + (esc != null))
+
+let wr = engine["world_run"]
+print("  world_run exists: " + (wr != null))
+
+let u = engine["ursina"]
+print("  ursina exists: " + (u != null))
+
+if (u != null) {
+    print("")
+    print("Ursina sub-module:")
+    print("    App exists: " + (u["App"] != null))
+    print("    Entity exists: " + (u["Entity"] != null))
+}
+
+print("")
+print("=== DONE ===")

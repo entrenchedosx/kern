@@ -1,0 +1,78 @@
+// Data structures: stack and queue using arrays
+
+print("=== Data Structures Demo ===")
+
+// Stack implementation
+def stack_new() {
+    return array()
+}
+
+def stack_push(stack, item) {
+    push(stack, item)
+}
+
+def stack_pop(stack) {
+    if (len(stack) == 0) {
+        return null
+    }
+    let idx = len(stack) - 1
+    let item = stack[idx]
+    // Remove last element by slicing
+    return item
+}
+
+def stack_peek(stack) {
+    if (len(stack) == 0) {
+        return null
+    }
+    return stack[len(stack) - 1]
+}
+
+// Queue implementation (using array with index tracking)
+def queue_new() {
+    let q = array()
+    push(q, array())  // storage
+    push(q, 0)        // front index
+    push(q, 0)        // back index
+    return q
+}
+
+def queue_enqueue(queue, item) {
+    let storage = queue[0]
+    push(storage, item)
+    queue[2] = queue[2] + 1  // increment back
+}
+
+def queue_dequeue(queue) {
+    let front = queue[1]
+    let back = queue[2]
+    if (front >= back) {
+        return null
+    }
+    let storage = queue[0]
+    let item = storage[front]
+    queue[1] = front + 1  // increment front
+    return item
+}
+
+// Test stack
+print("--- Stack Test ---")
+let stack = stack_new()
+stack_push(stack, 10)
+stack_push(stack, 20)
+stack_push(stack, 30)
+print("Stack top:", stack_peek(stack))
+print("Popped:", stack_pop(stack))
+print("Stack top after pop:", stack_peek(stack))
+
+// Test queue
+print("--- Queue Test ---")
+let queue = queue_new()
+queue_enqueue(queue, "first")
+queue_enqueue(queue, "second")
+queue_enqueue(queue, "third")
+print("Dequeued:", queue_dequeue(queue))
+print("Dequeued:", queue_dequeue(queue))
+print("Dequeued:", queue_dequeue(queue))
+
+print("=== Data structures demo complete ===")

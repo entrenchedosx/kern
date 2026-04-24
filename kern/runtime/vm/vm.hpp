@@ -83,6 +83,11 @@ public:
 class VM {
 public:
     VM();
+    ~VM();  // Cleanup VM instance state
+    
+    // Explicit shutdown API for deterministic global state cleanup
+    // Call this when shutting down the application or when no more VMs will be created
+    static void shutdownGlobalState();
     void setBytecode(Bytecode code);
     void setStringConstants(std::vector<std::string> constants);
     void setValueConstants(std::vector<Value> constants);
@@ -119,6 +124,19 @@ public:
     RuntimeGuardPolicy& mutableRuntimeGuards() { return runtimeGuards_; }
     bool isInUnsafeContext() const { return unsafeDepth_ > 0; }
     int unsafeDepth() const { return unsafeDepth_; }
+    
+    /* * Module cache accessors for safe import handling.*/
+    ValuePtr getCachedModule(const std::string& name) const {
+        auto it = moduleCache_.find(name);
+        return (it != moduleCache_.end()) ? it->second : ValuePtr(nullptr);
+    }
+    void setCachedModule(const std::string& name, ValuePtr module) {
+        moduleCache_[name] = std::move(module);
+    }
+    bool hasCachedModule(const std::string& name) const {
+        return moduleCache_.find(name) != moduleCache_.end();
+    }
+    void clearModuleCache() { moduleCache_.clear(); }
     /* * set CLI arguments (e.g. from main argv). Used by cli_args() builtin.*/
     void setCliArgs(std::vector<std::string> args) { cliArgs_ = std::move(args); }
     const std::vector<std::string>& getCliArgs() const { return cliArgs_; }
@@ -182,6 +200,9 @@ private:
     std::shared_ptr<ScriptCode> entryScriptCache_;
     /** Saved caller bytecode + constants + caller source path when calling into another script's function. */
     std::vector<std::tuple<Bytecode, std::vector<std::string>, std::vector<Value>, std::string>> codeFrameStack_;
+    
+    /* * Module cache for safe import handling - prevents double-initialization and provides safe fallback.*/
+    std::unordered_map<std::string, ValuePtr> moduleCache_;
     void runDeferredCalls();
     bool resumeGenerator(std::shared_ptr<GeneratorObject> gen, ValuePtr& out);
     void restoreExecutionState(

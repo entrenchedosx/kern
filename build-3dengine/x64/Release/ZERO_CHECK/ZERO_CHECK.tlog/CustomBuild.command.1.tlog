@@ -1,0 +1,10 @@
+^D:\SIMPLE_PROGRAMMING_LANGUAGE\BUILD-3DENGINE\CMAKEFILES\EB0BBD39C6973C7B3926A9A3F1DA818C\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/simple_programming_language -BD:/simple_programming_language/build-3dengine --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file D:/simple_programming_language/build-3dengine/Kern.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

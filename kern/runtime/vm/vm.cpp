@@ -3,6 +3,7 @@
  */
 
 #include "vm.hpp"
+#include "builtins.hpp"
 #include "bytecode_verifier.hpp"
 #include "errors/vm_error_registry.hpp"
 #include "platform/env_compat.hpp"
@@ -17,20 +18,41 @@
 
 namespace kern {
 
-/* * map subscript: string key, or int/float coerced to decimal string (for handles-as-keys).*/
+/* * map subscript: string key, or int/float coerced to decimal string (for handles-as-keys).
+ * SAFETY: Returns false for null, nil, or invalid types - never crashes.
+ */
 static bool mapIndexToKey(const ValuePtr& index, std::string& out) {
     if (!index) return false;
+    
+    // Explicit NIL check to prevent use of nil as dictionary key
+    if (index->type == Value::Type::NIL) {
+        return false;
+    }
+    
     switch (index->type) {
         case Value::Type::STRING:
-            out = std::get<std::string>(index->data);
-            return true;
+            try {
+                out = std::get<std::string>(index->data);
+                return true;
+            } catch (...) {
+                return false;
+            }
         case Value::Type::INT:
-            out = std::to_string(std::get<int64_t>(index->data));
-            return true;
+            try {
+                out = std::to_string(std::get<int64_t>(index->data));
+                return true;
+            } catch (...) {
+                return false;
+            }
         case Value::Type::FLOAT:
-            out = std::to_string(std::get<double>(index->data));
-            return true;
+            try {
+                out = std::to_string(std::get<double>(index->data));
+                return true;
+            } catch (...) {
+                return false;
+            }
         default:
+            // Reject all other types (FUNC, MAP, ARRAY, PTR, etc.)
             return false;
     }
 }
@@ -112,6 +134,32 @@ VM::VM() : ip_(0), vmTraceEnabled_(false) {
         vmTraceEnabled_ = tr && tr[0] != '\0' && tr[0] != '0';
     #endif
 #endif
+}
+
+VM::~VM() {
+    // Break shared_ptr cycles to prevent reference leaks
+    currentScript_.reset();
+    entryScriptCache_.reset();
+    activeGenerator_.reset();
+    
+    // Clear VM state vectors
+    stack_.clear();
+    callStack_.clear();
+    tryStack_.clear();
+    exceptionStack_.clear();
+    callFrames_.clear();
+    frameLocals_.clear();
+    deferStack_.clear();
+    iterStack_.clear();
+    codeFrameStack_.clear();
+    
+    // Note: Global state cleanup is now explicit via VM::shutdownGlobalState()
+    // This removes hidden coupling between VM instances
+}
+
+void VM::shutdownGlobalState() {
+    extern void cleanupGlobalMemoryState();
+    cleanupGlobalMemoryState();
 }
 
 void VM::setBytecode(Bytecode code) {
@@ -1504,35 +1552,79 @@ void VM::runDeferredCalls() {
     }
 }
 
-// Production-optimized VM execution loop
+// Production-optimized VM execution loop with crash protection
 // 
 // Performance notes:
 // - Pre-reserved vectors avoid allocations
 // - No heap allocations in hot path
 // - Switch-based dispatch is branch-prediction friendly
 // - vmTraceEnabled_ only checked in debug builds (constexpr optimization possible)
+// - All errors are caught and reported safely - engine never crashes
 void VM::run() {
     if (code_.empty()) return;
-    verifyBytecodeOrThrow(code_, stringConstants_.size(), valueConstants_.size());
+    try {
+        verifyBytecodeOrThrow(code_, stringConstants_.size(), valueConstants_.size());
+    } catch (const VMError& e) {
+        std::cerr << "[Kern] Bytecode Verification Error [" << e.category << "]: " << e.what()
+                  << " at line " << e.line << ", column " << e.column << std::endl;
+        scriptExitCode_ = e.category;
+        return;
+    } catch (...) {
+        std::cerr << "[Kern] Unknown bytecode verification error" << std::endl;
+        scriptExitCode_ = 1;
+        return;
+    }
+    
     resetCycleCount();
     
     // Pre-reserve to prevent reallocations in hot path
     if (stack_.capacity() < 512) stack_.reserve(512);
     
-    while (ip_ < code_.size()) {
-        const Instruction& inst = code_[ip_];
-        runInstruction(inst);
-        
+    try {
+        while (ip_ < code_.size()) {
+            const Instruction& inst = code_[ip_];
+            
+            // Check for stack overflow
+            if (stack_.size() > 10000) {
+                throw VMError("Stack overflow - too many values on stack", inst.line, inst.column, 1,
+                              static_cast<int>(VMErrorCode::STACK_OVERFLOW));
+            }
+            
+            runInstruction(inst);
+            
 #if defined(KERN_DEBUG) && defined(KERN_DEBUG_VM_TRACE)
-        if (vmTraceEnabled_ && cycleCount_ <= 500000u) {
-            std::cerr << "[vm] op=" << static_cast<int>(inst.op) 
-                      << " line=" << inst.line << " col=" << inst.column
-                      << " sp=" << stack_.size() << "\n";
-        }
+            if (vmTraceEnabled_ && cycleCount_ <= 500000u) {
+                std::cerr << "[vm] op=" << static_cast<int>(inst.op) 
+                          << " line=" << inst.line << " col=" << inst.column
+                          << " sp=" << stack_.size() << "\n";
+            }
 #endif
+            
+            ip_++;
+            if (scriptExitCode_ >= 0) break;
+        }
+    } catch (const VMError& e) {
+        // Format and print runtime error with full context
+        std::cerr << "[Kern] Runtime Error [" << e.category << "]: " << e.what();
+        if (e.line > 0) {
+            std::cerr << " at line " << e.line;
+            if (e.column > 0) {
+                std::cerr << ", column " << e.column;
+            }
+        }
+        std::cerr << std::endl;
+        scriptExitCode_ = e.category;
         
-        ip_++;
-        if (scriptExitCode_ >= 0) break;
+        // Attach traceback to any error value on stack
+        if (!stack_.empty() && stack_.back()) {
+            attachTracebackToError(stack_.back());
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "[Kern] Internal Error: " << e.what() << std::endl;
+        scriptExitCode_ = 1;
+    } catch (...) {
+        std::cerr << "[Kern] Unknown internal error occurred" << std::endl;
+        scriptExitCode_ = 1;
     }
 }
 
@@ -1547,7 +1639,16 @@ void VM::runSubScript(Bytecode code, std::vector<std::string> stringConstants, s
     currentScript_->stringConstants = std::move(stringConstants);
     currentScript_->valueConstants = std::move(valueConstants);
     currentScript_->sourcePath = sourcePath;
-    verifyBytecodeOrThrow(currentScript_->code, currentScript_->stringConstants.size(), currentScript_->valueConstants.size());
+    
+    try {
+        verifyBytecodeOrThrow(currentScript_->code, currentScript_->stringConstants.size(), currentScript_->valueConstants.size());
+    } catch (const VMError& e) {
+        std::cerr << "[Kern] Import Error [" << e.category << "]: " << e.what()
+                  << " in " << sourcePath << " at line " << e.line << std::endl;
+        scriptExitCode_ = savedExitCode;
+        return;
+    }
+    
     Bytecode savedCode = std::move(code_);
     std::vector<std::string> savedStr = std::move(stringConstants_);
     std::vector<Value> savedVal = std::move(valueConstants_);
@@ -1557,12 +1658,33 @@ void VM::runSubScript(Bytecode code, std::vector<std::string> stringConstants, s
     valueConstants_ = currentScript_->valueConstants;
     activeSourcePath_ = sourcePath;
     ip_ = 0;
-    while (ip_ < code_.size()) {
-        const Instruction& inst = code_[ip_];
-        runInstruction(inst);
-        ip_++;
-        if (scriptExitCode_ >= 0) break;
+    
+    try {
+        while (ip_ < code_.size()) {
+            const Instruction& inst = code_[ip_];
+            
+            // Check for stack overflow in subscript
+            if (stack_.size() > 10000) {
+                throw VMError("Stack overflow in imported script", inst.line, inst.column, 1,
+                              static_cast<int>(VMErrorCode::STACK_OVERFLOW));
+            }
+            
+            runInstruction(inst);
+            ip_++;
+            if (scriptExitCode_ >= 0) break;
+        }
+    } catch (const VMError& e) {
+        std::cerr << "[Kern] Runtime Error in " << sourcePath << " [" << e.category << "]: " << e.what();
+        if (e.line > 0) {
+            std::cerr << " at line " << e.line;
+        }
+        std::cerr << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "[Kern] Internal Error in " << sourcePath << ": " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "[Kern] Unknown error in imported script: " << sourcePath << std::endl;
     }
+    
     code_ = std::move(savedCode);
     stringConstants_ = std::move(savedStr);
     valueConstants_ = std::move(savedVal);

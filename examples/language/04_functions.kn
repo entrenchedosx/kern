@@ -1,0 +1,163 @@
+// 04_functions.kn - Function definitions, parameters, and return values
+
+print("=== Basic Functions ===")
+
+// Simple function
+def greet(name) {
+    return "Hello, " + name + "!"
+}
+
+print(greet("Alice"))
+print(greet("Bob"))
+
+// Function with multiple parameters
+def add(a, b) {
+    return a + b
+}
+
+print("5 + 3 = " + add(5, 3))
+print("10.5 + 2.5 = " + add(10.5, 2.5))
+
+print("")
+print("=== Default Parameters ===")
+
+def power(base, exponent = 2) {
+    let result = 1
+    for i in range(exponent) {
+        result = result * base
+    }
+    return result
+}
+
+print("power(3): " + power(3))        // 3^2 = 9
+print("power(2, 3): " + power(2, 3))  // 2^3 = 8
+print("power(5, 0): " + power(5, 0))  // 5^0 = 1
+
+print("")
+print("=== Multiple Return Values (via Array) ===")
+
+def minMax(arr) {
+    if (len(arr) == 0) {
+        return [null, null]
+    }
+    
+    let min = arr[0]
+    let max = arr[0]
+    
+    for val in arr {
+        if (val < min) {
+            min = val
+        }
+        if (val > max) {
+            max = val
+        }
+    }
+    
+    return [min, max]
+}
+
+let data = [3, 1, 4, 1, 5, 9, 2, 6]
+let result = minMax(data)
+print("Array: " + data)
+print("Min: " + result[0] + ", Max: " + result[1])
+
+print("")
+print("=== Higher-Order Functions ===")
+
+def applyTwice(f, x) {
+    return f(f(x))
+}
+
+def double(n) {
+    return n * 2
+}
+
+print("applyTwice(double, 5): " + applyTwice(double, 5))  // 5 -> 10 -> 20
+
+// Anonymous/lambda functions
+let triple = def (n) { return n * 3 }
+print("triple(4): " + triple(4))
+
+print("")
+print("=== Closures ===")
+
+def makeCounter() {
+    let count = 0
+    return def () {
+        count = count + 1
+        return count
+    }
+}
+
+let counterA = makeCounter()
+let counterB = makeCounter()
+
+print("counterA: " + counterA())  // 1
+print("counterA: " + counterA())  // 2
+print("counterB: " + counterB())  // 1
+print("counterA: " + counterA())  // 3
+print("counterB: " + counterB())  // 2
+
+print("")
+print("=== Recursion ===")
+
+// Factorial
+def factorial(n) {
+    if (n <= 1) {
+        return 1
+    }
+    return n * factorial(n - 1)
+}
+
+print("factorial(5): " + factorial(5))  // 120
+
+// Fibonacci
+def fibonacci(n) {
+    if (n <= 1) {
+        return n
+    }
+    return fibonacci(n - 1) + fibonacci(n - 2)
+}
+
+print("fibonacci(10): " + fibonacci(10))  // 55
+
+print("")
+print("=== Variadic Functions ===")
+
+// Using rest parameters (if supported)
+// def sumAll(...args) {
+//     let total = 0
+//     for arg in args {
+//         total = total + arg
+//     }
+//     return total
+// }
+
+// Alternative: array parameter
+def sumArray(numbers) {
+    let total = 0
+    for n in numbers {
+        total = total + n
+    }
+    return total
+}
+
+print("sum([1, 2, 3, 4, 5]): " + sumArray([1, 2, 3, 4, 5]))
+
+print("")
+print("=== Function Composition ===")
+
+def compose(f, g) {
+    return def (x) {
+        return f(g(x))
+    }
+}
+
+def add1(x) { return x + 1 }
+def square(x) { return x * x }
+
+let add1ThenSquare = compose(square, add1)
+print("add1ThenSquare(4): " + add1ThenSquare(4))  // (4+1)^2 = 25
+
+let squareThenAdd1 = compose(add1, square)
+print("squareThenAdd1(4): " + squareThenAdd1(4))  // 4^2+1 = 17

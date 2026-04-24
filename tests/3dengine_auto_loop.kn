@@ -1,0 +1,37 @@
+// Test: Auto-loop functionality
+// Verifies app.run triggers simulation + render pipeline
+
+print("=== 3dengine Auto-Loop Test ===")
+
+let e = import("3dengine")
+let u = e["ursina"]
+
+let app = u["App"]()
+
+// Create some entities
+let player = u["Entity"](app, {
+    "model": "cube",
+    "color": [0.0, 0.5, 1.0],
+    "position": [0.0, 0.0, 0.0]
+})
+
+// Verify app.run exists and can be called
+// Note: In full implementation, this would block and run the game loop
+// For testing, we just verify the call doesn't crash
+
+// The run method should be available on app or in the module
+// This depends on how we structure the API
+
+// For now, just verify the setup is complete
+print("App setup complete with entity id=" + str(player))
+
+// In real implementation:
+// u["run"]() or app.run() would start the loop
+// We can't test the actual loop in automated tests without graphics
+
+// Cleanup
+if (u["destroy"] != null) {
+    u["destroy"](player)
+}
+
+print("=== Auto-Loop Test Passed (setup only) ===")

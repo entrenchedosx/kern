@@ -15,7 +15,10 @@
 namespace kern {
 
 /* * Current bytecode format version. Increment on breaking changes. */
-inline constexpr uint16_t kBytecodeFormatVersion = 2;  // KERN v2.0.0
+inline constexpr uint16_t kBytecodeSchemaVersion = 2;  // Major version
+inline constexpr uint8_t kBytecodeMinorVersion = 0;
+inline constexpr uint8_t kBytecodePatchVersion = 2;
+// Full version: 2.0.2
 
 /* * Magic number "KERN" (big-endian: 0x4B45524E) */
 inline constexpr uint32_t kBytecodeMagic = 0x4B45524E;

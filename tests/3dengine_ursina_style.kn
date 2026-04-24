@@ -1,0 +1,96 @@
+// Test: Ursina-style API (high-level immediate-mode)
+// Verifies App, Entity, and auto-loop functionality
+
+print("=== 3dengine Ursina-Style Test ===")
+
+let e = import("3dengine")
+
+// Check Ursina API exists
+if (e["ursina"] == null) {
+    print("FAIL: ursina submodule not found")
+    exit_code(1)
+}
+
+let u = e["ursina"]
+print("Ursina API loaded")
+
+// Test App creation
+if (u["App"] == null) {
+    print("FAIL: App constructor not found")
+    exit_code(1)
+}
+
+let app = u["App"]()
+if (app == null || app == 0) {
+    print("FAIL: App() returned invalid id")
+    exit_code(1)
+}
+print("App created: id=" + str(app))
+
+// Test Entity creation
+if (u["Entity"] == null) {
+    print("FAIL: Entity constructor not found")
+    exit_code(1)
+}
+
+// Simple entity
+let cube = u["Entity"](app, {
+    "model": "cube",
+    "color": [1.0, 0.0, 0.0],
+    "position": [0.0, 0.0, 0.0]
+})
+
+if (cube == null || cube < 0) {
+    print("FAIL: Entity creation failed")
+    exit_code(1)
+}
+print("Entity created: id=" + str(cube) + " (cube)")
+
+// Entity with all properties
+let sphere = u["Entity"](app, {
+    "model": "sphere",
+    "color": [0.0, 1.0, 0.0, 0.8],
+    "position": [2.0, 1.0, -3.0],
+    "rotation": [0.0, 45.0, 0.0],
+    "scale": [1.5, 1.5, 1.5],
+    "visible": true
+})
+
+if (sphere == null || sphere < 0) {
+    print("FAIL: Complex entity creation failed")
+    exit_code(1)
+}
+print("Complex entity created: id=" + str(sphere) + " (sphere)")
+
+// Test Input API
+if (u["input"] == null) {
+    print("FAIL: input namespace not found")
+    exit_code(1)
+}
+
+let input = u["input"]
+if (input["is_key_down"] == null) {
+    print("FAIL: input.is_key_down not found")
+    exit_code(1)
+}
+if (input["is_key_pressed"] == null) {
+    print("FAIL: input.is_key_pressed not found")
+    exit_code(1)
+}
+if (input["get_mouse_position"] == null) {
+    print("FAIL: input.get_mouse_position not found")
+    exit_code(1)
+}
+print("Input API verified")
+
+// Test entity position get/set (if available)
+// These may be stubs in initial implementation
+
+// Cleanup
+if (u["destroy"] != null) {
+    u["destroy"](cube)
+    u["destroy"](sphere)
+    print("Entities destroyed")
+}
+
+print("=== Ursina-Style Test Passed ===")

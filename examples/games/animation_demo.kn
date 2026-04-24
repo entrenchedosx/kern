@@ -1,0 +1,50 @@
+// Animation Demo - Shows entity_move_to, entity_rotate_to, entity_look_at
+
+let g = import("g3d")
+let e = import("3dengine")
+let u = e["ursina"]
+
+let app = u["App"]()
+
+// Create entities
+let player = u["Entity"](app, {"model": "cube", "color": [0.0, 1.0, 0.0], "position": [0.0, 0.5, 0.0], "scale": [1.0, 1.0, 1.0]})
+let target = u["Entity"](app, {"model": "sphere", "color": [1.0, 0.0, 0.0], "position": [5.0, 0.5, 5.0], "scale": [0.5, 0.5, 0.5]})
+let ground = u["Entity"](app, {"model": "plane", "color": [0.3, 0.3, 0.3], "position": [0.0, 0.0, 0.0], "scale": [20.0, 1.0, 20.0]})
+
+// Target positions for animation
+let targets = [[5.0, 0.5, 5.0], [-5.0, 0.5, 5.0], [-5.0, 0.5, -5.0], [5.0, 0.5, -5.0]]
+let targetIndex = 0
+
+// Main update function
+def update(dt) {
+    // Move player towards current target
+    let currentTarget = targets[targetIndex]
+    u["entity_move_to"](player, currentTarget, 2.0 * dt)
+    
+    // Rotate player to face target
+    u["entity_look_at"](player, currentTarget)
+    
+    // Check if close to target, then switch
+    let pos = u["entity_get_position"](player)
+    let dx = pos[0] - currentTarget[0]
+    let dz = pos[2] - currentTarget[2]
+    let dist = sqrt(dx * dx + dz * dz)
+    
+    if (dist < 0.5) {
+        targetIndex = (targetIndex + 1) % 4
+        print("Target reached! Moving to next...")
+    }
+    
+    // Animate target sphere (bouncing)
+    let t = float(time())
+    let bounceY = 0.5 + abs(sin(t * 2.0)) * 1.0
+    u["entity_set_position"](target, [currentTarget[0], bounceY, currentTarget[2]])
+}
+
+print("Animation Demo")
+print("Green cube moves between waypoints using entity_move_to()")
+print("Cube always faces target using entity_look_at()")
+print("Red sphere bounces at current target position")
+
+u["app_set_update"](app, update)
+u["run"](app)

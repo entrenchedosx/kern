@@ -1,0 +1,63 @@
+// Entity Script Demo - Per-entity update functions (like Ursina's def update(self))
+
+let g = import("g3d")
+let e = import("3dengine")
+let u = e["ursina"]
+
+let app = u["App"]()
+
+// Define per-entity update scripts
+def rotatingCubeScript(self, dt) {
+    // self contains: id, x, y, z, model
+    // This rotates the cube around Y axis
+    let speed = 90.0 // degrees per second
+    let newRotY = speed * float(time()) 
+    u["entity_set_rotation"](self["id"], [0.0, newRotY, 0.0])
+}
+
+def bouncingSphereScript(self, dt) {
+    // Makes sphere bounce up and down
+    let bounceHeight = 2.0
+    let bounceSpeed = 3.0
+    let newY = 1.0 + abs(sin(float(time()) * bounceSpeed)) * bounceHeight
+    u["entity_set_position"](self["id"], [self["x"], newY, self["z"]])
+}
+
+// Create entities with built-in scripts
+let cube = u["Entity"](app, {
+    "model": "cube",
+    "color": [1.0, 0.0, 0.0],
+    "position": [-2.0, 0.0, 0.0],
+    "scale": [1.0, 1.0, 1.0],
+    "script": rotatingCubeScript  // Built-in per-entity update!
+})
+
+let sphere = u["Entity"](app, {
+    "model": "sphere", 
+    "color": [0.0, 0.0, 1.0],
+    "position": [2.0, 1.0, 0.0],
+    "scale": [1.0, 1.0, 1.0],
+    "script": bouncingSphereScript
+})
+
+// You can also set scripts after creation
+def groundScript(self, dt) {
+    // Ground doesn't do anything
+}
+
+let ground = u["Entity"](app, {
+    "model": "plane",
+    "color": [0.3, 0.3, 0.3],
+    "position": [0.0, -1.0, 0.0],
+    "scale": [10.0, 1.0, 10.0]
+})
+
+u["entity_set_script"](ground, groundScript)
+
+print("Entity Script Demo")
+print("- Red cube: rotates automatically via script")
+print("- Blue sphere: bounces automatically via script")
+print("Both use per-entity update(dt) like Ursina!")
+
+// Run the app (this will now actually render)
+u["run"](app)

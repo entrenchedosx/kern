@@ -1,0 +1,177 @@
+/* *
+ * demo_ursina_style.kn - Ursina-Style Demo for Kern G3D
+ * 
+ * Demonstrates:
+ * - Entity creation with simple properties
+ * - Update loop with rotation
+ * - Camera control
+ * - Input handling
+ * - Lighting
+ * 
+ * Run with: ./kern examples/demo_ursina_style.kn
+ */
+
+// Import the g3d module
+use g3d
+
+// ============================================================================
+// Setup Scene
+// ============================================================================
+
+// Create main light
+sun = Light(
+    type = DIRECTIONAL,
+    position = (10, 20, 10),
+    color = (255, 255, 230),
+    intensity = 1.2
+)
+
+// Ambient light (through App)
+App.ambientLight = 0.3
+
+// ============================================================================
+// Create Entities
+// ============================================================================
+
+// Main spinning cube
+cube = Entity(
+    model = "cube",
+    position = (0, 0, 0),
+    color = "red",
+    scale = 2
+)
+
+// Smaller orbiting cubes
+for i in range(3):
+    small_cube = Entity(
+        model = "cube",
+        position = (3 + i * 2, 0, 0),
+        color = ["green", "blue", "yellow"][i],
+        scale = 0.5
+    )
+    small_cube.orbit_speed = 30 + i * 20
+    small_cube.orbit_radius = 3 + i * 2
+    small_cube.orbit_angle = i * 120
+
+// Ground plane
+floor = Entity(
+    model = "plane",
+    position = (0, -2, 0),
+    color = (100, 100, 100),
+    scale = (10, 1, 10)
+)
+
+// ============================================================================
+// Camera Setup
+// ============================================================================
+
+// Create camera with WASD and mouse look
+camera = Camera(
+    position = (0, 3, -8),
+    enableWASD = true,
+    enableMouseLook = true,
+    fov = 60
+)
+
+// Lock mouse for FPS-style control
+input.lockMouse()
+
+// ============================================================================
+// Game State
+// ============================================================================
+
+speed = 50  // Rotation speed
+is_spinning = true
+current_color = 0
+colors = ["red", "green", "blue", "yellow", "purple", "cyan"]
+
+// ============================================================================
+// Update Function - Called every frame
+// ============================================================================
+
+def update(dt):
+    global speed, is_spinning, current_color
+    
+    // Main cube rotation
+    if is_spinning:
+        cube.rotation_y += speed * dt
+        cube.rotation_x += (speed / 2) * dt
+    
+    // Pulse the cube scale
+    pulse = 1.0 + 0.1 * sin(time() * 3)
+    cube.scale = (2 * pulse, 2 * pulse, 2 * pulse)
+    
+    // Orbit the small cubes
+    for child in [floor]:  // Would be: cube.children or scene entities
+        pass  # placeholder
+    
+    // Input handling
+    if input.pressed(input.Key.SPACE):
+        is_spinning = !is_spinning
+        print("Spinning: " + str(is_spinning))
+    
+    // Change color on C key
+    if input.pressed(input.Key.C):
+        current_color = (current_color + 1) % len(colors)
+        cube.color = colors[current_color]
+        print("Color: " + colors[current_color])
+    
+    // Speed up/down with +/-
+    if input.held(input.Key.PLUS) or input.held(input.Key.EQUAL):
+        speed += 10 * dt
+    if input.held(input.Key.MINUS):
+        speed -= 10 * dt
+        if speed < 0:
+            speed = 0
+    
+    // Reset camera on R
+    if input.pressed(input.Key.R):
+        camera.position = (0, 3, -8)
+        camera.rotation = (0, 0, 0)
+        print("Camera reset")
+    
+    // Escape to unlock mouse
+    if input.pressed(input.Key.ESCAPE):
+        input.unlockMouse()
+        print("Mouse unlocked")
+    
+    // Click to relock
+    if input.pressed(input.Mouse.LEFT) and !input.isMouseLocked():
+        input.lockMouse()
+        print("Mouse locked")
+    
+    // Print FPS occasionally
+    if int(time() * 10) % 50 == 0:
+        print("FPS: " + str(App.fps))
+
+// ============================================================================
+// Setup Callbacks
+// ============================================================================
+
+App.onUpdate(update)
+
+// ============================================================================
+// Run
+// ============================================================================
+
+print("Ursina-Style Demo Starting...")
+print("Controls:")
+print("  WASD - Move camera")
+print("  Mouse - Look around")
+print("  SPACE - Toggle spinning")
+print("  C - Change cube color")
+print("  +/- - Change rotation speed")
+print("  R - Reset camera")
+print("  ESC - Unlock mouse")
+print("  Click - Lock mouse")
+print("")
+
+App.configure(
+    title = "Kern G3D - Ursina Style Demo",
+    width = 1280,
+    height = 720,
+    vsync = true,
+    backgroundColor = (20, 20, 30)
+)
+
+App.run()

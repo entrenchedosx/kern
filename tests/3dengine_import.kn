@@ -1,0 +1,83 @@
+// Test: 3dengine module import and API surface
+// Verifies that import("3dengine") works and all expected exports exist
+
+print("=== 3dengine Import Test ===")
+
+// Import the module
+let e = import("3dengine")
+
+// Verify module was returned
+if (e == null) {
+    print("FAIL: import('3dengine') returned null")
+    exit_code(1)
+}
+
+print("Module imported successfully")
+
+// Check all expected exports exist
+let required_exports = [
+    "world_create",
+    "world_destroy", 
+    "world_run",
+    "world_set_camera",
+    "world_get_camera",
+    "world_query",
+    "mesh_make",
+    "material_make",
+    "texture_make",
+    "mesh_make_from_obj",
+    "world_set_lighting",
+    "world_get_lighting",
+    "world_parallel_runtime_stats",
+    "VERSION",
+    "CONVENTIONS"
+]
+
+let missing = []
+for name in required_exports {
+    // Check if key exists by trying to access it and comparing to nil
+    let val = e[name]
+    if (val == null) {
+        push(missing, name)
+    }
+}
+
+if (len(missing) > 0) {
+    print("FAIL: Missing exports: " + str(missing))
+    exit_code(1)
+}
+
+print("All required exports present: " + str(len(required_exports)) + " functions")
+
+// Check VERSION
+if (e["VERSION"] == null) {
+    print("FAIL: VERSION not set")
+    exit_code(1)
+}
+print("VERSION: " + e["VERSION"])
+
+// Check CONVENTIONS
+if (e["CONVENTIONS"] == null) {
+    print("FAIL: CONVENTIONS not set")
+    exit_code(1)
+}
+let conv = e["CONVENTIONS"]
+print("CONVENTIONS:")
+print("  handedness: " + default(conv["handedness"], "NOT SET"))
+print("  world_up: " + default(conv["world_up"], "NOT SET"))
+print("  ndc_depth: " + default(conv["ndc_depth"], "NOT SET"))
+print("  matrix_layout: " + default(conv["matrix_layout"], "NOT SET"))
+
+// Test world_create
+let world_id = e["world_create"]()
+if (world_id == null || world_id == 0) {
+    print("FAIL: world_create() returned invalid id")
+    exit_code(1)
+}
+print("World created with id: " + str(world_id))
+
+// Test world_destroy
+e["world_destroy"](world_id)
+print("World destroyed successfully")
+
+print("=== All Tests Passed ===")

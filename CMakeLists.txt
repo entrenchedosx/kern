@@ -488,6 +488,9 @@ if(KERN_BUILD_GAME)
       "${KERN_MODULES_SRC_DIR}/g2d/text.cpp"
       "${KERN_MODULES_SRC_DIR}/g2d/colors.cpp"
       "${KERN_MODULES_SRC_DIR}/g3d/g3d.cpp"
+      # 3dengine - high-level ECS 3D engine (wraps g3d backend)
+      "${KERN_MODULES_SRC_DIR}/3dengine/3dengine.cpp"
+      "${KERN_MODULES_SRC_DIR}/3dengine/ursina_api.cpp"
     )
     add_library(kern_gfx STATIC "${KERN_GAME_MODULE_DIR}/game_builtins.cpp" ${G2D_SOURCES})
     target_include_directories(kern_gfx PUBLIC ${KERN_TOOLCHAIN_PRIVATE_INCLUDES})

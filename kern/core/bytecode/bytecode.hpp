@@ -19,7 +19,7 @@
 namespace kern {
 
 /** Bump when serialized bytecode or opcode semantics change incompatibly. Reported by `kern --version`. */
-inline constexpr int kBytecodeSchemaVersion = 1;
+inline constexpr int kBytecodeSchemaVersion = 2;  // KERN v2.0.2
 
 enum class Opcode : uint8_t {
     // constants

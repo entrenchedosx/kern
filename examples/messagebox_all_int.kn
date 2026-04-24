@@ -1,0 +1,25 @@
+// messagebox_all_int.kn - Use all int types for FFI
+// Run with: kern --unsafe --ffi messagebox_all_int.kn
+
+// Declare MessageBoxA with all int types (Windows handles are intptr_t)
+extern def MessageBoxA(int hwnd, int text, int caption, int type) : int from "user32.dll"
+
+print("=== MESSAGEBOX ALL INT ===")
+print("")
+print("Opening Windows message box...")
+print("(Click OK to continue)")
+print("")
+
+unsafe {
+    // Use 0 for null HWND - strings need to be passed somehow
+    // Try passing string pointers - Kern may auto-convert
+    let result = MessageBoxA(0, "Hello from Kern!", "Kern Demo", 0)
+    
+    print("Result: " + result)
+    if (result == 1) {
+        print("You clicked OK!")
+    }
+}
+
+print("")
+print("=== DONE ===")

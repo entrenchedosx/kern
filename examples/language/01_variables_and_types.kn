@@ -1,0 +1,51 @@
+// 01_variables_and_types.kn - Variable declarations and basic types
+
+// Variable declarations with type inference
+let name = "Kern"
+let version = 2.0
+let isAwesome = true
+let count = 42
+
+// Multiple declarations
+let x = 10, y = 20, z = 30
+
+// Reassignment with 'let'
+let mutable = 5
+mutable = 10  // Reassign same value type
+
+// Different numeric types
+let integer = 100
+let floating = 3.14159
+let negative = -50
+let large = 1000000
+
+// String operations
+let greeting = "Hello, " + name + "!"
+let multiline = "Line 1\nLine 2\nLine 3"
+
+// Boolean logic
+let a = true, b = false
+let andResult = a && b
+let orResult = a || b
+let notResult = !a
+
+// Type coercion in expressions
+let mixed = integer + floating  // Results in float
+
+// Null/nil
+let empty = null
+
+// Printing values
+print("=== Variable Types ===")
+print("String: " + name)
+print("Integer: " + count)
+print("Float: " + version)
+print("Boolean: " + isAwesome)
+print("Mixed expression: " + mixed)
+print("")
+print("String concat: " + greeting)
+print("Boolean AND: " + andResult)
+print("Boolean OR: " + orResult)
+print("Boolean NOT: " + notResult)
+print("")
+print("Multiple vars: x=" + x + ", y=" + y + ", z=" + z)

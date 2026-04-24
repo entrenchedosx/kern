@@ -1,0 +1,103 @@
+// ursina_api.kn - Ursina-style API wrapper over g3d
+// Usage: import("ursina_api") as ursina
+
+// Internal module state
+let _g3 = import("g3d")
+let _entities = {}
+let _nextId = 0
+
+// Color constants (maps with r,g,b,a)
+let color = {
+    red: {r: 1.0, g: 0.0, b: 0.0, a: 1.0},
+    green: {r: 0.0, g: 1.0, b: 0.0, a: 1.0},
+    blue: {r: 0.0, g: 0.0, b: 1.0, a: 1.0},
+    white: {r: 1.0, g: 1.0, b: 1.0, a: 1.0},
+    black: {r: 0.0, g: 0.0, b: 0.0, a: 1.0},
+    yellow: {r: 1.0, g: 1.0, b: 0.0, a: 1.0},
+    cyan: {r: 0.0, g: 1.0, b: 1.0, a: 1.0},
+    magenta: {r: 1.0, g: 0.0, b: 1.0, a: 1.0},
+    orange: {r: 1.0, g: 0.5, b: 0.0, a: 1.0},
+    purple: {r: 0.5, g: 0.0, b: 1.0, a: 1.0},
+    gray: {r: 0.5, g: 0.5, b: 0.5, a: 1.0},
+    random: {r: 0.5, g: 0.5, b: 0.5, a: 1.0}
+}
+
+// Entity class - creates 3D object
+def Entity(params) {
+    let id = _nextId
+    _nextId = _nextId + 1
+    
+    // Get model type (default cube)
+    let model = "cube"
+    if (params["model"] != null) {
+        model = params["model"]
+    }
+    
+    // Get size/scale
+    let scale = 1.0
+    if (params["scale"] != null) {
+        scale = params["scale"]
+    }
+    
+    // Create g3d object
+    let g3dId = _g3.createObject(model, scale)
+    
+    // Set position
+    let pos = params["position"]
+    if (pos != null && pos[0] != null) {
+        _g3.setPosition(g3dId, pos[0], pos[1], pos[2])
+    } else {
+        _g3.setPosition(g3dId, 0, 0, 0)
+    }
+    
+    // Set color
+    let col = params["color"]
+    if (col != null) {
+        let r = 255
+        let g = 255
+        let b = 255
+        if (col["r"] != null) {
+            r = col["r"] * 255
+            g = col["g"] * 255
+            b = col["b"] * 255
+        }
+        _g3.setObjectColor(g3dId, r, g, b)
+    }
+    
+    // Store entity data
+    _entities[id] = {
+        g3dId: g3dId,
+        model: model,
+        update: params["update"]
+    }
+    
+    return id
+}
+
+// Run the app with all entities
+def run() {
+    def update() {
+        // Call entity update functions
+        // (Would iterate _entities and call update if defined)
+    }
+    
+    def draw() {
+        // Draw all entities
+        for (let id in _entities) {
+            let entity = _entities[id]
+            _g3.drawObject(entity["g3dId"])
+        }
+    }
+    
+    _g3.run(update, draw)
+}
+
+// Export the API
+let ursina = {
+    Entity: Entity,
+    run: run,
+    color: color,
+    _g3: _g3
+}
+
+ursina

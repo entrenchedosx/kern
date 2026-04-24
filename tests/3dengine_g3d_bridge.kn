@@ -1,0 +1,55 @@
+// Test: 3dengine -> g3d backend bridge
+// Verifies that 3dengine calls route through g3d correctly
+
+print("=== 3dengine -> g3d Bridge Test ===")
+
+let e = import("3dengine")
+
+// Create a world (this should initialize g3d backend)
+let world_id = e["world_create"]()
+print("World created: " + str(world_id))
+
+// Set camera (routes through g3d camera system)
+let pos = {"x": 0.0, "y": 5.0, "z": 10.0}
+let target = {"x": 0.0, "y": 0.0, "z": 0.0}
+let up = {"x": 0.0, "y": 1.0, "z": 0.0}
+
+e["world_set_camera"](world_id, pos, target, up)
+print("Camera set via 3dengine -> g3d bridge")
+
+// Get camera back
+let cam = e["world_get_camera"](world_id)
+if (cam == null) {
+    print("FAIL: world_get_camera returned null")
+    e["world_destroy"](world_id)
+    exit_code(1)
+}
+
+print("Camera retrieved:")
+print("  position: (" + str(default(cam["position"]["x"], 0)) + ", " + str(default(cam["position"]["y"], 0)) + ", " + str(default(cam["position"]["z"], 0)) + ")")
+
+// Verify camera values match what was set
+let eps = 0.001
+if (abs(default(cam["position"]["x"], 0) - pos["x"]) > eps ||
+    abs(default(cam["position"]["y"], 0) - pos["y"]) > eps ||
+    abs(default(cam["position"]["z"], 0) - pos["z"]) > eps) {
+    print("FAIL: Camera position mismatch")
+    e["world_destroy"](world_id)
+    exit_code(1)
+}
+
+print("Camera values verified through g3d backend")
+
+// Test mesh creation through bridge
+// let mesh_id = e["mesh_make"](world_id, "cube", {"size": 1.0})
+// print("Mesh created via bridge: " + str(mesh_id))
+
+// Test material creation
+// let mat_id = e["material_make"](world_id, {"color": "red"})
+// print("Material created via bridge: " + str(mat_id))
+
+// Cleanup
+e["world_destroy"](world_id)
+print("World destroyed")
+
+print("=== Bridge Test Passed ===")

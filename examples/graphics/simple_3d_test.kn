@@ -1,0 +1,24 @@
+// Simple 3D Test - Verify render loop works
+
+use g3d
+
+print("Creating app...")
+App.configure(
+    title = "Simple 3D Test",
+    width = 800,
+    height = 600
+)
+
+print("Creating cube...")
+let cube = Entity(
+    model = "cube",
+    color = "red",
+    position = (0, 0, 0)
+)
+
+let camera = Camera(position = (0, 2, -5))
+
+print("Running app...")
+App.run()
+
+print("App finished!")

@@ -1,0 +1,210 @@
+// snake.kn - Classic Snake game using g3d
+
+use g3d
+
+// Game configuration
+let GRID_SIZE = 20
+let CELL_SIZE = 1
+let GAME_SPEED = 0.15  // Seconds per move
+
+// Game state
+let snake = []  // Array of positions [x, y]
+let direction = (1, 0)  // Moving right
+let food = (0, 0)
+let score = 0
+let gameOver = false
+let paused = false
+
+// Colors
+let COLOR_SNAKE_HEAD = "green"
+let COLOR_SNAKE_BODY = "lime"
+let COLOR_FOOD = "red"
+let COLOR_BG = "black"
+
+// Initialize game
+def initGame() {
+    // Start with snake of length 3
+    snake = [(5, 10), (4, 10), (3, 10)]
+    direction = (1, 0)
+    score = 0
+    gameOver = false
+    spawnFood()
+    
+    print("=== SNAKE GAME ===")
+    print("Controls: WASD or Arrow Keys")
+    print("P to pause, ESC to quit")
+    print("Score: " + score)
+}
+
+// Spawn food at random position
+def spawnFood() {
+    while (true) {
+        let fx = randomInt(0, GRID_SIZE - 1)
+        let fy = randomInt(0, GRID_SIZE - 1)
+        
+        // Check if food spawns on snake
+        let onSnake = false
+        for segment in snake {
+            if (segment[0] == fx && segment[1] == fy) {
+                onSnake = true
+                break
+            }
+        }
+        
+        if (!onSnake) {
+            food = (fx, fy)
+            break
+        }
+    }
+}
+
+// Update game state
+def update(dt) {
+    if (gameOver || paused) {
+        return
+    }
+    
+    // Move timer - only move every GAME_SPEED seconds
+    // In real implementation, use accumulated time
+    
+    // Get new head position
+    let head = snake[0]
+    let newHead = (
+        head[0] + direction[0],
+        head[1] + direction[1]
+    )
+    
+    // Check wall collision
+    if (newHead[0] < 0 || newHead[0] >= GRID_SIZE ||
+        newHead[1] < 0 || newHead[1] >= GRID_SIZE) {
+        gameOver = true
+        print("GAME OVER! Hit wall. Score: " + score)
+        return
+    }
+    
+    // Check self collision
+    for segment in snake {
+        if (newHead[0] == segment[0] && newHead[1] == segment[1]) {
+            gameOver = true
+            print("GAME OVER! Hit yourself. Score: " + score)
+            return
+        }
+    }
+    
+    // Move snake
+    snake.insert(0, newHead)
+    
+    // Check food collision
+    if (newHead[0] == food[0] && newHead[1] == food[1]) {
+        score = score + 10
+        print("Score: " + score)
+        spawnFood()
+        // Don't remove tail - snake grows
+    } else {
+        // Remove tail
+        snake.pop()
+    }
+}
+
+// Handle input
+def handleInput() {
+    // Up
+    if (input.pressed(input.Key.W) || input.pressed(input.Key.UP)) {
+        if (direction[1] != 1) {  // Not going down
+            direction = (0, -1)
+        }
+    }
+    // Down
+    if (input.pressed(input.Key.S) || input.pressed(input.Key.DOWN)) {
+        if (direction[1] != -1) {  // Not going up
+            direction = (1, 0)
+        }
+    }
+    // Left
+    if (input.pressed(input.Key.A) || input.pressed(input.Key.LEFT)) {
+        if (direction[0] != 1) {  // Not going right
+            direction = (-1, 0)
+        }
+    }
+    // Right
+    if (input.pressed(input.Key.D) || input.pressed(input.Key.RIGHT)) {
+        if (direction[0] != -1) {  // Not going left
+            direction = (1, 0)
+        }
+    }
+    
+    // Pause
+    if (input.pressed(input.Key.P)) {
+        paused = !paused
+        print(if (paused) { "PAUSED" } else { "RESUMED" })
+    }
+    
+    // Restart on R if game over
+    if (gameOver && input.pressed(input.Key.R)) {
+        initGame()
+    }
+}
+
+// Render game
+def render() {
+    // Clear/background handled by App
+    
+    // Draw food
+    let foodEntity = Entity(
+        model = "cube",
+        position = (food[0] * CELL_SIZE, 0.5, food[1] * CELL_SIZE),
+        color = COLOR_FOOD,
+        scale = 0.8
+    )
+    
+    // Draw snake
+    for i in range(len(snake)) {
+        let segment = snake[i]
+        let color = if (i == 0) { COLOR_SNAKE_HEAD } else { COLOR_SNAKE_BODY }
+        
+        let segmentEntity = Entity(
+            model = "cube",
+            position = (segment[0] * CELL_SIZE, 0.5, segment[1] * CELL_SIZE),
+            color = color,
+            scale = 0.9
+        )
+    }
+    
+    // Draw grid border (optional)
+    for x in range(GRID_SIZE + 1) {
+        // Vertical lines
+        // Would need line drawing primitive
+    }
+}
+
+// Main game
+def main() {
+    App.configure(
+        title = "Snake Game",
+        width = 800,
+        height = 600,
+        backgroundColor = COLOR_BG
+    )
+    
+    // Camera setup - top down view
+    let camera = Camera(
+        position = (GRID_SIZE / 2, GRID_SIZE + 5, GRID_SIZE / 2),
+        lookAt = (GRID_SIZE / 2, 0, GRID_SIZE / 2)
+    )
+    
+    // Lighting
+    let light = Light(
+        type = DIRECTIONAL,
+        position = (GRID_SIZE, GRID_SIZE + 10, GRID_SIZE),
+        color = (255, 255, 200)
+    )
+    
+    App.ambientLight = 0.4
+    
+    initGame()
+    
+    App.onUpdate(update)
+    App.run()
+}
+
+main()

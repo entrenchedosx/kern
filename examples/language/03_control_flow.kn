@@ -1,0 +1,119 @@
+// 03_control_flow.kn - If/else, loops, and control structures
+
+print("=== If/Else Statements ===")
+
+let score = 85
+
+if (score >= 90) {
+    print("Grade: A")
+} else if (score >= 80) {
+    print("Grade: B")
+} else if (score >= 70) {
+    print("Grade: C")
+} else if (score >= 60) {
+    print("Grade: D")
+} else {
+    print("Grade: F")
+}
+
+// Ternary-like conditional
+let age = 20
+let status = if (age >= 18) { "adult" } else { "minor" }
+print("Status: " + status)
+
+print("")
+print("=== While Loops ===")
+
+// Basic while loop
+let counter = 0
+while (counter < 5) {
+    print("Counter: " + counter)
+    counter = counter + 1
+}
+
+// While with break condition
+let num = 1
+while (true) {
+    print("Num: " + num)
+    if (num >= 5) {
+        break
+    }
+    num = num * 2
+}
+
+// While with continue
+let i = 0
+while (i < 10) {
+    i = i + 1
+    if (i % 2 == 0) {
+        continue  // Skip even numbers
+    }
+    print("Odd number: " + i)
+}
+
+print("")
+print("=== For Loops (Range-based) ===")
+
+// For with range
+for j in range(5) {
+    print("For loop j: " + j)
+}
+
+// For with start and end
+for k in range(3, 8) {
+    print("Range 3-8, k: " + k)
+}
+
+// For with step
+for n in range(0, 10, 2) {
+    print("Even number: " + n)
+}
+
+print("")
+print("=== For Each (Collections) ===")
+
+let fruits = ["apple", "banana", "cherry"]
+for fruit in fruits {
+    print("Fruit: " + fruit)
+}
+
+let scores = {"Alice": 95, "Bob": 87, "Carol": 92}
+for name in scores {
+    print(name + " scored " + scores[name])
+}
+
+print("")
+print("=== Nested Loops ===")
+
+// Multiplication table
+for row in range(1, 6) {
+    let line = ""
+    for col in range(1, 6) {
+        line = line + (row * col) + "\t"
+    }
+    print(line)
+}
+
+print("")
+print("=== Loop Control ===")
+
+// Break out of nested loop
+outer_loop:
+for x in range(10) {
+    for y in range(10) {
+        if (x * y > 50) {
+            print("Breaking at x=" + x + ", y=" + y)
+            break outer_loop
+        }
+    }
+}
+
+print("")
+print("=== Pattern Matching / Switch (if available) ===")
+// switch (day) {
+//     case "Monday": print("Start of week")
+//     case "Friday": print("End of week")
+//     default: print("Midweek")
+// }
+
+print("Done!")

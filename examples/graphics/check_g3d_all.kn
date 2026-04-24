@@ -1,0 +1,29 @@
+// Check all g3d methods we need
+let g3 = import("g3d")
+
+if (g3 == null) {
+    print("g3d not available")
+} else {
+    print("=== G3D METHODS CHECK ===")
+    
+    // Window/Camera
+    print("createWindow: " + (g3["createWindow"] != null))
+    print("setCameraPosition: " + (g3["setCameraPosition"] != null))
+    print("setCameraTarget: " + (g3["setCameraTarget"] != null))
+    
+    // Objects
+    print("createObject: " + (g3["createObject"] != null))
+    print("setPosition: " + (g3["setPosition"] != null))
+    print("setObjectColor: " + (g3["setObjectColor"] != null))
+    print("setMaterial: " + (g3["setMaterial"] != null))
+    
+    // Lighting
+    print("setAmbientLight: " + (g3["setAmbientLight"] != null))
+    print("addPointLight: " + (g3["addPointLight"] != null))
+    
+    // Render loop
+    print("run: " + (g3["run"] != null))
+    print("clear: " + (g3["clear"] != null))
+    
+    print("=== DONE ===")
+}

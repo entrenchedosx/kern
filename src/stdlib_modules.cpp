@@ -2,6 +2,9 @@
 #include "stdlib_stdv1_exports.hpp"
 #include "vm/builtins.hpp"
 #include "bytecode/value.hpp"
+#ifdef KERN_BUILD_GAME
+#include "../modules/3dengine/3dengine.h"
+#endif
 #include <unordered_map>
 #include <vector>
 #include <string>
@@ -44,6 +47,13 @@ ValuePtr createStdlibModule(VM& vm, const std::string& nameIn) {
         }
     };
 
+#ifdef KERN_BUILD_GAME
+    // 3dengine module - high-level ECS 3D engine (wraps g3d backend)
+    if (name == "3dengine") {
+        return create3dengineModule(vm);
+    }
+#endif
+    
     if (name == "std") {
         std::unordered_map<std::string, ValuePtr> out;
         out["v1"] = createStdlibModule(vm, "std.v1");
@@ -330,7 +340,11 @@ bool isStdlibModuleName(const std::string& name) {
         || name == "itools" || name == "cli" || name == "encoding" || name == "run"
         || name == "interop" || name == "concurrency" || name == "observability" || name == "security"
         || name == "automation" || name == "binary" || name == "websec" || name == "netops"
-        || name == "datatools" || name == "runtime_controls";
+        || name == "datatools" || name == "runtime_controls"
+#ifdef KERN_BUILD_GAME
+        || name == "3dengine"
+#endif
+        ;
 }
 
 } // namespace kern

@@ -1,0 +1,34 @@
+// clean_ursina_test.kn - Clean Ursina-style API test
+
+use g3d
+
+// Create a red cube
+let cube = Entity(
+    model = "cube",
+    position = (0, 0, 0),
+    color = "red",
+    scale = 2.0
+)
+
+// Create a blue sphere
+let sphere = Entity(
+    model = "sphere",
+    position = (3, 0, 0),
+    color = "blue",
+    scale = 1.5
+)
+
+// Create a green cube
+let greenCube = Entity(
+    model = "cube",
+    position = (-3, 0, 0),
+    color = "green",
+    scale = 1.5
+)
+
+print("Created 3 entities")
+
+// Run the app (handles window, render loop, everything)
+App.run()
+
+print("Test complete!")

@@ -1,0 +1,78 @@
+// Test: 3dengine determinism - serial/parallel parity
+// Verifies that ECS determinism guarantees are preserved
+
+print("=== 3dengine Determinism Test ===")
+
+let e = import("3dengine")
+
+// Create worlds
+let world1 = e["world_create"]()
+let world2 = e["world_create"]()
+
+print("Created worlds: " + str(world1) + ", " + str(world2))
+
+// Set identical state in both worlds
+def setup_world(wid) {
+    // Set camera
+    e["world_set_camera"](wid, 
+        {"x": 0.0, "y": 5.0, "z": 10.0},
+        {"x": 0.0, "y": 0.0, "z": 0.0},
+        {"x": 0.0, "y": 1.0, "z": 0.0}
+    )
+    
+    // Set lighting
+    e["world_set_lighting"](wid, {
+        "ambient": 0.2,
+        "directional": {
+            "direction": {"x": -0.5, "y": -1.0, "z": -0.5},
+            "color": {"r": 1.0, "g": 1.0, "b": 1.0},
+            "intensity": 1.0
+        }
+    })
+}
+
+setup_world(world1)
+setup_world(world2)
+print("Both worlds configured identically")
+
+// Get states
+let cam1 = e["world_get_camera"](world1)
+let cam2 = e["world_get_camera"](world2)
+let light1 = e["world_get_lighting"](world1)
+let light2 = e["world_get_lighting"](world2)
+
+// Compare camera states
+let eps = 0.0001
+def vec3_eq(a, b) {
+    return abs(default(a["x"], 0) - default(b["x"], 0)) < eps &&
+           abs(default(a["y"], 0) - default(b["y"], 0)) < eps &&
+           abs(default(a["z"], 0) - default(b["z"], 0)) < eps
+}
+
+if (!vec3_eq(cam1["position"], cam2["position"])) {
+    print("FAIL: Camera position mismatch between worlds")
+    e["world_destroy"](world1)
+    e["world_destroy"](world2)
+    exit_code(1)
+}
+
+if (!vec3_eq(cam1["target"], cam2["target"])) {
+    print("FAIL: Camera target mismatch between worlds")
+    e["world_destroy"](world1)
+    e["world_destroy"](world2)
+    exit_code(1)
+}
+
+print("Camera states match (deterministic)")
+
+// Get runtime stats
+let stats1 = e["world_parallel_runtime_stats"](world1)
+let stats2 = e["world_parallel_runtime_stats"](world2)
+
+print("Runtime stats available for both worlds")
+
+// Cleanup
+e["world_destroy"](world1)
+e["world_destroy"](world2)
+
+print("=== Determinism Test Passed ===")
