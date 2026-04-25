@@ -1279,10 +1279,10 @@ std::vector<CallArg> Parser::argumentList() {
             advance();
             ExprPtr e = expression();
             args.push_back(CallArg{"", std::move(e), true});
-        } else if (check(TokenType::IDENTIFIER) && current_ + 1 < tokens_.size() && tokens_[current_ + 1].type == TokenType::ASSIGN) {
+        } else if (check(TokenType::IDENTIFIER) && current_ + 1 < tokens_.size() && (tokens_[current_ + 1].type == TokenType::ASSIGN || tokens_[current_ + 1].type == TokenType::COLON)) {
             advance();
             std::string name = std::holds_alternative<std::string>(previous().value) ? std::get<std::string>(previous().value) : "";
-            advance();  // consume ASSIGN
+            advance();  // consume ASSIGN or COLON
             ExprPtr e = expression();
             args.push_back(CallArg{std::move(name), std::move(e), false});
         } else {

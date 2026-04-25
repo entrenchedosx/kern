@@ -18,6 +18,7 @@ bool Value::isTruthy() const {
         case Type::ARRAY: return !std::get<std::vector<ValuePtr>>(data).empty();
         case Type::MAP: return !std::get<std::unordered_map<std::string, ValuePtr>>(data).empty();
         case Type::GENERATOR: return true;
+        case Type::VEC3: return true;
         default: return true;
     }
 }
@@ -52,6 +53,12 @@ std::string Value::toString() const {
         case Type::INSTANCE: return "<instance>";
         case Type::GENERATOR: return "<generator>";
         case Type::PTR: return "<ptr>";
+        case Type::VEC3: {
+            auto& v = std::get<Vec3Ptr>(data);
+            std::ostringstream oss;
+            oss << "Vec3(" << v->x << ", " << v->y << ", " << v->z << ")";
+            return oss.str();
+        }
         default: return "?";
     }
 }
@@ -71,6 +78,11 @@ bool Value::equals(const Value& other) const {
         case Type::INT: return std::get<int64_t>(data) == std::get<int64_t>(other.data);
         case Type::FLOAT: return std::get<double>(data) == std::get<double>(other.data);
         case Type::STRING: return std::get<std::string>(data) == std::get<std::string>(other.data);
+        case Type::VEC3: {
+            auto& v1 = std::get<Vec3Ptr>(data);
+            auto& v2 = std::get<Vec3Ptr>(other.data);
+            return v1->x == v2->x && v1->y == v2->y && v1->z == v2->z;
+        }
         default: return false;
     }
 }

@@ -19,15 +19,23 @@ struct FunctionObject;
 struct ClassObject;
 struct InstanceObject;
 struct GeneratorObject;
+struct Vec3Object;
 
 using ValuePtr = std::shared_ptr<Value>;
 using FunctionPtr = std::shared_ptr<FunctionObject>;
 using ClassPtr = std::shared_ptr<ClassObject>;
 using InstancePtr = std::shared_ptr<InstanceObject>;
 using GeneratorPtr = std::shared_ptr<GeneratorObject>;
+using Vec3Ptr = std::shared_ptr<Vec3Object>;
+
+struct Vec3Object {
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+};
 
 struct Value {
-    enum class Type { NIL, BOOL, INT, FLOAT, STRING, ARRAY, MAP, FUNCTION, CLASS, INSTANCE, GENERATOR, PTR };
+    enum class Type { NIL, BOOL, INT, FLOAT, STRING, ARRAY, MAP, FUNCTION, CLASS, INSTANCE, GENERATOR, PTR, VEC3 };
     Type type = Type::NIL;
     std::variant<
         std::monostate,
@@ -41,7 +49,8 @@ struct Value {
         ClassPtr,
         InstancePtr,
         GeneratorPtr,
-        void*
+        void*,
+        Vec3Ptr
     > data;
 
     Value() : type(Type::NIL), data(std::monostate{}) {}
@@ -73,6 +82,12 @@ struct Value {
     static Value fromInstance(InstancePtr i) { Value v; v.type = Type::INSTANCE; v.data = std::move(i); return v; }
     static Value fromGenerator(GeneratorPtr g) { Value v; v.type = Type::GENERATOR; v.data = std::move(g); return v; }
     static Value fromPtr(void* p) { Value v; v.type = Type::PTR; v.data = p; return v; }
+    static Value fromVec3(double x, double y, double z) { 
+        Value v; 
+        v.type = Type::VEC3; 
+        v.data = std::make_shared<Vec3Object>(Vec3Object{x, y, z}); 
+        return v; 
+    }
 
     bool isTruthy() const;
     std::string toString() const;

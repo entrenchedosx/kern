@@ -938,6 +938,44 @@ void VM::runInstruction(const Instruction& inst) {
             push(stored);
             break;
         }
+        case Opcode::BUILD_VEC3: {
+            ValuePtr z = popStack(), y = popStack(), x = popStack();
+            requireNumeric(x, "BUILD_VEC3 x");
+            requireNumeric(y, "BUILD_VEC3 y");
+            requireNumeric(z, "BUILD_VEC3 z");
+            push(std::make_shared<Value>(Value::fromVec3(toDouble(x), toDouble(y), toDouble(z))));
+            break;
+        }
+        case Opcode::VEC3_GET_X: {
+            ValuePtr v = popStack();
+            if (v && v->type == Value::Type::VEC3) {
+                auto vec = std::get<Vec3Ptr>(v->data);
+                push(std::make_shared<Value>(Value::fromFloat(vec->x)));
+            } else {
+                push(std::make_shared<Value>(Value::nil()));
+            }
+            break;
+        }
+        case Opcode::VEC3_GET_Y: {
+            ValuePtr v = popStack();
+            if (v && v->type == Value::Type::VEC3) {
+                auto vec = std::get<Vec3Ptr>(v->data);
+                push(std::make_shared<Value>(Value::fromFloat(vec->y)));
+            } else {
+                push(std::make_shared<Value>(Value::nil()));
+            }
+            break;
+        }
+        case Opcode::VEC3_GET_Z: {
+            ValuePtr v = popStack();
+            if (v && v->type == Value::Type::VEC3) {
+                auto vec = std::get<Vec3Ptr>(v->data);
+                push(std::make_shared<Value>(Value::fromFloat(vec->z)));
+            } else {
+                push(std::make_shared<Value>(Value::nil()));
+            }
+            break;
+        }
         case Opcode::GET_INDEX: {
             ValuePtr index = popStack(), obj = popStack();
             if (obj && obj->type == Value::Type::ARRAY) {

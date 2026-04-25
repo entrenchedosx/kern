@@ -231,6 +231,16 @@ static bool stackMinAndDelta(const Instruction& inst, size_t codeSize, size_t st
         case Opcode::INVOKE_METHOD:
         case Opcode::LOAD_THIS:
             return false;
+        case Opcode::BUILD_VEC3:
+            *minDepth = 3;
+            *delta = -2;  // pop 3, push 1
+            return true;
+        case Opcode::VEC3_GET_X:
+        case Opcode::VEC3_GET_Y:
+        case Opcode::VEC3_GET_Z:
+            *minDepth = 1;
+            *delta = 0;  // pop 1 Vec3, push 1 float
+            return true;
         default:
             return false;
     }

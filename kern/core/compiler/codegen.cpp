@@ -657,27 +657,53 @@ void CodeGenerator::emitExpr(const Expr* e) {
             currentColumn_ = x->column;
             emit(Opcode::CALL, static_cast<size_t>(x->args.size()));
         } else {
-            emitExpr(x->callee.get());
-            if (!ordered.empty()) {
-                for (const Expr* arg : ordered) {
-                    if (arg) emitExpr(arg);
-                    else emit(Opcode::CONST_NULL);
+            // Check for Vec3 constructor: Vec3(x, y, z)
+            const Identifier* vec3Id = dynamic_cast<const Identifier*>(x->callee.get());
+            if (vec3Id && vec3Id->name == "Vec3" && x->args.size() == 3) {
+                // Emit args in order (x, y, z)
+                if (!ordered.empty()) {
+                    for (const Expr* arg : ordered) {
+                        if (arg) emitExpr(arg);
+                        else emit(Opcode::CONST_NULL);
+                    }
+                } else {
+                    for (const auto& a : x->args) emitExpr(a.expr.get());
                 }
                 currentLine_ = x->line;
                 currentColumn_ = x->column;
-                emit(Opcode::CALL, static_cast<size_t>(ordered.size()));
+                emit(Opcode::BUILD_VEC3);
             } else {
-                for (const auto& a : x->args) emitExpr(a.expr.get());
-                currentLine_ = x->line;
-                currentColumn_ = x->column;
-                emit(Opcode::CALL, static_cast<size_t>(x->args.size()));
+                emitExpr(x->callee.get());
+                if (!ordered.empty()) {
+                    for (const Expr* arg : ordered) {
+                        if (arg) emitExpr(arg);
+                        else emit(Opcode::CONST_NULL);
+                    }
+                    currentLine_ = x->line;
+                    currentColumn_ = x->column;
+                    emit(Opcode::CALL, static_cast<size_t>(ordered.size()));
+                } else {
+                    for (const auto& a : x->args) emitExpr(a.expr.get());
+                    currentLine_ = x->line;
+                    currentColumn_ = x->column;
+                    emit(Opcode::CALL, static_cast<size_t>(x->args.size()));
+                }
             }
         }
         return;
     }
     if (auto* x = dynamic_cast<const MemberExpr*>(e)) {
         emitExpr(x->object.get());
-        emit(Opcode::GET_FIELD, addConstant(x->member));
+        // Check for Vec3 field access: .x, .y, .z
+        if (x->member == "x") {
+            emit(Opcode::VEC3_GET_X);
+        } else if (x->member == "y") {
+            emit(Opcode::VEC3_GET_Y);
+        } else if (x->member == "z") {
+            emit(Opcode::VEC3_GET_Z);
+        } else {
+            emit(Opcode::GET_FIELD, addConstant(x->member));
+        }
         return;
     }
     if (auto* x = dynamic_cast<const IndexExpr*>(e)) {
@@ -1600,6 +1626,7 @@ void CodeGenerator::emitStmt(const Stmt* s) {
         return;
     }
     if (auto* x = dynamic_cast<const StructDeclStmt*>(s)) {
+        // Register struct metadata
         emit(Opcode::LOAD_GLOBAL, addConstant("struct_define"));
         emit(Opcode::CONST_STR, addConstant(x->name));
         for (const auto& f : x->fields) {
@@ -1612,21 +1639,43 @@ void CodeGenerator::emitStmt(const Stmt* s) {
         emit(Opcode::CALL, static_cast<size_t>(2));
         emit(Opcode::POP);
 
+        // Create constructor function: builds map with field values
+        size_t skipBody = emit(Opcode::JMP, size_t(0));
+        size_t entry = code_.size();
+        // Build the instance object
         emit(Opcode::NEW_OBJECT);
+        // Set __kind = "struct"
         emit(Opcode::DUP);
         emit(Opcode::CONST_STR, addConstant("struct"));
         emit(Opcode::SET_FIELD, addConstant("__kind"));
         emit(Opcode::POP);
+        // Set __name = struct name
         emit(Opcode::DUP);
         emit(Opcode::CONST_STR, addConstant(x->name));
         emit(Opcode::SET_FIELD, addConstant("__name"));
         emit(Opcode::POP);
+        // Set each field from parameter (locals 0, 1, 2, ...)
+        int64_t slot = 0;
         for (const auto& f : x->fields) {
             emit(Opcode::DUP);
-            emit(Opcode::CONST_STR, addConstant(f.typeName));
+            emit(Opcode::LOAD, slot++);
             emit(Opcode::SET_FIELD, addConstant(f.name));
             emit(Opcode::POP);
         }
+        emit(Opcode::RETURN);
+        patchJump(skipBody, code_.size());
+        // Build the function object using opcodes
+        emit(Opcode::BUILD_FUNC, entry);
+        emit(Opcode::SET_FUNC_ARITY, static_cast<size_t>(x->fields.size()));
+        emit(Opcode::SET_FUNC_NAME, addConstant(x->name));
+        std::vector<std::string> pnames;
+        for (const auto& f : x->fields) pnames.push_back(f.name);
+        if (!pnames.empty()) {
+            std::string joined;
+            for (size_t i = 0; i < pnames.size(); ++i) joined += (i ? "," : "") + pnames[i];
+            emit(Opcode::SET_FUNC_PARAM_NAMES, addConstant(joined));
+        }
+        functionParams_[x->name] = std::move(pnames);
         emit(Opcode::STORE_GLOBAL, addConstant(x->name));
         return;
     }

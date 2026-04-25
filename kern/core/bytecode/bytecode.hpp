@@ -18,8 +18,7 @@
 
 namespace kern {
 
-/** Bump when serialized bytecode or opcode semantics change incompatibly. Reported by `kern --version`. */
-inline constexpr int kBytecodeSchemaVersion = 2;  // KERN v2.0.2
+/* * kBytecodeSchemaVersion is defined in bytecode_header.hpp (included above) */
 
 enum class Opcode : uint8_t {
     // constants
@@ -92,6 +91,12 @@ enum class Opcode : uint8_t {
     NEW_INSTANCE,
     INVOKE_METHOD,
     LOAD_THIS,
+
+    // Vec3 (minimal implementation)
+    BUILD_VEC3,      // pop z, y, x (floats), push Vec3
+    VEC3_GET_X,      // pop Vec3, push x (float)
+    VEC3_GET_Y,      // pop Vec3, push y (float)
+    VEC3_GET_Z,      // pop Vec3, push z (float)
 
     // memory / DMA
     ALLOC,
@@ -177,6 +182,10 @@ inline const char* opcodeName(Opcode op) {
         case Opcode::NEW_INSTANCE: return "NEW_INSTANCE";
         case Opcode::INVOKE_METHOD: return "INVOKE_METHOD";
         case Opcode::LOAD_THIS: return "LOAD_THIS";
+        case Opcode::BUILD_VEC3: return "BUILD_VEC3";
+        case Opcode::VEC3_GET_X: return "VEC3_GET_X";
+        case Opcode::VEC3_GET_Y: return "VEC3_GET_Y";
+        case Opcode::VEC3_GET_Z: return "VEC3_GET_Z";
         case Opcode::ALLOC: return "ALLOC";
         case Opcode::FREE: return "FREE";
         case Opcode::MEM_COPY: return "MEM_COPY";

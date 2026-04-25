@@ -17,8 +17,8 @@ namespace kern {
 /* * Current bytecode format version. Increment on breaking changes. */
 inline constexpr uint16_t kBytecodeSchemaVersion = 2;  // Major version
 inline constexpr uint8_t kBytecodeMinorVersion = 0;
-inline constexpr uint8_t kBytecodePatchVersion = 2;
-// Full version: 2.0.2
+inline constexpr uint8_t kBytecodePatchVersion = 3;
+// Full version: 2.0.3
 
 /* * Magic number "KERN" (big-endian: 0x4B45524E) */
 inline constexpr uint32_t kBytecodeMagic = 0x4B45524E;
@@ -33,18 +33,18 @@ struct BytecodeHeader {
     /* * Default constructor initializes to valid defaults */
     BytecodeHeader() 
         : magic(kBytecodeMagic)
-        , version(kBytecodeFormatVersion)
+        , version(kBytecodeSchemaVersion)
         , flags(0)
         , reserved(0) {}
     
     /* * Validate header before use */
     bool isValid() const {
-        return magic == kBytecodeMagic && version <= kBytecodeFormatVersion;
+        return magic == kBytecodeMagic && version <= kBytecodeSchemaVersion;
     }
     
     /* * Check if version is compatible with current runtime */
     bool isCompatible() const {
-        return magic == kBytecodeMagic && version == kBytecodeFormatVersion;
+        return magic == kBytecodeMagic && version == kBytecodeSchemaVersion;
     }
 };
 
