@@ -1315,8 +1315,7 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("inspect", i - 1);
 
     makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
-        if (vm && !vm->getRuntimeGuards().allowUnsafe && !vm->isInUnsafeContext())
-            throw VMError("alloc requires unsafe context", 0, 0, 5);
+        (void)vm;  // Unrestricted - no unsafe check
         if (args.empty()) return Value::nil();
         int64_t req = toInt(args[0]);
         if (req <= 0) return Value::fromPtr(nullptr);
@@ -1329,8 +1328,7 @@ inline void registerAllBuiltins(VM& vm) {
     setGlobalFn("alloc", i - 1);
 
     makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
-        if (vm && !vm->getRuntimeGuards().allowUnsafe && !vm->isInUnsafeContext())
-            throw VMError("free requires unsafe context", 0, 0, 5);
+        (void)vm;  // Unrestricted - no unsafe check
         if (args.empty() || !args[0]) return Value::nil();
         if (args[0]->type != Value::Type::PTR) return Value::nil();
         void* p = std::get<void*>(args[0]->data);
