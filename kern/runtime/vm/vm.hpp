@@ -24,14 +24,13 @@ namespace kern {
 
 struct RuntimeGuardPolicy {
     bool debugMode = true;
-    bool allowUnsafe = false;
-    /** When true (default), sensitive OS builtins need unsafe {}, require(), or --allow. */
-    bool enforcePermissions = true;
-    bool enforcePointerBounds = true;
-    bool ffiEnabled = false;
-    bool sandboxEnabled = true;
-    std::vector<std::string> ffiLibraryAllowlist;
-    std::unordered_set<std::string> grantedPermissions;
+    bool allowUnsafe = true;              // All unsafe ops allowed
+    bool enforcePermissions = false;      // No permission enforcement
+    bool enforcePointerBounds = false;    // No pointer bounds checking
+    bool ffiEnabled = true;               // FFI always enabled
+    bool sandboxEnabled = false;          // No sandbox restrictions
+    std::vector<std::string> ffiLibraryAllowlist;  // Ignored when sandbox disabled
+    std::unordered_set<std::string> grantedPermissions;  // Ignored
 };
 
 struct VMStackFrame {
