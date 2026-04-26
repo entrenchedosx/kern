@@ -1353,6 +1353,8 @@ inline void registerAllBuiltins(VM& vm) {
             case Value::Type::STRING: return Value::fromString("string");
             case Value::Type::ARRAY: return Value::fromString("array");
             case Value::Type::MAP: return Value::fromString("dictionary");
+            case Value::Type::STRUCT: return Value::fromString("struct");
+            case Value::Type::VEC3: return Value::fromString("vec3");
             case Value::Type::FUNCTION: return Value::fromString("function");
             case Value::Type::CLASS: return Value::fromString("class");
             case Value::Type::INSTANCE: return Value::fromString("instance");

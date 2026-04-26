@@ -20,8 +20,10 @@ struct ClassObject;
 struct InstanceObject;
 struct GeneratorObject;
 struct Vec3Object;
+struct StructObject;
 
 using ValuePtr = std::shared_ptr<Value>;
+using StructPtr = std::shared_ptr<StructObject>;
 using FunctionPtr = std::shared_ptr<FunctionObject>;
 using ClassPtr = std::shared_ptr<ClassObject>;
 using InstancePtr = std::shared_ptr<InstanceObject>;
@@ -34,8 +36,13 @@ struct Vec3Object {
     double z = 0.0;
 };
 
+struct StructObject {
+    std::string name;
+    std::unordered_map<std::string, ValuePtr> fields;
+};
+
 struct Value {
-    enum class Type { NIL, BOOL, INT, FLOAT, STRING, ARRAY, MAP, FUNCTION, CLASS, INSTANCE, GENERATOR, PTR, VEC3 };
+    enum class Type { NIL, BOOL, INT, FLOAT, STRING, ARRAY, MAP, FUNCTION, CLASS, INSTANCE, GENERATOR, PTR, VEC3, STRUCT };
     Type type = Type::NIL;
     std::variant<
         std::monostate,
@@ -50,7 +57,8 @@ struct Value {
         InstancePtr,
         GeneratorPtr,
         void*,
-        Vec3Ptr
+        Vec3Ptr,
+        StructPtr
     > data;
 
     Value() : type(Type::NIL), data(std::monostate{}) {}
