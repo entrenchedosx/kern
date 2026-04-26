@@ -25,12 +25,6 @@
     <ClCompile Include="D:\simple_programming_language\kern\modules\g3d\g3d.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="D:\simple_programming_language\kern\modules\3dengine\3dengine.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="D:\simple_programming_language\kern\modules\3dengine\ursina_api.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="D:\simple_programming_language\CMakeLists.txt" />

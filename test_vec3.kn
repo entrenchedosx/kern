@@ -1,0 +1,11 @@
+// Test Vec3 functionality
+let v = Vec3(1, 2, 3)
+print("Vec3 created: " + v)
+print("x: " + v.x)
+print("y: " + v.y)  
+print("z: " + v.z)
+
+// Test with floats
+let pos = Vec3(1.5, 2.5, 3.5)
+print("Float Vec3: " + pos)
+print("pos.x: " + pos.x)

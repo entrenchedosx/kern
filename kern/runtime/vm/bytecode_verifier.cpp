@@ -150,10 +150,11 @@ static bool stackMinAndDelta(const Instruction& inst, size_t codeSize, size_t st
         case Opcode::SET_FUNC_PARAM_NAMES:
         case Opcode::SET_FUNC_NAME:
         case Opcode::SET_FUNC_GENERATOR:
+        case Opcode::SET_FUNC_STRUCT:
             *delta = 0;
             if (inst.op == Opcode::BUILD_FUNC) *delta = 1;
             if (inst.op == Opcode::SET_FUNC_ARITY || inst.op == Opcode::SET_FUNC_PARAM_NAMES || inst.op == Opcode::SET_FUNC_NAME ||
-                inst.op == Opcode::SET_FUNC_GENERATOR) {
+                inst.op == Opcode::SET_FUNC_GENERATOR || inst.op == Opcode::SET_FUNC_STRUCT) {
                 *minDepth = 1;
             }
             return true;

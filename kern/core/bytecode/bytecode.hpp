@@ -75,6 +75,7 @@ enum class Opcode : uint8_t {
     SET_FUNC_PARAM_NAMES,  // operand = string constant index "a,b,c"; pop function, set paramNames, push
     SET_FUNC_NAME,   // operand = string constant index; pop function, set name, push
     SET_FUNC_GENERATOR,  // pop function, mark isGenerator, push
+    SET_FUNC_STRUCT,     // pop function, mark isStructConstructor, push
 
     YIELD,  // pop value, suspend generator (only valid inside generator execution)
 
@@ -169,6 +170,7 @@ inline const char* opcodeName(Opcode op) {
         case Opcode::SET_FUNC_PARAM_NAMES: return "SET_FUNC_PARAM_NAMES";
         case Opcode::SET_FUNC_NAME: return "SET_FUNC_NAME";
         case Opcode::SET_FUNC_GENERATOR: return "SET_FUNC_GENERATOR";
+        case Opcode::SET_FUNC_STRUCT: return "SET_FUNC_STRUCT";
         case Opcode::YIELD: return "YIELD";
         case Opcode::NEW_OBJECT: return "NEW_OBJECT";
         case Opcode::BUILD_ARRAY: return "BUILD_ARRAY";

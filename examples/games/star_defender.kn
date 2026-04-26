@@ -1,0 +1,306 @@
+// star_defender.kn - Simple 3D Space Shooter
+// A working game for Kern v2.0.2
+
+use g3d
+import "random" as rnd
+
+// Game settings as simple globals
+let PLAYER_SPEED = 10
+let BULLET_SPEED = 30
+let ENEMY_SPEED = 5
+let SPAWN_RATE = 60
+let WORLD_BOUNDS = 15
+
+// Game state
+let score = 0
+let lives = 3
+let gameTime = 0
+let lastSpawn = 0
+let lastFire = 0
+let isPlaying = false
+
+// Entity lists
+let bullets = []
+let enemies = []
+let stars = []
+
+// Player
+let player = null
+let playerX = 0
+let playerY = 0
+let playerZ = -10
+
+// ============================================================================
+// SETUP
+// ============================================================================
+
+def initGame() {
+    // Create starfield
+    for i in range(100) {
+        let star = Entity(
+            model: "sphere",
+            position: (rnd.random_int(-30, 30), rnd.random_int(-20, 20), rnd.random_int(0, 50)),
+            color: (200, 200, 255),
+            scale: 1
+        )
+        stars.append(star)
+    }
+    
+    // Create player
+    player = Entity(
+        model: "cone",
+        position: (playerX, playerY, playerZ),
+        color: (0, 150, 255),
+        scale: 2
+    )
+    
+    isPlaying = true
+    print("STAR DEFENDER - Press SPACE to shoot!")
+}
+
+// ============================================================================
+// GAME LOGIC
+// ============================================================================
+
+def spawnEnemy() {
+    let x = randomRange(-WORLD_BOUNDS, WORLD_BOUNDS)
+    let enemy = Entity(
+        model: "cube",
+        position: (x, 0, 30),
+        color: (255, 80, 80),
+        scale: 2
+    )
+    enemies.append({entity: enemy, health: 10, active: true})
+}
+
+def fireBullet() {
+    let now = gameTime
+    if (now - lastFire < 10) {
+        return
+    }
+    lastFire = now
+    
+    let bullet = Entity(
+        model: "sphere",
+        position: (playerX, playerY, playerZ + 2),
+        color: (100, 255, 100),
+        scale: 1
+    )
+    bullets.append({entity: bullet, active: true})
+}
+
+def updatePlayer() {
+    let moveX = 0
+    let moveZ = 0
+    
+    if (input.held(input.Key.A) || input.held(input.Key.LEFT)) {
+        moveX = -1
+    }
+    if (input.held(input.Key.D) || input.held(input.Key.RIGHT)) {
+        moveX = 1
+    }
+    if (input.held(input.Key.W) || input.held(input.Key.UP)) {
+        moveZ = 1
+    }
+    if (input.held(input.Key.S) || input.held(input.Key.DOWN)) {
+        moveZ = -1
+    }
+    
+    // Apply movement
+    playerX = playerX + moveX * PLAYER_SPEED / 60
+    playerZ = playerZ + moveZ * PLAYER_SPEED / 60
+    
+    // Clamp to world bounds
+    if (playerX > WORLD_BOUNDS) { playerX = WORLD_BOUNDS }
+    if (playerX < -WORLD_BOUNDS) { playerX = -WORLD_BOUNDS }
+    if (playerZ > 5) { playerZ = 5 }
+    if (playerZ < -20) { playerZ = -20 }
+    
+    player.position = (playerX, playerY, playerZ)
+}
+
+def updateBullets() {
+    let i = 0
+    while (i < len(bullets)) {
+        let b = bullets[i]
+        if (!b.active) {
+            i = i + 1
+            continue
+        }
+        
+        let pos = b.entity.position
+        pos.z = pos.z + BULLET_SPEED / 60
+        b.entity.position = pos
+        
+        // Remove if out of bounds
+        if (pos.z > 40) {
+            b.entity.hide()
+            b.active = false
+        }
+        
+        i = i + 1
+    }
+}
+
+def updateEnemies() {
+    let i = 0
+    while (i < len(enemies)) {
+        let e = enemies[i]
+        if (!e.active) {
+            i = i + 1
+            continue
+        }
+        
+        let pos = e.entity.position
+        pos.z = pos.z - ENEMY_SPEED / 60
+        e.entity.position = pos
+        
+        // Remove if passed player
+        if (pos.z < -30) {
+            e.entity.hide()
+            e.active = false
+            lives = lives - 1
+            print("Life lost! Lives: " + lives)
+        }
+        
+        i = i + 1
+    }
+}
+
+def checkCollisions() {
+    // Bullet vs Enemy
+    let bi = 0
+    while (bi < len(bullets)) {
+        let b = bullets[bi]
+        if (!b.active) {
+            bi = bi + 1
+            continue
+        }
+        
+        let bz = b.entity.position.z
+        let bx = b.entity.position.x
+        let ei = 0
+        let hit = false
+        
+        while (ei < len(enemies)) {
+            let e = enemies[ei]
+            if (!e.active) {
+                ei = ei + 1
+                continue
+            }
+            
+            let ez = e.entity.position.z
+            let ex = e.entity.position.x
+            let dx = bx - ex
+            let dz = bz - ez
+            let dist = abs(dx) + abs(dz)  // Simple manhattan distance
+            
+            if (dist < 3) {
+                // Hit!
+                e.health = e.health - 10
+                if (e.health <= 0) {
+                    e.entity.hide()
+                    e.active = false
+                    score = score + 100
+                    print("Enemy destroyed! Score: " + score)
+                }
+                b.entity.hide()
+                b.active = false
+                hit = true
+                break
+            }
+            
+            ei = ei + 1
+        }
+        
+        bi = bi + 1
+    }
+    
+    // Enemy vs Player
+    let ei = 0
+    while (ei < len(enemies)) {
+        let e = enemies[ei]
+        if (!e.active) {
+            ei = ei + 1
+            continue
+        }
+        
+        let ex = e.entity.position.x
+        let ez = e.entity.position.z
+        let dx = playerX - ex
+        let dz = playerZ - ez
+        let dist = abs(dx) + abs(dz)
+        
+        if (dist < 3) {
+            // Crash!
+            e.entity.hide()
+            e.active = false
+            lives = lives - 1
+            print("Crashed! Lives: " + lives)
+        }
+        
+        ei = ei + 1
+    }
+}
+
+def updateStars() {
+    for star in stars {
+        let pos = star.position
+        pos.z = pos.z - 1
+        if (pos.z < -30) {
+            pos.z = 50
+            pos.x = rnd.random_int(-30, 30)
+        }
+        star.position = pos
+    }
+}
+
+// ============================================================================
+// MAIN LOOP
+// ============================================================================
+
+def update() {
+    if (!isPlaying) {
+        return
+    }
+    
+    gameTime = gameTime + 1
+    
+    // Spawn enemies
+    if (gameTime - lastSpawn > SPAWN_RATE) {
+        lastSpawn = gameTime
+        spawnEnemy()
+    }
+    
+    // Fire
+    if (input.held(input.Key.SPACE)) {
+        fireBullet()
+    }
+    
+    // Updates
+    updatePlayer()
+    updateBullets()
+    updateEnemies()
+    checkCollisions()
+    updateStars()
+    
+    // Game over check
+    if (lives <= 0) {
+        print("GAME OVER! Final Score: " + score)
+        isPlaying = false
+    }
+}
+
+// ============================================================================
+// START
+// ============================================================================
+
+App.configure(
+    title: "Star Defender",
+    width: 1024,
+    height: 768,
+    fullscreen: false
+)
+
+initGame()
+App.run(update)

@@ -1,0 +1,12 @@
+// Test struct with named arguments
+struct Enemy {
+    health: int
+    speed: float
+    name: string
+}
+
+// Named arguments
+let e = Enemy(name: "Goblin", health: 50, speed: 3.5)
+print("Enemy: " + e.name)
+print("health: " + e.health)
+print("speed: " + e.speed)

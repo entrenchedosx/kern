@@ -1,0 +1,11 @@
+// Test struct functionality
+struct Enemy {
+    health: int
+    speed: float
+}
+
+// Try to create an instance
+let e = Enemy(100, 5.5)
+print("Enemy created")
+print("health: " + e.health)
+print("speed: " + e.speed)

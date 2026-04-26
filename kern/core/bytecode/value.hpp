@@ -113,6 +113,7 @@ struct FunctionObject {
     bool isBuiltin = false;
     size_t builtinIndex = 0;
     bool isGenerator = false;  // contains yield; call returns GeneratorObject instead of running
+    bool isStructConstructor = false;  // true for struct constructors (e.g., Vec2, Color)
 };
 
 /* * resumable generator instance (call to generator function).*/

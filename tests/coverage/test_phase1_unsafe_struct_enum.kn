@@ -10,7 +10,7 @@ enum Color {
 }
 
 assert_eq(type(Vec2), "struct")
-assert_eq(type(Color), "struct")
+assert_eq(type(Color), "dictionary")  // Enums are implemented as const maps
 assert_eq(Color.Red, 1)
 assert_eq(Color.Green, 2)
 assert_eq(Color.Blue, 3)

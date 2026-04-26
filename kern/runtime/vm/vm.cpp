@@ -866,6 +866,13 @@ void VM::runInstruction(const Instruction& inst) {
             push(std::move(v));
             break;
         }
+        case Opcode::SET_FUNC_STRUCT: {
+            ValuePtr v = popStack();
+            if (v->type == Value::Type::FUNCTION)
+                std::get<FunctionPtr>(v->data)->isStructConstructor = true;
+            push(std::move(v));
+            break;
+        }
         case Opcode::YIELD: {
             ValuePtr val = stack_.empty() ? std::make_shared<Value>(Value::nil()) : popStack();
             if (!inGeneratorExecution_)

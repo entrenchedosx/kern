@@ -1353,7 +1353,16 @@ inline void registerAllBuiltins(VM& vm) {
             case Value::Type::MAP: return Value::fromString("dictionary");
             case Value::Type::STRUCT: return Value::fromString("struct");
             case Value::Type::VEC3: return Value::fromString("vec3");
-            case Value::Type::FUNCTION: return Value::fromString("function");
+            case Value::Type::FUNCTION: {
+                // Check if this is a struct constructor
+                if (args[0] && std::holds_alternative<FunctionPtr>(args[0]->data)) {
+                    auto& fn = std::get<FunctionPtr>(args[0]->data);
+                    if (fn && fn->isStructConstructor) {
+                        return Value::fromString("struct");
+                    }
+                }
+                return Value::fromString("function");
+            }
             case Value::Type::CLASS: return Value::fromString("class");
             case Value::Type::INSTANCE: return Value::fromString("instance");
             case Value::Type::PTR: return Value::fromString("ptr");

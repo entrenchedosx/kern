@@ -26,12 +26,12 @@ echo Project: %CD%
 REM Check source files exist
 echo.
 echo Checking source files...
-if not exist "kern\modules\3dengine\3dengine.cpp" (
-    echo ERROR: 3dengine.cpp not found
+if not exist "kern\modules\g3d\g3d.cpp" (
+    echo ERROR: g3d.cpp not found
     exit /b 1
 )
-if not exist "kern\modules\3dengine\ursina_api.cpp" (
-    echo ERROR: ursina_api.cpp not found
+if not exist "kern\modules\g3d\g3d_api.cpp" (
+    echo ERROR: g3d_api.cpp not found
     exit /b 1
 )
 echo OK: Source files found
@@ -80,6 +80,8 @@ echo Binary location:
 echo   %CD%\Release\kern.exe
 echo.
 echo Test with:
-echo   Release\kern.exe -e "print(import(\"3dengine\")[\"VERSION\"])"
+echo   Release\kern.exe -e "print(import(\"g3d\")[\"VERSION\"])"
 echo.
-pause
+echo Binary is ready at:
+echo   %CD%\Release\kern.exe
+echo.

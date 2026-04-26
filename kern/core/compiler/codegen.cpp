@@ -1675,6 +1675,7 @@ void CodeGenerator::emitStmt(const Stmt* s) {
             for (size_t i = 0; i < pnames.size(); ++i) joined += (i ? "," : "") + pnames[i];
             emit(Opcode::SET_FUNC_PARAM_NAMES, addConstant(joined));
         }
+        emit(Opcode::SET_FUNC_STRUCT);  // Mark as struct constructor
         functionParams_[x->name] = std::move(pnames);
         emit(Opcode::STORE_GLOBAL, addConstant(x->name));
         return;
