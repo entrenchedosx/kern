@@ -87,6 +87,12 @@ else()
   # Debug
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g3 -DDEBUG -DKERN_DEBUG=1 -fno-omit-frame-pointer")
   set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0 -g3 -DDEBUG -DKERN_DEBUG=1 -fno-omit-frame-pointer")
+  if(WIN32)
+    # MinGW on Windows: force static libstdc++/libgcc linkage to resolve
+    # .refptr (DLL import thunk) and __emutls_v (TLS emulation) symbols
+    # that appear in lambda bodies inside registerAllBuiltins().
+    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} -static-libstdc++ -static-libgcc")
+  endif()
   
   # Safe
   set(CMAKE_CXX_FLAGS_SAFE "-O2 -g -DKERN_SAFE_MODE=1 -DNDEBUG -fstack-protector-strong")
@@ -231,6 +237,7 @@ set(VM_SOURCES
     "${KERN_VM_DIR}/vm.cpp"
     "${KERN_VM_DIR}/bytecode_verifier.cpp"
     "${KERN_VM_DIR}/kern_socket.cpp"
+    "${KERN_VM_DIR}/builtins.cpp"
 )
 if(WIN32)
   list(APPEND VM_SOURCES "${KERN_VM_DIR}/http_get_winhttp.cpp")
