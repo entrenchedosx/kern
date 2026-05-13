@@ -1,0 +1,10 @@
+{
+  "name": "consumer-app",
+  "version": "1.0.0",
+  "main": "src/main.kn",
+  "dependencies": {
+    "sec.auth": "^1.0.0",
+    "sec.perm": "^1.0.0",
+    "3dengine": "*"
+  }
+}

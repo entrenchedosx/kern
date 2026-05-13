@@ -1,0 +1,108 @@
+// regression test: movement/input integrity for g2d.
+// verifies:
+// 1) smooth sub-pixel movement (float positions + dt)
+// 2) lowercase key names work in isKeyDown/isKeyPressed
+// 
+// controls:
+// w/a/s/d move marker
+// shift speed boost
+// r reset position
+// space pause/resume auto drift
+
+g = import("g2d")
+math = import("math")
+
+// use float coordinates on purpose to catch truncation jitter.
+x = 500.0
+y = 350.0
+vx = 0.0
+vy = 0.0
+baseSpeed = 220.0
+drag = 9.0
+paused = false
+t = 0.0
+
+def update() {
+    dt = g.delta_time()
+    if (dt < 0.0) { dt = 0.0 }
+    if (dt > 0.05) { dt = 0.05 } // clamp large frame jumps
+
+    if (g.isKeyPressed("space")) { paused = !paused }
+    if (g.isKeyPressed("r")) {
+        x = 500.0
+        y = 350.0
+        vx = 0.0
+        vy = 0.0
+        t = 0.0
+    }
+
+    if (!paused) {
+        speed = baseSpeed
+        if (g.isKeyDown("shift")) { speed = 360.0 }
+
+        ax = 0.0
+        ay = 0.0
+        // lowercase key names intentionally used here.
+        if (g.isKeyDown("a")) { ax = ax - speed }
+        if (g.isKeyDown("d")) { ax = ax + speed }
+        if (g.isKeyDown("w")) { ay = ay - speed }
+        if (g.isKeyDown("s")) { ay = ay + speed }
+
+        vx = vx + ax * dt
+        vy = vy + ay * dt
+
+        // simple exponential drag for stable feel.
+        damp = 1.0 - drag * dt
+        if (damp < 0.0) { damp = 0.0 }
+        vx = vx * damp
+        vy = vy * damp
+
+        // optional auto drift so motion is visible without input.
+        t = t + dt
+        driftX = 45.0 * math.sin(t * 1.3)
+        driftY = 30.0 * math.cos(t * 1.1)
+
+        x = x + (vx + driftX) * dt
+        y = y + (vy + driftY) * dt
+    }
+
+    if (x < 20.0) { x = 20.0; vx = 0.0 }
+    if (x > g.width() - 20.0) { x = g.width() - 20.0; vx = 0.0 }
+    if (y < 20.0) { y = 20.0; vy = 0.0 }
+    if (y > g.height() - 20.0) { y = g.height() - 20.0; vy = 0.0 }
+}
+
+def draw() {
+    // clear and then draw primitives in the same frame
+    g.clear(14, 16, 24)
+
+    cx = g.width() / 2
+    cy = g.height() / 2
+    g.drawLine(cx - 14, cy, cx + 14, cy, 80, 90, 120, 255)
+    g.drawLine(cx, cy - 14, cx, cy + 14, 80, 90, 120, 255)
+
+    g.fillCircle(x, y, 14, 255, 220, 120, 255)
+    g.drawCircle(x, y, 16, 255, 255, 255, 180)
+
+    status = "dt=" + g.delta_time() + " fps=" + g.fps() + " x=" + x + " y=" + y
+    g.drawText(status, 14, 14, -1, 220, 230, 255, 255)
+    g.drawText("Controls: w/a/s/d, shift, space, r", 14, 40, -1, 170, 190, 230, 255)
+}
+
+if (g == null || math == null) {
+    print("g2d/math unavailable")
+} else {
+    g.createWindow(1000, 700, "Kern - Sprite Movement Integrity")
+    g.setTargetFps(60)
+    // manual loop avoids callback execution-path variance.
+    while (g.isOpen()) {
+        update()
+        draw()
+        g.present()
+    }
+}
+
+
+
+
+

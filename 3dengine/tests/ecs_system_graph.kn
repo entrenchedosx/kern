@@ -1,0 +1,29 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let w = ecs["world_create"]()
+let noop = lambda (world, dt) => { return null }
+let spec = {}
+spec["name"] = "graph.custom"
+spec["stage"] = "POST_SIMULATION"
+spec["after"] = ["simulation"]
+spec["write"] = ["transform"]
+spec["run"] = noop
+if (!ecs["world_register_system_spec"](w, spec)) { panic("ecs_system_graph: failed to register custom system") }
+
+let g = ecs["world_system_graph"](w)
+let order = default(g["execution_order"], [])
+let systems = default(g["systems"], {})
+let edges = default(g["edges"], [])
+if (len(default(g["stages"], [])) < 6) { panic("ecs_system_graph: expected formal stage list") }
+if (len(order) < 5) { panic("ecs_system_graph: expected builtins plus custom in order") }
+if (!has(systems, "simulation")) { panic("ecs_system_graph: missing simulation node") }
+if (!has(systems, "graph.custom")) { panic("ecs_system_graph: missing custom node") }
+let custom = systems["graph.custom"]
+if (str(default(custom["stage"], "")) != "POST_SIMULATION") { panic("ecs_system_graph: custom stage mismatch") }
+if (!default(custom["builtin"], false) && !has(custom, "writes")) { panic("ecs_system_graph: custom node missing writes") }
+if (len(edges) < 1) { panic("ecs_system_graph: expected at least one dependency edge") }
+
+print("ecs_system_graph: ok")

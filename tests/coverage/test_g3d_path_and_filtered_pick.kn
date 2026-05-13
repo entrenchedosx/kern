@@ -1,0 +1,44 @@
+let g3 = null
+try {
+    g3 = import("g3d")
+} catch (e) {
+    g3 = null
+}
+if (g3 == null) {
+    print("skip-g3d")
+} else {
+    a = g3.createObject("cube", 1.0)
+    b = g3.createObject("sphere", 0.5)
+    g3.setMaterial(a, "lambert")
+    g3.setMaterial(b, "flat")
+    gid = g3.createGroup("pickers")
+    g3.addToGroup(gid, a)
+
+    // path format: [px, py, pz, tx, ty, tz] repeated.
+    path = [
+        4, 3, 4, 0, 0, 0,
+        0, 4, 6, 0, 0, 0,
+        -4, 3, 4, 0, 0, 0
+    ]
+    nodeCount = g3.setCameraPath(path, false)
+    sample = g3.sampleCameraPath(0.5)
+    applied = g3.applyCameraPath(0.5)
+    cam = g3.getCamera()
+
+    vis = g3.visibleObjectsFiltered(32, "cube", null, gid)
+    pick = g3.pickObjectFiltered(null, null, null, "lambert", gid)
+    info = g3.pickObjectInfoFiltered(null, null, "cube", null, gid)
+
+    s1 = g3.status()
+    g3.clearCameraPath()
+    s2 = g3.status()
+
+    ok = (nodeCount >= 2 && sample != null && applied && cam != null && vis != null && len(vis) >= 0 && pick >= -1 && info != null && s1.cameraPathNodes >= 2 && s2.cameraPathNodes == 0)
+
+    if (ok) {
+        print("g3d-path-filter-ok")
+    } else {
+        print("g3d-path-filter-fail")
+    }
+}
+

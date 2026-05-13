@@ -1,0 +1,31 @@
+// scoped state containers with mutable and immutable sections.
+
+def create_state(initial_mutable, initial_immutable) {
+    let s = {}
+    if (initial_mutable == null) { s["mutable"] = {} }
+    else { s["mutable"] = initial_mutable }
+    if (initial_immutable == null) { s["immutable"] = {} }
+    else { s["immutable"] = initial_immutable }
+    return s
+}
+
+def get(s, key, fallback) {
+    let k = str(key)
+    if (has(s["mutable"], k)) { return s["mutable"][k] }
+    if (has(s["immutable"], k)) { return s["immutable"][k] }
+    return fallback
+}
+
+def set(s, key, value) {
+    let k = str(key)
+    if (has(s["immutable"], k)) {
+        throw Error("State key is immutable: " + k, "STATE-IMMUTABLE")
+    }
+    s["mutable"][k] = value
+    return value
+}
+
+def increment(s, key, delta) {
+    let cur = int(get(s, key, 0))
+    return set(s, key, cur + int(delta))
+}

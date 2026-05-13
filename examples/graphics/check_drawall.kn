@@ -1,0 +1,21 @@
+// Check if drawAll and drawObject exist
+let g3 = import("g3d")
+
+if (g3 == null) {
+    print("g3d not available")
+} else {
+    print("drawAll exists: " + (g3["drawAll"] != null))
+    print("drawObject exists: " + (g3["drawObject"] != null))
+    
+    // Try creating a window and object to test
+    g3.createWindow(640, 480, "Test")
+    let cube = g3.createObject("cube", 2.0)
+    g3.setPosition(cube, 0, 0, 0)
+    g3.setObjectColor(cube, 255, 0, 0)
+    print("Cube ID: " + cube)
+    print("Testing drawObject...")
+    g3.drawObject(cube)
+    print("Testing drawAll...")
+    g3.drawAll()
+    print("Done - you should see a red cube")
+}

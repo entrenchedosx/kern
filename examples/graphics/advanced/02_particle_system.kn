@@ -1,0 +1,275 @@
+// 02_particle_system.kn - Particle effects system
+
+use g3d
+
+print("=== Particle System Demo ===")
+
+// Particle class
+let particles = []
+let nextId = 0
+
+def createParticle(position, velocity, color, lifetime, size) {
+    let p = {
+        id: nextId,
+        entity: Entity(
+            model = "sphere",
+            position = position,
+            color = color,
+            scale = size
+        ),
+        velocity: velocity,
+        color: color,
+        initialLifetime: lifetime,
+        lifetime: lifetime,
+        size: size,
+        active: true
+    }
+    nextId = nextId + 1
+    return p
+}
+
+// Emitters
+let emitters = []
+
+def createEmitter(config) {
+    let emitter = {
+        position: config.position,
+        rate: config.rate,  // particles per second
+        colorMin: config.colorMin,
+        colorMax: config.colorMax,
+        velocityMin: config.velocityMin,
+        velocityMax: config.velocityMax,
+        lifetimeMin: config.lifetimeMin,
+        lifetimeMax: config.lifetimeMax,
+        sizeMin: config.sizeMin,
+        sizeMax: config.sizeMax,
+        accumulated: 0,
+        active: true
+    }
+    emitters.append(emitter)
+    return emitter
+}
+
+// Update all particles
+def updateParticles(dt) {
+    let i = 0
+    while (i < len(particles)) {
+        let p = particles[i]
+        
+        if (!p.active) {
+            i = i + 1
+            continue
+        }
+        
+        // Update lifetime
+        p.lifetime = p.lifetime - dt
+        
+        if (p.lifetime <= 0) {
+            // Kill particle
+            p.entity.hide()
+            p.active = false
+            particles.removeAt(i)
+        } else {
+            // Update position
+            let pos = p.entity.position
+            p.entity.position = (
+                pos.x + p.velocity.x * dt,
+                pos.y + p.velocity.y * dt,
+                pos.z + p.velocity.z * dt
+            )
+            
+            // Fade out based on lifetime
+            let alpha = p.lifetime / p.initialLifetime
+            // p.entity.setAlpha(alpha)
+            
+            // Shrink
+            let scale = p.size * alpha
+            p.entity.scale = (scale, scale, scale)
+            
+            i = i + 1
+        }
+    }
+}
+
+// Update emitters
+def updateEmitters(dt) {
+    for emitter in emitters {
+        if (!emitter.active) {
+            continue
+        }
+        
+        emitter.accumulated = emitter.accumulated + emitter.rate * dt
+        
+        while (emitter.accumulated >= 1) {
+            emitter.accumulated = emitter.accumulated - 1
+            
+            // Spawn particle
+            let color = lerpColor(emitter.colorMin, emitter.colorMax, random())
+            let velocity = (
+                lerp(emitter.velocityMin.x, emitter.velocityMax.x, random()),
+                lerp(emitter.velocityMin.y, emitter.velocityMax.y, random()),
+                lerp(emitter.velocityMin.z, emitter.velocityMax.z, random())
+            )
+            let lifetime = lerp(emitter.lifetimeMin, emitter.lifetimeMax, random())
+            let size = lerp(emitter.sizeMin, emitter.sizeMax, random())
+            
+            let p = createParticle(emitter.position, velocity, color, lifetime, size)
+            particles.append(p)
+        }
+    }
+}
+
+// Color interpolation
+def lerpColor(a, b, t) {
+    return (
+        lerp(a[0], b[0], t),
+        lerp(a[1], b[1], t),
+        lerp(a[2], t)
+    )
+}
+
+// Number interpolation
+def lerp(a, b, t) {
+    return a + (b - a) * t
+}
+
+// Random
+def random() {
+    return randomFloat(0, 1)
+}
+
+// Preset effects
+def createFireEffect(position) {
+    return createEmitter({
+        position: position,
+        rate: 50,
+        colorMin: (255, 100, 0),    // Orange
+        colorMax: (255, 50, 0),     // Red-orange
+        velocityMin: (-0.5, 1, -0.5),
+        velocityMax: (0.5, 3, 0.5),
+        lifetimeMin: 0.5,
+        lifetimeMax: 1.5,
+        sizeMin: 0.1,
+        sizeMax: 0.3
+    })
+}
+
+def createSmokeEffect(position) {
+    return createEmitter({
+        position: position,
+        rate: 20,
+        colorMin: (100, 100, 100),  // Gray
+        colorMax: (200, 200, 200),  // Light gray
+        velocityMin: (-0.3, 0.5, -0.3),
+        velocityMax: (0.3, 1.5, 0.3),
+        lifetimeMin: 2,
+        lifetimeMax: 4,
+        sizeMin: 0.2,
+        sizeMax: 0.5
+    })
+}
+
+def createSparkEffect(position) {
+    return createEmitter({
+        position: position,
+        rate: 100,
+        colorMin: (255, 255, 100),  // Yellow
+        colorMax: (255, 255, 255),  // White
+        velocityMin: (-2, -2, -2),
+        velocityMax: (2, 2, 2),
+        lifetimeMin: 0.1,
+        lifetimeMax: 0.3,
+        sizeMin: 0.05,
+        sizeMax: 0.1
+    })
+}
+
+def createMagicEffect(position) {
+    return createEmitter({
+        position: position,
+        rate: 30,
+        colorMin: (100, 0, 255),    // Purple
+        colorMax: (0, 200, 255),    // Cyan
+        velocityMin: (-1, 0, -1),
+        velocityMax: (1, 2, 1),
+        lifetimeMin: 1,
+        lifetimeMax: 2,
+        sizeMin: 0.1,
+        sizeMax: 0.2
+    })
+}
+
+// Demo setup
+def main() {
+    App.configure(
+        title = "Particle System Demo",
+        width = 1280,
+        height = 720
+    )
+    
+    // Create floor
+    let floor = Entity(
+        model = "plane",
+        position = (0, 0, 0),
+        color = (30, 30, 30),
+        scale = (20, 1, 20)
+    )
+    
+    // Create effect showcases
+    let fire = createFireEffect((-5, 0, 0))
+    let smoke = createSmokeEffect((-5, 0, 0))
+    let spark = createSparkEffect((0, 1, 0))
+    let magic = createMagicEffect((5, 0, 0))
+    
+    // Labels
+    print("Effects:")
+    print("  1: Fire (-5, 0, 0)")
+    print("  2: Smoke (with fire)")
+    print("  3: Sparks (0, 1, 0)")
+    print("  4: Magic (5, 0, 0)")
+    
+    // Toggle sparks with space
+    def update(dt) {
+        updateEmitters(dt)
+        updateParticles(dt)
+        
+        // Toggle effects
+        if (input.pressed(input.Key.NUM_1)) {
+            fire.active = !fire.active
+            print("Fire: " + if (fire.active) { "ON" } else { "OFF" })
+        }
+        if (input.pressed(input.Key.NUM_2)) {
+            smoke.active = !smoke.active
+            print("Smoke: " + if (smoke.active) { "ON" } else { "OFF" })
+        }
+        if (input.pressed(input.Key.NUM_3)) {
+            spark.active = !spark.active
+            print("Sparks: " + if (spark.active) { "ON" } else { "OFF" })
+        }
+        if (input.pressed(input.Key.NUM_4)) {
+            magic.active = !magic.active
+            print("Magic: " + if (magic.active) { "ON" } else { "OFF" })
+        }
+        
+        // Burst on space
+        if (input.pressed(input.Key.SPACE)) {
+            spark.accumulated = 100  // Burst!
+        }
+        
+        // Particle count
+        if (input.pressed(input.Key.P)) {
+            print("Active particles: " + len(particles))
+        }
+    }
+    
+    // Camera
+    let camera = Camera(
+        position = (0, 10, 15),
+        lookAt = (0, 2, 0)
+    )
+    
+    App.onUpdate(update)
+    App.run()
+}
+
+main()

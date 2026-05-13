@@ -1,0 +1,12 @@
+// Apply a list of unary functions left-to-right.
+// import("lib/kern/stdlib/fun/pipe_chain.kn")
+
+def pipe_chain(x, fs) {
+    let v = x
+    let i = 0
+    while (i < len(fs)) {
+        v = fs[i](v)
+        i = i + 1
+    }
+    return v
+}

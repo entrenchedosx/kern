@@ -1,0 +1,7 @@
+interop = import("interop")
+
+unsafe {
+  interop.ffi_allow_library("kernel32.dll")
+  // this should fail: signature expects 1 arg, but 0 runtime args are supplied.
+  interop.ffi_call("kernel32.dll", "Sleep", "void", "win64", ["int"])
+}

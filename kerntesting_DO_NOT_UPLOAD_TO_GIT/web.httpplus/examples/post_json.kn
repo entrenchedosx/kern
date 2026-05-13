@@ -1,0 +1,3 @@
+let httpx = import("web.httpplus")
+let r = httpx["post_json"]("https://httpbin.org/post", { "service": "billing", "status": "ok" })
+print(json_stringify(r, 2))

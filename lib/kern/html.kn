@@ -1,0 +1,34 @@
+// kern html (Python html) — import("lib/kern/html.kn")
+// adds: escape, unescape, tag, tag_attr
+
+def escape(s) {
+    let out = replace(s, "&", "&amp;")
+    out = replace(out, "<", "&lt;")
+    out = replace(out, ">", "&gt;")
+    out = replace(out, "\"", "&quot;")
+    out = replace(out, "'", "&#x27;")
+    return out
+}
+
+def unescape(s) {
+    let out = replace(s, "&quot;", "\"")
+    out = replace(out, "&#x27;", "'")
+    out = replace(out, "&lt;", "<")
+    out = replace(out, "&gt;", ">")
+    out = replace(out, "&amp;", "&")
+    return out
+}
+
+def tag(name, content) {
+    return "<" + name + ">" + escape(content) + "</" + name + ">"
+}
+
+def tag_attr(name, attrs, content) {
+    let parts = array()
+    for k in keys(attrs) {
+        push(parts, k + "=\"" + escape(attrs[k]) + "\"")
+    }
+    let attr_str = join(parts, " ")
+    if (len(attr_str) > 0) { attr_str = " " + attr_str }
+    return "<" + name + attr_str + ">" + escape(content) + "</" + name + ">"
+}

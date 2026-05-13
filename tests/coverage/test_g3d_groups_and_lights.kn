@@ -1,0 +1,26 @@
+let g3 = import("g3d")
+if (g3 == null) {
+    print("skip-g3d")
+} else {
+    a = g3.createObject("cube", 1.0)
+    b = g3.createObject("sphere", 0.5)
+    gid = g3.createGroup("grp")
+    g3.addToGroup(gid, a)
+    g3.addToGroup(gid, b)
+    g3.setGroupVisible(gid, true)
+    g3.setGroupVisible(gid, false)
+    g3.setGroupVisible(gid, true)
+
+    d = g3.addDirectionalLight(1, -1, 0, 255, 255, 255, 1.0)
+    d2 = g3.addDirectionalLight(-0.5, -1, -0.3, 180, 200, 255, 0.5)
+    p = g3.addPointLight(2, 3, 4, 255, 180, 120, 0.7)
+    p2 = g3.addPointLight(-3, 2, 1, 120, 180, 255, 0.4)
+    g3.setAmbientLight(40, 40, 60)
+
+    if (gid >= 0 && d >= 0 && d2 >= 0 && p >= 0 && p2 >= 0) {
+        print("groups-lights-ok")
+    } else {
+        print("groups-lights-fail")
+    }
+}
+

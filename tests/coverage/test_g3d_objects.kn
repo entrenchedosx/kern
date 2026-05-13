@@ -1,0 +1,20 @@
+let g3 = import("g3d")
+if (g3 == null) {
+    print("skip-g3d")
+} else {
+    a = g3.createObject("cube", 1.0)
+    b = g3.createObject("sphere", 0.5)
+    if (a >= 0 && b >= 0) {
+        g3.setPosition(a, 1, 2, 3)
+        g3.setRotation(a, 10, 20, 30)
+        g3.setScale(a, 1, 2, 1)
+        g3.setObjectColor(a, 255, 0, 0)
+        g3.setVisible(b, true)
+        print("objects-ok")
+    } else {
+        print("objects-fail")
+    }
+}
+
+
+

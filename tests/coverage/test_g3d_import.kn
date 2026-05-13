@@ -1,0 +1,8 @@
+let g3 = import("g3d")
+if (g3 == null) {
+    print("g3d-missing")
+} else {
+    print("g3d-ok")
+}
+
+

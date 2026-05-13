@@ -1,0 +1,15 @@
+def count3() {
+    yield 1
+    yield 2
+    yield 3
+}
+
+let acc = []
+for n in count3() {
+    push(acc, n)
+}
+assert_eq(len(acc), 3)
+assert_eq(acc[0], 1)
+assert_eq(acc[1], 2)
+assert_eq(acc[2], 3)
+print("OK: test_generators")

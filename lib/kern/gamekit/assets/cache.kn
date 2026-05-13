@@ -1,0 +1,50 @@
+// gamekit asset cache
+
+g2 = import("g2d")
+g3 = import("g3d")
+game = import("game")
+
+textures2d = {}
+models3d = {}
+sounds = {}
+
+def texture(path) {
+    if (has(textures2d, path)) { return textures2d[path] }
+    let id = -1
+    if (g2 != null) { id = g2.loadImage(path) }
+    else {
+        if (game != null) { id = game.load_image(path) }
+    }
+    textures2d[path] = id
+    return id
+}
+
+def model(path) {
+    if (has(models3d, path)) { return models3d[path] }
+    let id = -1
+    if (g3 != null) { id = g3.loadModel(path) }
+    models3d[path] = id
+    return id
+}
+
+def sound(path) {
+    if (has(sounds, path)) { return sounds[path] }
+    let id = -1
+    if (game != null) { id = game.load_sound(path) }
+    sounds[path] = id
+    return id
+}
+
+def stats() {
+    let s = {}
+    s["textures"] = len(keys(textures2d))
+    s["models"] = len(keys(models3d))
+    s["sounds"] = len(keys(sounds))
+    return s
+}
+
+def clear_cache() {
+    textures2d = {}
+    models3d = {}
+    sounds = {}
+}

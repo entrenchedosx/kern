@@ -1,0 +1,14 @@
+{
+  "name": "sys.config",
+  "description": "Layered configuration helpers (defaults, file, env) for Kern apps.",
+  "trusted": false,
+  "latest": "1.0.2",
+  "versions": {
+    "1.0.0": {
+      "manifest": "versions/1.0.0.json"
+    },
+    "1.0.2": {
+      "manifest": "versions/1.0.2.json"
+    }
+  }
+}

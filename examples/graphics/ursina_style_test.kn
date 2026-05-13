@@ -1,0 +1,19 @@
+// ursina_style_test.kn - Clean Ursina-like API test
+// Simple approach: use g3d directly (working)
+let g3 = import("g3d")
+
+// Create window
+g3.createWindow(640, 480, "Ursina-Style Test")
+
+// Create a red cube at origin
+let cube = g3.createObject("cube", 2.0)
+g3.setPosition(cube, 0, 0, 0)
+g3.setObjectColor(cube, 255, 0, 0)  // Red
+print("Created red cube: " + cube)
+
+// Run render loop
+def update() {}
+def draw() { g3.drawObject(cube) }
+g3.run(update, draw)
+
+print("Test complete!")

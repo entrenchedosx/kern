@@ -1,0 +1,15 @@
+{
+  "name": "sec.audit",
+  "version": "1.0.1",
+  "main": "src/index.kn",
+  "dependencies": {
+    "sec.crypto": "^1.0.0",
+    "sec.perm": "^1.0.0",
+    "sys.log": "^1.0.0"
+  },
+  "trusted": false,
+  "dist": {
+    "tarball": "https://github.com/entrenchedosx/kern/releases/download/sec.audit-v1.0.1/sec.audit-1.0.1.tgz",
+    "shasum": "sha256-be65780286259515ea918648c5df3f744ce0a23603e53bdd0c4e3641a438005e"
+  }
+}

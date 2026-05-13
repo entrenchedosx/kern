@@ -1,0 +1,35 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+let vec3 = import("src/math/vec3.kn")
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+def run_once() {
+    let w = ecs["world_create"]()
+    let e = ecs["world_create_entity"](w)
+    ecs["world_add_transform"](w, e, ecs["transform_make"](vec3["zero"](), null, null))
+    ecs["world_add_velocity"](w, e, ecs["velocity_make"](vec3["zero"](), 100.0))
+    let held = []
+    held[0] = "W"
+    ecs["world_input_feed"](w, held, [], [])
+    ecs["world_run_fixed_pipeline"](w, 0.1)
+    ecs["world_run_fixed_pipeline"](w, 0.1)
+    let tr = ecs["world_get_transform"](w, e)
+    return float(default(tr["local_position"]["y"], 0.0))
+}
+
+let a = run_once()
+let b = run_once()
+if (a != b) { panic("ecs_input: non-deterministic movement") }
+if (a != 20.0) { panic("ecs_input: expected y=20 after two 0.1s steps at speed 100 with W held") }
+
+let w2 = ecs["world_create"]()
+let e2 = ecs["world_create_entity"](w2)
+ecs["world_add_transform"](w2, e2, ecs["transform_make"](vec3["zero"](), null, null))
+ecs["world_add_velocity"](w2, e2, ecs["velocity_make"](vec3["zero"](), 50.0))
+ecs["world_input_feed"](w2, [], [], [])
+ecs["world_run_fixed_pipeline"](w2, 0.1)
+let tr2 = ecs["world_get_transform"](w2, e2)
+if (float(tr2["local_position"]["x"]) != 0.0 || float(tr2["local_position"]["y"]) != 0.0) { panic("ecs_input: no keys should zero planar input velocity") }
+
+print("ecs_input: ok")

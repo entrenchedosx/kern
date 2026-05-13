@@ -1,0 +1,75 @@
+// kern table formatter — import("lib/kern/table.kn")
+// format_table(rows, col_sep), format_table_header(headers, rows)
+
+def _str_cell(x) {
+    if (x == null) { return "" }
+    return str(x)
+}
+
+def _col_width(rows, col_idx) {
+    let w = 0
+    let i = 0
+    while (i < len(rows)) {
+        let row = rows[i]
+        if (col_idx < len(row)) {
+            let len_c = len(_str_cell(row[col_idx]))
+            if (len_c > w) { w = len_c }
+        }
+        i = i + 1
+    }
+    return w
+}
+
+def format_table(rows, col_sep) {
+    if (len(rows) == 0) { return "" }
+    let num_cols = 0
+    let i = 0
+    while (i < len(rows)) {
+        if (len(rows[i]) > num_cols) { num_cols = len(rows[i]) }
+        i = i + 1
+    }
+    let widths = array()
+    let c = 0
+    while (c < num_cols) {
+        push(widths, _col_width(rows, c))
+        c = c + 1
+    }
+    let lines = array()
+    let r = 0
+    while (r < len(rows)) {
+        let row = rows[r]
+        let parts = array()
+        let c = 0
+        while (c < num_cols) {
+            let cell = ""
+            if (c < len(row)) { cell = _str_cell(row[c]) }
+            let w = widths[c]
+            while (len(cell) < w) { cell = cell + " " }
+            push(parts, cell)
+            c = c + 1
+        }
+        push(lines, join(parts, col_sep))
+        r = r + 1
+    }
+    return join(lines, "\n")
+}
+
+def format_table_header(headers, rows) {
+    let all = array(headers)
+    let i = 0
+    while (i < len(rows)) {
+        push(all, rows[i])
+        i = i + 1
+    }
+    let out = format_table(all, " | ")
+    let line_len = len(split_lines(out)[0])
+    let sep = ""
+    let j = 0
+    while (j < line_len) {
+        sep = sep + "-"
+        j = j + 1
+    }
+    let ls = split_lines(out)
+    if (len(ls) <= 1) { return out }
+    return ls[0] + "\n" + sep + "\n" + join(slice(ls, 1, len(ls)), "\n")
+}

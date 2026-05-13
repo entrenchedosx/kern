@@ -1,0 +1,30 @@
+// messagebox_typed.kn - Use ffi_call_typed with explicit types
+// Run with: kern --unsafe --ffi messagebox_typed.kn
+
+print("=== MESSAGEBOX TYPED FFI ===")
+print("")
+
+let interop = import("interop")
+print("Interop loaded: " + interop)
+print("")
+
+unsafe {
+    print("Allowing user32.dll...")
+    interop.ffi_allow_library("user32.dll")
+    
+    print("Calling MessageBoxA via ffi_call_typed...")
+    
+    // ffi_call_typed(dll, func, retType, abi, paramTypes, args...)
+    let result = interop.ffi_call_typed("user32.dll", "MessageBoxA", "i32", "win64", 
+        ["u64", "ptr", "ptr", "u32"],  // param types: HWND, text, caption, type
+        0,                                  // HWND (0 = no parent window)
+        "Hello from Kern FFI!",             // Message text  
+        "Kern Demo",                        // Window caption
+        0                                   // MB_OK = 0
+    )
+    
+    print("Result: " + result)
+}
+
+print("")
+print("=== DONE ===")

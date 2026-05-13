@@ -1,0 +1,37 @@
+// structured, context-aware logging helpers.
+
+def create_logger(scope) {
+    let logger = {}
+    logger["scope"] = str(scope)
+    logger["level"] = "info"
+    return logger
+}
+
+def set_level(logger, level) {
+    logger["level"] = str(level)
+    return true
+}
+
+def _should_log(logger, level) {
+    let rank = {"debug": 10, "info": 20, "warn": 30, "error": 40}
+    let cur = 20
+    if (has(rank, logger["level"])) { cur = int(rank[logger["level"]]) }
+    let req = 20
+    if (has(rank, str(level))) { req = int(rank[str(level)]) }
+    return req >= cur
+}
+
+def _emit(logger, level, message, ctx) {
+    if (!_should_log(logger, level)) { return false }
+    let line = "[" + str(level) + "] " + str(logger["scope"]) + " " + str(message)
+    if (ctx != null && type(ctx) == "map" && has(ctx, "env")) {
+        line = line + " (pid=" + str(ctx["env"]["pid"]) + ")"
+    }
+    print(line)
+    return true
+}
+
+def debug(logger, message, ctx) { return _emit(logger, "debug", message, ctx) }
+def info(logger, message, ctx) { return _emit(logger, "info", message, ctx) }
+def warn(logger, message, ctx) { return _emit(logger, "warn", message, ctx) }
+def error(logger, message, ctx) { return _emit(logger, "error", message, ctx) }

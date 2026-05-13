@@ -1,0 +1,18 @@
+// Pad strings to width with truncation option.
+// import("lib/kern/stdlib/string/pad_extra.kn")
+
+import("lib/kern/string_utils.kn")
+
+def pad_left_trunc(s, width, fill) {
+    if (len(fill) == 0) { fill = " " }
+    if (len(s) >= width) { return slice(s, len(s) - width, len(s)) }
+    let need = width - len(s)
+    return repeat_str(fill, need) + s
+}
+
+def pad_right_trunc(s, width, fill) {
+    if (len(fill) == 0) { fill = " " }
+    if (len(s) >= width) { return slice(s, 0, width) }
+    let need = width - len(s)
+    return s + repeat_str(fill, need)
+}

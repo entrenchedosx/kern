@@ -1,0 +1,13 @@
+{
+  "name": "ai.prompts",
+  "version": "1.0.1",
+  "main": "src/index.kn",
+  "dependencies": {
+    "ai.client": "^1.0.0"
+  },
+  "trusted": false,
+  "dist": {
+    "tarball": "https://github.com/entrenchedosx/kern/releases/download/ai.prompts-v1.0.1/ai.prompts-1.0.1.tgz",
+    "shasum": "sha256-64772a481b20823f179ce0f4cb04030d713971e6b47e3266c9c9a2842cfe2397"
+  }
+}

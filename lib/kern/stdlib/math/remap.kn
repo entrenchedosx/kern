@@ -1,0 +1,12 @@
+// Linear remapping between intervals (floats).
+// import("lib/kern/stdlib/math/remap.kn")
+
+def remap(x, in_lo, in_hi, out_lo, out_hi) {
+    if (in_hi == in_lo) { return out_lo }
+    let t = (x - in_lo) / (in_hi - in_lo)
+    return out_lo + t * (out_hi - out_lo)
+}
+
+def lerp(a, b, t) {
+    return a + (b - a) * t
+}

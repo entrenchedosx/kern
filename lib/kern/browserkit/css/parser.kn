@@ -1,0 +1,42 @@
+// browserkit css/parser.kn
+// parse CSS text to simple rules.
+
+def _mk_rule(selector) {
+    let r = {}
+    r["selector"] = trim(selector)
+    r["decl"] = {}
+    return r
+}
+
+def parse(css_text) {
+    let rules = []
+    let blocks = split(str(css_text), "}")
+    let i = 0
+    while (i < len(blocks)) {
+        let b = trim(blocks[i])
+        if (b == "") { i = i + 1; continue }
+        let pair = split(b, "{")
+        if (len(pair) < 2) { i = i + 1; continue }
+        let selector = trim(pair[0])
+        let body = join(slice(pair, 1), "{")
+        let rule = _mk_rule(selector)
+
+        let decls = split(body, ";")
+        let j = 0
+        while (j < len(decls)) {
+            let d = trim(decls[j])
+            if (d != "") {
+                let kv = split(d, ":")
+                if (len(kv) >= 2) {
+                    let key = lower(trim(kv[0]))
+                    let val = trim(join(slice(kv, 1), ":"))
+                    rule["decl"][key] = val
+                }
+            }
+            j = j + 1
+        }
+        push(rules, rule)
+        i = i + 1
+    }
+    return rules
+}

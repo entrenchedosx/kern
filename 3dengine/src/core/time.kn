@@ -1,0 +1,58 @@
+// 3dengine core time helpers
+
+def now() { return float(monotonic_time()) }
+
+def clamp_dt(dt, max_dt) {
+    let d = float(default(dt, 0.0))
+    if (d < 0.0) { return 0.0 }
+    let md = float(default(max_dt, 0.25))
+    if (d > md) { return md }
+    return d
+}
+
+def fixed_dt(hz) {
+    let h = float(default(hz, 60.0))
+    if (h <= 0.0) { return 1.0 / 60.0 }
+    return 1.0 / h
+}
+
+def next_accumulator(accumulator, dt, max_dt) {
+    return float(default(accumulator, 0.0)) + clamp_dt(dt, max_dt)
+}
+
+def alpha(accumulator, step) {
+    let s = float(default(step, 0.0166666667))
+    if (s <= 0.0) { return 0.0 }
+    let a = float(default(accumulator, 0.0)) / s
+    if (a < 0.0) { return 0.0 }
+    if (a > 1.0) { return 1.0 }
+    return a
+}
+
+def create_state(fixed_hz, time_scale) {
+    let hz = float(default(fixed_hz, 60.0))
+    let scale = float(default(time_scale, 1.0))
+    if (scale < 0.0) { scale = 0.0 }
+    return {"frame_count": 0, "sim_frame_count": 0, "sim_time": 0.0, "raw_dt": 0.0, "delta_time": 0.0, "fixed_delta_time": fixed_dt(hz), "alpha": 0.0, "time_scale": scale}
+}
+
+def set_time_scale(state, scale) {
+    let s = float(default(scale, 1.0))
+    if (s < 0.0) { s = 0.0 }
+    state["time_scale"] = s
+    return s
+}
+
+def begin_frame(state, raw_dt, max_dt) {
+    let clamped_raw = clamp_dt(raw_dt, max_dt)
+    let scaled = clamped_raw * float(default(state["time_scale"], 1.0))
+    state["raw_dt"] = clamped_raw
+    state["delta_time"] = scaled
+    state["frame_count"] = int(default(state["frame_count"], 0)) + 1
+    return scaled
+}
+
+def did_fixed_step(state, step) {
+    state["sim_time"] = float(default(state["sim_time"], 0.0)) + float(default(step, 0.0))
+    state["sim_frame_count"] = int(default(state["sim_frame_count"], 0)) + 1
+}

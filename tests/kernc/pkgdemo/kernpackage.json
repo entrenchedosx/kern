@@ -1,0 +1,6 @@
+{
+  "name": "kern-project",
+  "version": "1.0.0",
+  "entry": "main.kn",
+  "dependencies": {}
+}

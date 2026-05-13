@@ -1,0 +1,7 @@
+m = import("observability")
+assert_eq(has(m, "runtime_info"), true)
+assert_eq(has(m, "stack_trace"), true)
+assert_eq(has(m, "profile_cycles"), true)
+txt = m.stack_trace()
+assert_eq(type(txt), "string")
+print("OK: test_module_observability")

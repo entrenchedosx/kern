@@ -1,0 +1,56 @@
+// Ordered key/value list sorted by string key — linear search, good for small maps.
+// import("lib/kern/stdlib/collections/ordered_map.kn")
+
+def omap_new() {
+    return { "pairs": array() }
+}
+
+def omap_find_index(o, key) {
+    let k = str(key)
+    let pairs = o["pairs"]
+    let i = 0
+    while (i < len(pairs)) {
+        if (str(pairs[i][0]) == k) { return i }
+        i = i + 1
+    }
+    return -1
+}
+
+def omap_get(o, key, default_val) {
+    let i = omap_find_index(o, key)
+    if (i < 0) { return default_val }
+    return o["pairs"][i][1]
+}
+
+def omap_set(o, key, value) {
+    let i = omap_find_index(o, key)
+    if (i >= 0) {
+        o["pairs"][i] = array(key, value)
+        return
+    }
+    push(o["pairs"], array(key, value))
+    sort_by(o["pairs"], lambda (a, b) => str(a[0]) < str(b[0]))
+}
+
+def omap_keys(o) {
+    let out = array()
+    let pairs = o["pairs"]
+    let i = 0
+    while (i < len(pairs)) {
+        push(out, pairs[i][0])
+        i = i + 1
+    }
+    return out
+}
+
+def omap_to_dict(o) {
+    let m = {}
+    let pairs = o["pairs"]
+    let i = 0
+    while (i < len(pairs)) {
+        let k = str(pairs[i][0])
+        m[k] = pairs[i][1]
+        i = i + 1
+    }
+    return m
+}

@@ -1,0 +1,2 @@
+// Intentional SEM_TYPE_MISMATCH: sqrt returns float; must fail under --strict-types only.
+let bad: int = sqrt(1.0)

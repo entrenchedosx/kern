@@ -1,0 +1,24 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+let vec3 = import("src/math/vec3.kn")
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let w = ecs["world_create"]()
+let e = ecs["world_create_entity"](w)
+if (!ecs["world_is_alive"](w, e)) { panic("ecs_basic: entity should be alive") }
+
+let ok_t = ecs["world_add_transform"](w, e, ecs["transform_make"](vec3["zero"](), null, null))
+let ok_v = ecs["world_add_velocity"](w, e, ecs["velocity_make"](vec3["make"](1, 0, 0)))
+if (!ok_t || !ok_v) { panic("ecs_basic: add component failed") }
+
+if (ecs["world_entity_count"](w) != 1) { panic("ecs_basic: entity_count mismatch") }
+if (ecs["world_transform_count"](w) != 1) { panic("ecs_basic: transform_count mismatch") }
+if (ecs["world_velocity_count"](w) != 1) { panic("ecs_basic: velocity_count mismatch") }
+
+let d = ecs["world_destroy_entity"](w, e)
+if (!d) { panic("ecs_basic: destroy failed") }
+if (ecs["world_is_alive"](w, e)) { panic("ecs_basic: stale handle should be dead") }
+if (ecs["world_get_transform"](w, e) != null) { panic("ecs_basic: stale transform access should be null in non-debug mode") }
+
+print("ecs_basic: ok")

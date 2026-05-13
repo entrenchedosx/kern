@@ -1,0 +1,16 @@
+// Shallow copy of environment map from env_all().
+// import("lib/kern/stdlib/sys/env_snapshot.kn")
+
+def env_snapshot() {
+    let m = env_all()
+    let out = {}
+    for k in keys(m) {
+        out[k] = m[k]
+    }
+    return out
+}
+
+def env_has(name) {
+    let v = env_get(name)
+    return v != null and str(v) != ""
+}

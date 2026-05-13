@@ -1,0 +1,40 @@
+// html_escape + http_parse_response (SSR / HTTP tooling for browser-adjacent apps)
+
+let h = html_escape("<a href=\"x\">Tom & Jerry's</a>")
+assert_eq(regex_match(h, "&lt;"), true)
+assert_eq(regex_match(h, "&amp;"), true)
+assert_eq(regex_match(h, "&#39;"), true)
+
+let raw = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nX-Test: a\r\n b\r\n\r\n<p>hi</p>"
+let r = http_parse_response(raw)
+assert_eq(r.status, 200)
+assert_eq(r.ok, true)
+assert_eq(r.headers["content-type"], "text/html")
+assert_eq(r.headers["x-test"], "a b")
+assert_eq(r.body, "<p>hi</p>")
+
+let bad = "not http"
+let r2 = http_parse_response(bad)
+assert_eq(r2.status, 0)
+assert_eq(r2.ok, false)
+assert_eq(r2.body, bad)
+
+let ck = parse_cookie_header("a=1; b=two; ")
+assert_eq(ck["a"], "1")
+assert_eq(ck["b"], "two")
+
+let n = import("net")
+assert_eq(n.content_type_charset("text/html; charset=ISO-8859-1"), "iso-8859-1")
+assert_eq(content_type_charset("Text/HTML"), "utf-8")
+
+assert_eq(is_safe_http_redirect("/dash", "http://x.com/a"), true)
+assert_eq(is_safe_http_redirect("//evil.com", "http://good.com/"), false)
+assert_eq(is_safe_http_redirect("http://good.com/r", "http://good.com/o"), true)
+assert_eq(is_safe_http_redirect("http://bad.com", "http://good.com/o"), false)
+assert_eq(is_safe_http_redirect("javascript:alert(1)", "http://x"), false)
+
+let line = set_cookie_fields({ "name": "sid", "value": "x", "path": "/", "httponly": true })
+assert_eq(regex_match(line, "sid="), true)
+assert_eq(regex_match(line, "HttpOnly"), true)
+
+print("OK: test_web_escape_and_http_parse")

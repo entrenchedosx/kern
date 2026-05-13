@@ -1,0 +1,40 @@
+// gamekit immediate UI widgets
+
+draw = import("lib/kern/gamekit/graphics/draw2d.kn")
+input = import("lib/kern/gamekit/input/input.kn")
+
+def panel(x, y, w, h, title) {
+    draw.rect(x, y, w, h, 28, 33, 52, 255)
+    draw.outline_rect(x, y, w, h, 110, 130, 180, 255)
+    if (title != null && title != "") {
+        draw.text(title, x + 10, y + 8, 18, 235, 240, 255)
+    }
+}
+
+def label(text, x, y, size) {
+    if (size == null) { size = 18 }
+    draw.text(text, x, y, size, 240, 245, 255)
+}
+
+def _hover(mx, my, x, y, w, h) {
+    return mx >= x && mx <= (x + w) && my >= y && my <= (y + h)
+}
+
+def button(text, x, y, w, h) {
+    let m = input.mouse_pos()
+    let hot = _hover(m.x, m.y, x, y, w, h)
+    if (hot) {
+        draw.rect(x, y, w, h, 65, 95, 170, 255)
+    } else {
+        draw.rect(x, y, w, h, 45, 65, 120, 255)
+    }
+    draw.outline_rect(x, y, w, h, 180, 200, 255, 255)
+    draw.text(text, x + 12, y + int(h / 2) - 8, 16, 255, 255, 255)
+    return hot && input.mouse_down("left")
+}
+
+def toggle(text, value, x, y, w, h) {
+    let pressed = button(text + ": " + (value ? "ON" : "OFF"), x, y, w, h)
+    if (pressed) { return !value }
+    return value
+}

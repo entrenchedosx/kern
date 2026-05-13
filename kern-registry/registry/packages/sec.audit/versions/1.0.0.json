@@ -1,0 +1,15 @@
+{
+  "name": "sec.audit",
+  "version": "1.0.0",
+  "main": "src/index.kn",
+  "dependencies": {
+    "sec.crypto": "^1.0.0",
+    "sec.perm": "^1.0.0",
+    "sys.log": "^1.0.0"
+  },
+  "trusted": false,
+  "dist": {
+    "tarball": "../../../dist/sec.audit/sec.audit-1.0.0.tgz",
+    "shasum": "sha256-7e190dcee8ffe2a8545690085319b7c88c091c895c20836f2079e677c0e194e1"
+  }
+}

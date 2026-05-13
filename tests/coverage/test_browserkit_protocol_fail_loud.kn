@@ -1,0 +1,12 @@
+p = import("lib/kern/browserkit/network/protocols.kn")
+
+ok = false
+try {
+  p.open("foo://example")
+} catch (e) {
+  msg = error_message(e)
+  if (regex_match(msg, "BROWSERKIT-UNSUPPORTED-PROTOCOL")) { ok = true }
+}
+
+assert_eq(ok, true)
+print("test_browserkit_protocol_fail_loud: pass")

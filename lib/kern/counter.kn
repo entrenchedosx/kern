@@ -1,0 +1,54 @@
+// kern counter (Python collections.Counter) — import("lib/kern/counter.kn")
+// adds: count_elements, most_common
+
+def count_elements(arr) {
+    let c = {}
+    for x in arr {
+        let k = str(x)
+        if (has(c, k)) { c[k] = c[k] + 1 }
+        else { c[k] = 1 }
+    }
+    return c
+}
+
+def most_common(c, n) {
+    let pairs = array()
+    for k in keys(c) { push(pairs, array(k, c[k])) }
+    sort_by(pairs, lambda (a, b) => a[1] > b[1])
+    if (n == null or n >= len(pairs)) { return pairs }
+    return slice(pairs, 0, n)
+}
+
+def counter_get(c, key, default_val) {
+    let k = str(key)
+    if (has(c, k)) { return c[k] }
+    if (default_val != null) { return default_val }
+    return 0
+}
+
+def counter_total(c) {
+    let t = 0
+    for k in keys(c) { t = t + c[k] }
+    return t
+}
+
+def least_common(c, n) {
+    let pairs = array()
+    for k in keys(c) { push(pairs, array(k, c[k])) }
+    sort_by(pairs, lambda (a, b) => a[1] < b[1])
+    if (n == null or n >= len(pairs)) { return pairs }
+    return slice(pairs, 0, n)
+}
+
+def counter_elements(c) {
+    let out = array()
+    for k in keys(c) {
+        let count = c[k]
+        let i = 0
+        while (i < count) {
+            push(out, k)
+            i = i + 1
+        }
+    }
+    return out
+}

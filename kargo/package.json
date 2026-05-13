@@ -1,0 +1,19 @@
+{
+  "name": "kargo",
+  "version": "1.0.20",
+  "private": true,
+  "description": "Package manager for Kern: GitHub installs + Kern registry search",
+  "type": "module",
+  "bin": {
+    "kargo": "./cli/entry.js"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "scripts": {
+    "test": "node --test ./cli/tests/*.test.js"
+  },
+  "dependencies": {
+    "semver": "^7.6.3"
+  }
+}

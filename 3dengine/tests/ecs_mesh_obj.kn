@@ -1,0 +1,82 @@
+let u = import("src/index.kn")
+let ecs = u["ecs"]
+
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let obj_min = "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"
+let obj_neg = "v 0 0 0\nv 1 0 0\nv 0 1 0\nf -3 -2 -1\n"
+let m0 = ecs["mesh_make_from_obj"](obj_min)
+let m_neg = ecs["mesh_make_from_obj"](obj_neg)
+if (has(m_neg, "error")) { panic("ecs_mesh_obj: negative face indices: " + str(m_neg["error"])) }
+let va = default(m0["vertices"], [])
+let vb = default(m_neg["vertices"], [])
+if (json_stringify(va) != json_stringify(vb)) { panic("ecs_mesh_obj: neg vs pos vertices differ: " + json_stringify(va) + " vs " + json_stringify(vb)) }
+
+if (has(m0, "error")) { panic("ecs_mesh_obj: parse failed: " + str(m0["error"])) }
+if (str(default(m0["primitive_type"], "")) != "indexed") { panic("ecs_mesh_obj: primitive_type") }
+if (len(default(m0["vertices"], [])) != 3) { panic("ecs_mesh_obj: vertex count") }
+if (len(default(m0["uvs"], [])) != 3) { panic("ecs_mesh_obj: uv count") }
+if (len(default(m0["indices"], [])) != 3) { panic("ecs_mesh_obj: index count") }
+if (len(default(m0["normals"], [])) != 3) { panic("ecs_mesh_obj: normal count") }
+let nm0 = default(default(m0["normals"], [])[0], [])
+if (float(default(nm0[2], 0.0)) < 0.99) { panic("ecs_mesh_obj: default normal should point +Z") }
+
+let obj_vn = "v 0 0 0\nv 1 0 0\nv 0 1 0\nvn 0 0 2\nf 1//1 2//1 3//1\n"
+let mv = ecs["mesh_make_from_obj"](obj_vn)
+if (has(mv, "error")) { panic("ecs_mesh_obj: vn parse failed: " + str(mv["error"])) }
+let nmv = default(default(mv["normals"], [])[1], [])
+if (float(default(nmv[2], 0.0)) < 0.99) { panic("ecs_mesh_obj: vn not applied") }
+
+let obj_triple = "v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nvt 1 0\nvt 0 1\nvn 0 0 1\nf 1/1/1 2/2/1 3/3/1\n"
+let mt = ecs["mesh_make_from_obj"](obj_triple)
+if (has(mt, "error")) { panic("ecs_mesh_obj: v/vt/vn face failed: " + str(mt["error"])) }
+if (len(default(mt["normals"], [])) != 3) { panic("ecs_mesh_obj: triple face normal count") }
+
+let obj_neg_uv = "v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nvt 1 0\nvt 0 1\nf -3/-3 -2/-2 -1/-1\n"
+let mnu = ecs["mesh_make_from_obj"](obj_neg_uv)
+if (has(mnu, "error")) { panic("ecs_mesh_obj: negative vt: " + str(mnu["error"])) }
+let mnu0 = default(mnu["uvs"], [])
+if (len(mnu0) < 1) { panic("ecs_mesh_obj: neg vt rows") }
+let mnu00 = mnu0[0]
+if (len(mnu00) < 2) { panic("ecs_mesh_obj: neg vt row len") }
+if (float(mnu00[0]) != 0.0 || float(mnu00[1]) != 0.0) { panic("ecs_mesh_obj: neg vt first") }
+
+let obj_neg_vn = "v 0 0 0\nv 1 0 0\nv 0 1 0\nvn 0 0 1\nf -3//-1 -2//-1 -1//-1\n"
+let mnv = ecs["mesh_make_from_obj"](obj_neg_vn)
+if (has(mnv, "error")) { panic("ecs_mesh_obj: negative vn: " + str(mnv["error"])) }
+
+let obj_uv = "v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nvt 1 0\nvt 0 1\nf 1/1 2/2 3/3\n"
+let m1 = ecs["mesh_make_from_obj"](obj_uv)
+let uva = default(m1["uvs"], [])
+if (len(uva) < 2) { panic("ecs_mesh_obj: uv rows") }
+let row1 = uva[1]
+if (len(row1) < 1) { panic("ecs_mesh_obj: uv row1 len") }
+if (float(row1[0]) != 1.0) { panic("ecs_mesh_obj: uv coord") }
+
+let bad = ecs["world_register_mesh"](ecs["world_create"](), ecs["mesh_make_from_obj"]("v 1 0 0\n"))
+if (str(default(bad, "")) != "") { panic("ecs_mesh_obj: empty obj should not register") }
+
+let wbad = ecs["world_create"]()
+let mq = ecs["mesh_make_quad"]()
+mq["normals"] = [[0.0, 0.0, 1.0]]
+let bad_n = ecs["world_register_mesh"](wbad, mq)
+if (str(default(bad_n, "")) != "") { panic("ecs_mesh_obj: mismatched normals should reject") }
+
+let w = ecs["world_create"]()
+let hid = ecs["world_register_mesh"](w, m0)
+if (str(default(hid, "")) == "") { panic("ecs_mesh_obj: register indexed mesh failed") }
+let e = ecs["world_create_entity"](w)
+ecs["world_add_transform"](w, e, ecs["transform_make"]({"x": 0.0, "y": 0.0, "z": 0.0}, null, null))
+ecs["world_add_mesh_handle"](w, e, hid)
+ecs["world_add_material"](w, e, ecs["material_make"]({"x": 1.0, "y": 1.0, "z": 1.0}, "m.obj", null))
+ecs["world_run_render_prep"](w)
+let _ = ecs["world_render"](w, {"rect": lambda (x, y, ww, hh, r, g, b, a) => { return null }})
+if (int(default(ecs["world_render_stats"](w)["draw_calls"], 0)) != 1) { panic("ecs_mesh_obj: draw_calls") }
+
+let w2 = ecs["world_create"]()
+let id1 = ecs["world_register_mesh"](w2, ecs["mesh_make_from_obj"](obj_min))
+let id2 = ecs["world_register_mesh"](w2, ecs["mesh_make_from_obj"](obj_min))
+if (id1 != id2) { panic("ecs_mesh_obj: mesh signature should dedupe identical OBJ") }
+
+print("ecs_mesh_obj: ok")

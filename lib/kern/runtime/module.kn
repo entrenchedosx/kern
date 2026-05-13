@@ -1,0 +1,6 @@
+// runtime module facade
+
+def use_memory() { return import("lib/kern/runtime/memory.kn") }
+def use_sync() { return import("lib/kern/runtime/sync.kn") }
+def use_time() { return import("lib/kern/runtime/time.kn") }
+def use_modern() { return import("lib/kern/runtime/modern/module.kn") }

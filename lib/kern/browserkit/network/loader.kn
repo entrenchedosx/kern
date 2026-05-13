@@ -1,0 +1,94 @@
+// browserkit network/loader.kn
+// resource loader with async queue + simple cache hooks.
+
+http = import("lib/kern/browserkit/network/http.kn")
+storage = import("lib/kern/browserkit/storage/local.kn")
+
+queue_items = []
+
+def _bk_fail(code, message, hint) {
+    throw Error(code + ": " + message + " | Hint: " + hint, code)
+}
+
+def _mk_req(url, kind) {
+    let r = {}
+    r["url"] = url
+    r["kind"] = kind
+    r["done"] = false
+    r["result"] = null
+    return r
+}
+
+def load_html(url) { return http.get(url, {}) }
+def load_css(url) { return http.get(url, {}) }
+def load_js(url) { return http.get(url, {}) }
+def load_image(url) { return http.get(url, {}) }
+
+def enqueue(url, kind) {
+    if (url == null || str(url) == "") {
+        _bk_fail("BROWSERKIT-LOADER-INVALID-URL",
+            "enqueue received an empty URL",
+            "Pass a non-empty URL string when queueing resources.")
+    }
+    let k = str(kind)
+    if (k != "html" && k != "css" && k != "js" && k != "image") {
+        _bk_fail("BROWSERKIT-LOADER-UNSUPPORTED-KIND",
+            "enqueue received unsupported resource kind '" + k + "'",
+            "Use one of: html, css, js, image.")
+    }
+    let req = _mk_req(url, kind)
+    push(queue_items, req)
+    return len(queue_items) - 1
+}
+
+def process_one() {
+    if (len(queue_items) == 0) { return null }
+    let req = remove_at(queue_items, 0)
+    if (req == null || !has(req, "kind") || !has(req, "url")) {
+        _bk_fail("BROWSERKIT-LOADER-STATE-INVALID",
+            "queue item is missing required fields",
+            "Ensure items are created through enqueue() only.")
+    }
+    let key = "cache:resource:" + req["kind"] + ":" + req["url"]
+    let cached = storage.get(key)
+    if (cached != null) {
+        let r = {}
+        r["ok"] = true
+        r["status"] = 200
+        r["body"] = cached
+        r["cached"] = true
+        req["result"] = r
+        req["done"] = true
+        return req
+    }
+
+    let out = null
+    if (req["kind"] == "html") {
+        out = load_html(req["url"])
+    } else {
+        if (req["kind"] == "css") {
+            out = load_css(req["url"])
+        } else {
+            if (req["kind"] == "js") {
+                out = load_js(req["url"])
+            } else {
+                if (req["kind"] == "image") {
+                    out = load_image(req["url"])
+                } else {
+                    _bk_fail("BROWSERKIT-LOADER-UNSUPPORTED-KIND",
+                        "process_one hit unsupported resource kind '" + str(req["kind"]) + "'",
+                        "Queue only html, css, js, or image resource kinds.")
+                }
+            }
+        }
+    }
+
+    if (out != null && out["ok"]) {
+        storage.set(key, out["body"])
+    }
+    req["result"] = out
+    req["done"] = true
+    return req
+}
+
+def pending_count() { return len(queue_items) }

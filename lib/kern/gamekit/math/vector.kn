@@ -1,0 +1,47 @@
+// gamekit math vectors and matrices
+
+def vec2(x, y) {
+    return {"x": x, "y": y}
+}
+
+def vec3(x, y, z) {
+    return {"x": x, "y": y, "z": z}
+}
+
+def vec2_add(a, b) { return vec2(a.x + b.x, a.y + b.y) }
+def vec2_sub(a, b) { return vec2(a.x - b.x, a.y - b.y) }
+def vec2_scale(a, s) { return vec2(a.x * s, a.y * s) }
+def vec2_len(a) { return sqrt(a.x * a.x + a.y * a.y) }
+
+def vec2_norm(a) {
+    let l = vec2_len(a)
+    if (l <= 0.000001) { return vec2(0.0, 0.0) }
+    return vec2(a.x / l, a.y / l)
+}
+
+def vec2_dot(a, b) { return a.x * b.x + a.y * b.y }
+
+def vec3_add(a, b) { return vec3(a.x + b.x, a.y + b.y, a.z + b.z) }
+def vec3_sub(a, b) { return vec3(a.x - b.x, a.y - b.y, a.z - b.z) }
+def vec3_scale(a, s) { return vec3(a.x * s, a.y * s, a.z * s) }
+def vec3_dot(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z }
+
+def vec3_len(a) { return sqrt(vec3_dot(a, a)) }
+
+def vec3_norm(a) {
+    let l = vec3_len(a)
+    if (l <= 0.000001) { return vec3(0.0, 0.0, 0.0) }
+    return vec3(a.x / l, a.y / l, a.z / l)
+}
+
+def vec3_cross(a, b) {
+    return vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x)
+}
+
+def rand_vec2(minv, maxv) {
+    return vec2(random(minv, maxv), random(minv, maxv))
+}
+
+def rand_vec3(minv, maxv) {
+    return vec3(random(minv, maxv), random(minv, maxv), random(minv, maxv))
+}

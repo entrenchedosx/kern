@@ -1,0 +1,19 @@
+Windows Registry Editor Version 5.00
+;
+; Double-click .kn files to run with Kern (current user only).
+; BEFORE MERGING: replace EVERY occurrence of C:\\Program Files\\Kern\\kern.exe
+; with the actual path to your kern.exe (double each backslash in .reg files).
+;
+; Right-click this file -> Merge, or: reg import kern-windows-file-association.reg
+
+[HKEY_CURRENT_USER\Software\Classes\.kn]
+@="Kern.Script"
+
+[HKEY_CURRENT_USER\Software\Classes\Kern.Script]
+@="Kern script"
+
+[HKEY_CURRENT_USER\Software\Classes\Kern.Script\DefaultIcon]
+@="C:\\Program Files\\Kern\\kern.exe,0"
+
+[HKEY_CURRENT_USER\Software\Classes\Kern.Script\shell\open\command]
+@="\"C:\\Program Files\\Kern\\kern.exe\" \"%1\" %*"

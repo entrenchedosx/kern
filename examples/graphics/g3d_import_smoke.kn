@@ -1,0 +1,12 @@
+// smoke test: graphics modules import successfully.
+// This test must not depend on any local dev backup paths.
+
+let g3d = import("g3d")
+if (g3d == null) {
+    print("g3d unavailable in this build")
+} else {
+    print("OK: g3d import")
+}
+
+
+

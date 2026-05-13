@@ -1,0 +1,70 @@
+slug_m = import("lib/kern/slug.kn")
+safe_json_m = import("lib/kern/safe_json.kn")
+semver_m = import("lib/kern/semver.kn")
+shell_m = import("lib/kern/shell_quote.kn")
+flow_m = import("lib/kern/flow.kn")
+group_m = import("lib/kern/groupby.kn")
+url_m = import("lib/kern/url_form.kn")
+zip_m = import("lib/kern/zip_dict.kn")
+bench_m = import("lib/kern/bench.kn")
+lines_m = import("lib/kern/lines_io.kn")
+html_tpl = import("lib/kern/html_template.kn")
+http_s = import("lib/kern/http_shortcuts.kn")
+
+assert_eq(slug_m.slug("  Hello World!  "), "hello-world")
+assert_eq(slug_m.slug("foo---bar"), "foo-bar")
+
+let bad = safe_json_m.safe_json_parse(42)
+assert_eq(bad["ok"], false)
+
+let good = safe_json_m.safe_json_parse("[1,2]")
+assert_eq(good["ok"], true)
+assert_eq(len(good["value"]), 2)
+
+assert_eq(semver_m.compare_version("1.2.3", "1.2.4"), -1)
+assert_eq(semver_m.compare_version("2.0", "1.9"), 1)
+assert_eq(semver_m.compare_version("1.0.0", "1.0.0"), 0)
+assert_eq(semver_m.valid_version("1.0.a"), false)
+assert_eq(semver_m.valid_version("1.0.0"), true)
+
+let q = shell_m.shell_quote("a'b")
+assert_eq(len(q) > 3, true)
+assert_eq(slice(q, 0, 1), "'")
+
+assert_eq(flow_m.identity(42), 42)
+let acc = { "n": 0 }
+flow_m.tap(5, lambda (x) => { acc["n"] = acc["n"] + x })
+assert_eq(acc["n"], 5)
+
+let rows = array()
+push(rows, { "k": "x", "v": 1 })
+push(rows, { "k": "y", "v": 2 })
+push(rows, { "k": "x", "v": 3 })
+let g = group_m.group_by_field(rows, "k")
+assert_eq(len(g["x"]), 2)
+assert_eq(len(g["y"]), 1)
+
+assert_eq(url_m.build_query_string({ "b": 2, "a": 1 }), "a=1&b=2")
+
+let zd = zip_m.zip_to_dict(array("p", "q"), array(10, 20))
+assert_eq(zd["p"], 10)
+assert_eq(zd["q"], 20)
+
+let bt = bench_m.timed(lambda () => { return 99 })
+assert_eq(bt["result"], 99)
+assert_eq(bt["seconds"] >= 0, true)
+
+let p = path_join(temp_dir(), "kern_cov_lines_io.txt")
+assert_eq(lines_m.write_lines(p, array("a", "b")), true)
+let rl = lines_m.read_lines(p)
+assert_eq(len(rl), 2)
+assert_eq(rl[0], "a")
+assert_eq(rl[1], "b")
+
+assert_eq(html_tpl.render("Hi {{name}}", { "name": "<b>" }), "Hi &lt;b&gt;")
+
+let jr = http_s.json_response(201, { "ok": true })
+assert_eq(regex_match(jr, "201"), true)
+assert_eq(regex_match(jr, "application/json"), true)
+
+print("OK: test_lib_extra_modules")

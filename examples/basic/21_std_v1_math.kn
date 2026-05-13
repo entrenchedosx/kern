@@ -1,0 +1,10 @@
+// Versioned stdlib: std.v1.math (see docs/STDLIB_STD_V1.md).
+
+let m = import("std.v1.math")
+if m == null {
+    print("std.v1.math not available in this build")
+} else {
+    print("PI =", m["PI"])
+    print("hypot(3,4) =", m["hypot"](3.0, 4.0))
+    print("fmod(7,3) =", m["fmod"](7.0, 3.0))
+}

@@ -1,0 +1,52 @@
+// flagship demo: modern runtime + commands + events + emit diagnostics + inspect_event / inspect_all_events.
+// run from repo root: .\shareable-ide\compiler\kern.exe examples\golden\golden_event_runtime_dashboard.kn
+
+runtime_mod = import("lib/kern/runtime/modern/module.kn")
+evmod = import("lib/kern/runtime/modern/events.kn")
+commands = import("lib/kern/runtime/modern/commands.kn")
+
+let state = {}
+state["booms"] = 0
+
+@event("demo_fault", priority=100, max_failures=1, cooldown_ms=50, max_circuit_trips=2, stop_on_error=false)
+def flaky(ctx, payload) {
+    state["booms"] = int(state["booms"]) + 1
+    if (int(state["booms"]) < 2) {
+        throw Error("transient", "DEMO-TRANSIENT")
+    }
+    return null
+}
+
+@command("ping", description="No-op", inject_ctx=false)
+def ping_cmd(ctx, args) {
+    return {"ok": true, "pong": true}
+}
+
+def main() {
+    let rt = runtime_mod.create_runtime({})
+    let bus = rt["events"]
+    let ctx = rt["ctx"]
+
+    print("--- inspect (before emits) ---")
+    print(json_stringify(evmod.inspect_all_events(bus)))
+
+    let r1 = evmod.emit(bus, "demo_fault", ctx, {})
+    print("emit1 delivered=", r1["delivered"], "circuit_skips=", r1["circuit_skips"], "errors=", len(r1["errors"]))
+
+    sleep_ms(60)
+
+    let r2 = evmod.emit(bus, "demo_fault", ctx, {})
+    print("emit2 delivered=", r2["delivered"], "listener_stats len=", len(r2["listener_stats"]))
+
+    let out = commands.run_command(rt["commands"], bus, ctx, "ping", {})
+    print("ping ok=", out["ok"])
+
+    print("--- inspect (after) ---")
+    print(json_stringify(evmod.inspect_event(bus, "demo_fault")))
+
+    runtime_mod.shutdown(rt)
+    print("ok")
+    return null
+}
+
+main()

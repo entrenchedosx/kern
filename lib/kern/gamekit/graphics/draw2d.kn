@@ -1,0 +1,101 @@
+// gamekit 2D rendering helpers
+
+g = import("g2d")
+game = import("game")
+
+def create_window(w, h, title) {
+    if (g != null) { g.createWindow(w, h, title); return true }
+    if (game != null) { game.window_create(w, h, title); return true }
+    return false
+}
+
+def set_target_fps(fps) {
+    if (g != null) { g.setTargetFps(fps); return }
+    if (game != null) { game.set_target_fps(fps); return }
+}
+
+def clear(r, gg, b, a) {
+    if (a == null) { a = 255 }
+    if (g != null) { g.clear(r, gg, b, a); return }
+    if (game != null) { game.clear(r, gg, b); return }
+}
+
+def rect(x, y, w, h, r, gg, b, a) {
+    if (a == null) { a = 255 }
+    if (g != null) { g.fillRect(x, y, w, h, r, gg, b, a); return }
+    if (game != null) { game.draw_rect(x, y, w, h, r, gg, b, a); return }
+}
+
+def outline_rect(x, y, w, h, r, gg, b, a) {
+    if (a == null) { a = 255 }
+    if (g != null) { g.drawRect(x, y, w, h, r, gg, b, a); return }
+}
+
+def circle(x, y, radius, r, gg, b, a) {
+    if (a == null) { a = 255 }
+    if (g != null) { g.fillCircle(x, y, radius, r, gg, b, a); return }
+    if (game != null) { game.draw_circle(x, y, radius, r, gg, b, a); return }
+}
+
+def text(s, x, y, size, r, gg, b) {
+    if (size == null) { size = 20 }
+    if (r == null) { r = 255; gg = 255; b = 255 }
+    if (g != null) { g.drawText(s, x, y, null, r, gg, b, 255); return }
+    if (game != null) { game.draw_text(s, x, y, size, r, gg, b); return }
+}
+
+def load_image(path) {
+    if (g != null) { return g.loadImage(path) }
+    if (game != null) { return game.load_image(path) }
+    return -1
+}
+
+def draw_image(image_id, x, y, scale) {
+    if (scale == null) { scale = 1.0 }
+    if (g != null) { g.draw_image(image_id, x, y, scale, 0.0); return }
+    if (game != null) {
+        if (scale == 1.0) { game.draw_image(image_id, x, y) }
+        else { game.draw_image_ex(image_id, x, y, scale, 0.0) }
+    }
+}
+
+def present() {
+    if (g != null) { g.present(); return }
+    if (game != null) { game.present(); return }
+}
+
+def is_open() {
+    if (g != null) { return g.isOpen() }
+    if (game != null) { return game.window_open() }
+    return false
+}
+
+def width() {
+    if (g != null) { return g.width() }
+    if (game != null) { return game.screen_width() }
+    return 0
+}
+
+def height() {
+    if (g != null) { return g.height() }
+    if (game != null) { return game.screen_height() }
+    return 0
+}
+
+def delta_time() {
+    if (g != null) { return g.delta_time() }
+    if (game != null) { return game.delta_time() }
+    return 0.016
+}
+
+def run(update_fn, draw_fn) {
+    if (g != null) {
+        g.run(update_fn, draw_fn)
+        return
+    }
+    while (is_open()) {
+        update_fn()
+        draw_fn()
+        present()
+    }
+}

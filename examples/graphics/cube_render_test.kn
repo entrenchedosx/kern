@@ -1,0 +1,37 @@
+// cube_render_test.kn - Minimal render verification using Ursina API
+print("=== CUBE RENDER TEST ===")
+print("")
+
+// Import 3dengine
+let engine = import("3dengine")
+print("3dengine module loaded")
+
+// Get Ursina submodule
+let ursina = engine["ursina"]
+print("Ursina module loaded")
+
+// Create App (returns app_id)
+let app_id = ursina["App"]()
+print("App created with ID: " + app_id)
+
+// Create Entity with params dictionary
+// Entity(app_id, { model: "cube", position: [0, 0, 5], color: [1, 0, 0, 1] })
+let params = {}
+params["model"] = "cube"
+params["position"] = [0, 0, 5]
+params["color"] = [1, 0, 0, 1]
+
+let cube = ursina["Entity"](app_id, params)
+print("Cube entity created with ID: " + cube)
+
+print("")
+print("Starting render loop...")
+print("You should see a RED CUBE in the center of the window")
+print("(Close window to exit)")
+print("")
+
+// Run the world using world_run with the app/world ID
+engine["world_run"](app_id)
+
+print("")
+print("=== TEST COMPLETE ===")

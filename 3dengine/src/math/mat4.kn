@@ -1,0 +1,100 @@
+// 3dengine mat4 math (row-major 4x4 as flat array of 16 floats)
+
+def identity() {
+    return [
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0
+    ]
+}
+
+def zero() {
+    return [
+        0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0
+    ]
+}
+
+def copy(m) {
+    return [
+        float(default(m[0], 0.0)), float(default(m[1], 0.0)), float(default(m[2], 0.0)), float(default(m[3], 0.0)),
+        float(default(m[4], 0.0)), float(default(m[5], 0.0)), float(default(m[6], 0.0)), float(default(m[7], 0.0)),
+        float(default(m[8], 0.0)), float(default(m[9], 0.0)), float(default(m[10], 0.0)), float(default(m[11], 0.0)),
+        float(default(m[12], 0.0)), float(default(m[13], 0.0)), float(default(m[14], 0.0)), float(default(m[15], 0.0))
+    ]
+}
+
+def mul(a, b) {
+    let out = zero()
+    let r = 0
+    while (r < 4) {
+        let c = 0
+        while (c < 4) {
+            let i = r * 4 + c
+            out[i] = float(default(a[r * 4 + 0], 0.0)) * float(default(b[0 * 4 + c], 0.0)) + float(default(a[r * 4 + 1], 0.0)) * float(default(b[1 * 4 + c], 0.0)) + float(default(a[r * 4 + 2], 0.0)) * float(default(b[2 * 4 + c], 0.0)) + float(default(a[r * 4 + 3], 0.0)) * float(default(b[3 * 4 + c], 0.0))
+            c = c + 1
+        }
+        r = r + 1
+    }
+    return out
+}
+
+def translate(v) {
+    let m = identity()
+    m[3] = float(default(v["x"], 0.0))
+    m[7] = float(default(v["y"], 0.0))
+    m[11] = float(default(v["z"], 0.0))
+    return m
+}
+
+def scale(v) {
+    let m = identity()
+    m[0] = float(default(v["x"], 1.0))
+    m[5] = float(default(v["y"], 1.0))
+    m[10] = float(default(v["z"], 1.0))
+    return m
+}
+
+def ortho(left, right, bottom, top, near, far) {
+    let m = zero()
+    let rl = float(right) - float(left)
+    let tb = float(top) - float(bottom)
+    let depth_span = float(far) - float(near)
+    if (rl == 0.0 || tb == 0.0 || depth_span == 0.0) { return identity() }
+    m[0] = 2.0 / rl
+    m[5] = 2.0 / tb
+    m[10] = -2.0 / depth_span
+    m[3] = -(float(right) + float(left)) / rl
+    m[7] = -(float(top) + float(bottom)) / tb
+    m[11] = -(float(far) + float(near)) / depth_span
+    m[15] = 1.0
+    return m
+}
+
+def perspective(fov_y_rad, aspect, near, far) {
+    let m = zero()
+    let f = 1.0 / tan(float(fov_y_rad) * 0.5)
+    let nf = float(near) - float(far)
+    if (nf == 0.0) { return identity() }
+    m[0] = f / float(aspect)
+    m[5] = f
+    m[10] = (float(far) + float(near)) / nf
+    m[11] = (2.0 * float(far) * float(near)) / nf
+    m[14] = -1.0
+    return m
+}
+
+def transform_point(m, v) {
+    let x = float(default(v["x"], 0.0))
+    let y = float(default(v["y"], 0.0))
+    let z = float(default(v["z"], 0.0))
+    let tx = x * float(default(m[0], 0.0)) + y * float(default(m[1], 0.0)) + z * float(default(m[2], 0.0)) + float(default(m[3], 0.0))
+    let ty = x * float(default(m[4], 0.0)) + y * float(default(m[5], 0.0)) + z * float(default(m[6], 0.0)) + float(default(m[7], 0.0))
+    let tz = x * float(default(m[8], 0.0)) + y * float(default(m[9], 0.0)) + z * float(default(m[10], 0.0)) + float(default(m[11], 0.0))
+    let tw = x * float(default(m[12], 0.0)) + y * float(default(m[13], 0.0)) + z * float(default(m[14], 0.0)) + float(default(m[15], 1.0))
+    if (tw == 0.0) { return {"x": tx, "y": ty, "z": tz} }
+    return {"x": tx / tw, "y": ty / tw, "z": tz / tw}
+}

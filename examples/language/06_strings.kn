@@ -1,0 +1,184 @@
+// 06_strings.kn - String manipulation and text processing
+
+print("=== String Basics ===")
+
+let str = "Hello, Kern!"
+print("String: " + str)
+print("Length: " + len(str))
+
+// String indexing
+print("First char: " + str[0])
+print("Last char: " + str[len(str) - 1])
+
+// String slicing
+print("Slice [0:5]: " + str[0:5])    // "Hello"
+print("Slice [7:]: " + str[7:])      // "Kern!"
+
+print("")
+print("=== String Concatenation ===")
+
+let first = "Hello"
+let last = "World"
+let full = first + " " + last
+print("Concatenated: " + full)
+
+// Multi-line string
+let multi = "Line 1\nLine 2\nLine 3"
+print("Multi-line:\n" + multi)
+
+// String repetition (if available)
+// let repeated = "Ha" * 3  // "HaHaHa"
+
+print("")
+print("=== String Methods ===")
+
+let text = "  Hello World  "
+
+// Trimming
+print("Original: '" + text + "'")
+// print("Trimmed: '" + text.trim() + "'")
+
+// Case conversion
+// print("Upper: " + str.upper())
+// print("Lower: " + str.lower())
+
+// Substring
+let sentence = "The quick brown fox"
+print("Contains 'quick': " + sentence.contains("quick"))
+print("Contains 'slow': " + sentence.contains("slow"))
+
+// Index finding
+print("Index of 'brown': " + sentence.indexOf("brown"))
+
+// Replacing
+// print("Replace 'brown' with 'red': " + sentence.replace("brown", "red"))
+
+// Splitting
+let csv = "apple,banana,cherry"
+let fruits = csv.split(",")
+print("Split result: " + fruits)
+
+let path = "/usr/local/bin"
+let parts = path.split("/")
+print("Path parts: " + parts)
+
+// Joining
+let words = ["The", "quick", "brown", "fox"]
+// let joined = " ".join(words)
+// print("Joined: " + joined)
+
+print("")
+print("=== String Parsing ===")
+
+// Parse integer
+let numStr = "42"
+// let parsed = parseInt(numStr)
+// print("Parsed: " + parsed + " (type: number)")
+
+// Parse float
+let floatStr = "3.14159"
+// let parsedFloat = parseFloat(floatStr)
+// print("Parsed float: " + parsedFloat)
+
+// Number to string
+let num = 123
+let numAsStr = "" + num
+print("Number as string: " + numAsStr)
+
+print("")
+print("=== String Interpolation ===")
+
+let name = "Alice"
+let age = 30
+let city = "Boston"
+
+// Concatenation approach
+let bio = "My name is " + name + ", I am " + age + " years old, and I live in " + city + "."
+print(bio)
+
+// Template literal (if supported)
+// let bio2 = "My name is {name}, I am {age} years old, and I live in {city}."
+
+print("")
+print("=== Pattern Matching ===")
+
+// Starts/ends with
+let filename = "document.txt"
+// print("Starts with 'doc': " + filename.startsWith("doc"))
+// print("Ends with '.txt': " + filename.endsWith(".txt"))
+
+// Character classification
+// print("Is digit: " + "42".isDigit())
+// print("Is alpha: " + "hello".isAlpha())
+// print("Is alphanumeric: " + "hello123".isAlnum())
+
+print("")
+print("=== Text Processing Examples ===")
+
+// Word count
+def wordCount(text) {
+    let words = text.split(" ")
+    return len(words)
+}
+
+let paragraph = "The quick brown fox jumps over the lazy dog"
+print("Word count: " + wordCount(paragraph))
+
+// Reverse string
+def reverseString(s) {
+    let result = ""
+    for i in range(len(s) - 1, -1, -1) {
+        result = result + s[i]
+    }
+    return result
+}
+
+print("Reversed: " + reverseString("Kern"))
+
+// Palindrome check
+def isPalindrome(s) {
+    // Remove non-alphanumeric and convert to lowercase
+    let cleaned = ""
+    for c in s {
+        // if (c.isAlnum()) {
+        //     cleaned = cleaned + c.lower()
+        // }
+    }
+    
+    // For now, simple check
+    for i in range(len(s) / 2) {
+        if (s[i] != s[len(s) - 1 - i]) {
+            return false
+        }
+    }
+    return true
+}
+
+print("'radar' palindrome: " + isPalindrome("radar"))
+print("'hello' palindrome: " + isPalindrome("hello"))
+
+print("")
+print("=== CSV Parsing ===")
+
+let csvData = "name,age,city\nAlice,30,NYC\nBob,25,LA\nCarol,35,Chicago"
+
+// Simple CSV parser
+def parseCSV(data) {
+    let lines = data.split("\n")
+    let headers = lines[0].split(",")
+    let rows = []
+    
+    for i in range(1, len(lines)) {
+        let values = lines[i].split(",")
+        let row = {}
+        for j in range(len(headers)) {
+            row[headers[j]] = values[j]
+        }
+        rows.append(row)
+    }
+    
+    return rows
+}
+
+let parsed = parseCSV(csvData)
+print("Parsed CSV: " + parsed)

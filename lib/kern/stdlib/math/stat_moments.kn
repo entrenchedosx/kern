@@ -1,0 +1,40 @@
+// Mean, variance, sample variance for numeric arrays.
+// import("lib/kern/stdlib/math/stat_moments.kn")
+
+def mean_arr(arr) {
+    if (len(arr) == 0) { throw "mean_arr: empty" }
+    let s = 0.0
+    let i = 0
+    while (i < len(arr)) {
+        s = s + float(arr[i])
+        i = i + 1
+    }
+    return s / float(len(arr))
+}
+
+def variance_pop(arr) {
+    if (len(arr) == 0) { throw "variance_pop: empty" }
+    let m = mean_arr(arr)
+    let s = 0.0
+    let i = 0
+    while (i < len(arr)) {
+        let d = float(arr[i]) - m
+        s = s + d * d
+        i = i + 1
+    }
+    return s / float(len(arr))
+}
+
+def variance_sample(arr) {
+    let n = len(arr)
+    if (n <= 1) { throw "variance_sample: need at least 2" }
+    let m = mean_arr(arr)
+    let s = 0.0
+    let i = 0
+    while (i < n) {
+        let d = float(arr[i]) - m
+        s = s + d * d
+        i = i + 1
+    }
+    return s / float(n - 1)
+}

@@ -1,0 +1,40 @@
+// Indent every line of a multi-line string.
+// import("lib/kern/stdlib/text/indent.kn")
+
+def indent_lines(s, prefix) {
+    let lines = split_lines(s)
+    let out = array()
+    let i = 0
+    while (i < len(lines)) {
+        push(out, prefix + lines[i])
+        i = i + 1
+    }
+    return join(out, "\n")
+}
+
+def dedent_lines(s) {
+    let lines = split_lines(s)
+    if (len(lines) == 0) { return "" }
+    let min_ws = null
+    let i = 0
+    while (i < len(lines)) {
+        let ln = lines[i]
+        if (len(ln) == 0) { i = i + 1; continue }
+        let j = 0
+        while (j < len(ln) and (ln[j] == " " or ln[j] == "\t")) { j = j + 1 }
+        if (j < len(ln)) {
+            if (min_ws == null or j < min_ws) { min_ws = j }
+        }
+        i = i + 1
+    }
+    if (min_ws == null or min_ws == 0) { return join(lines, "\n") }
+    let out = array()
+    i = 0
+    while (i < len(lines)) {
+        let ln = lines[i]
+        if (len(ln) >= min_ws) { push(out, slice(ln, min_ws, len(ln))) }
+        else { push(out, ln) }
+        i = i + 1
+    }
+    return join(out, "\n")
+}

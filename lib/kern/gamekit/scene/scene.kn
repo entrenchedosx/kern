@@ -1,0 +1,45 @@
+// gamekit scene manager
+
+scenes = {}
+current_scene = null
+
+
+def register(name, scene_obj) {
+    scenes[name] = scene_obj
+}
+
+def exists(name) {
+    return has(scenes, name)
+}
+
+def load(name, ctx) {
+    if (!has(scenes, name)) { throw "scene not found: " + name }
+
+    if (current_scene != null && has(current_scene, "on_exit")) {
+        current_scene.on_exit(ctx)
+    }
+
+    current_scene = scenes[name]
+    if (has(current_scene, "on_enter")) {
+        current_scene.on_enter(ctx)
+    }
+}
+
+def update(dt, ctx) {
+    if (current_scene != null && has(current_scene, "update")) {
+        current_scene.update(dt, ctx)
+    }
+}
+
+def render(ctx) {
+    if (current_scene != null && has(current_scene, "render")) {
+        current_scene.render(ctx)
+    }
+}
+
+def current_name() {
+    for k in keys(scenes) {
+        if (scenes[k] == current_scene) { return k }
+    }
+    return ""
+}

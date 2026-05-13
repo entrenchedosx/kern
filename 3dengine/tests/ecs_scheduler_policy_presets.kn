@@ -1,0 +1,31 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let pass = lambda (world, dt) => { return null }
+
+def run_with_preset(preset_name) {
+    let w = ecs["world_create"]()
+    let _ = ecs["world_set_scheduler_policy"](w, preset_name)
+
+    if (!ecs["world_register_system"](w, "POST_SIMULATION", "sp.a", pass, [], {"write_mask": ["registry"]})) { panic("ecs_scheduler_policy_presets: register sp.a failed") }
+    if (!ecs["world_register_system"](w, "POST_SIMULATION", "sp.b", pass, [], {"write_mask": ["render"]})) { panic("ecs_scheduler_policy_presets: register sp.b failed") }
+
+    ecs["world_run_fixed_pipeline_auto"](w, 1.0 / 60.0, null)
+    return ecs["world_parallel_runtime_stats"](w)
+}
+
+let w0 = ecs["world_create"]()
+let p0 = ecs["world_get_scheduler_policy"](w0)
+if (str(default(p0["name"], "")) != "balanced") { panic("ecs_scheduler_policy_presets: default policy should be balanced") }
+
+let s = run_with_preset("safe")
+if (str(default(s["policy_preset"], "")) != "safe") { panic("ecs_scheduler_policy_presets: safe preset not applied") }
+if (int(default(s["auto_parallel_stages"], 0)) != 0) { panic("ecs_scheduler_policy_presets: safe should avoid parallel stages in this test") }
+
+let a = run_with_preset("aggressive")
+if (str(default(a["policy_preset"], "")) != "aggressive") { panic("ecs_scheduler_policy_presets: aggressive preset not applied") }
+if (int(default(a["auto_parallel_stages"], 0)) <= 0) { panic("ecs_scheduler_policy_presets: aggressive should select parallel stage(s)") }
+
+print("ecs_scheduler_policy_presets: ok")

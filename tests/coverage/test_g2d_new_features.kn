@@ -1,0 +1,23 @@
+let g = import("g2d")
+if (g == null) {
+    print("skip-g2d")
+} else {
+    let w = g.measureText("hello", 20)
+    let md = g.isMouseDown(0)
+    let mw = g.mouseWheel()
+
+    // shape/text APIs should be callable safely even without window.
+    g.drawTriangle(0, 0, 10, 0, 5, 10, 255, 0, 0, 255)
+    g.fillTriangle(0, 0, 10, 0, 5, 10, 0, 255, 0, 255)
+    g.drawEllipse(20, 20, 8, 4, 255, 255, 0, 255)
+    g.fillEllipse(20, 20, 8, 4, 0, 255, 255, 255)
+    g.drawTextCentered("x", 40, 40, 16, 255, 255, 255, 255)
+
+    if (w >= 0 && md != null && mw != null) {
+        print("g2d-new-ok")
+    } else {
+        print("g2d-new-fail")
+    }
+}
+
+

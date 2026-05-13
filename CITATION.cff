@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+title: Kern
+message: "If you use Kern, please cite the project and link to the upstream repository."
+type: software
+authors:
+  - family-names: Awad
+    given-names: A.
+repository-code: "https://github.com/entrenchedosx/kern"
+license: GPL-3.0-only
+version: "1.0.7"

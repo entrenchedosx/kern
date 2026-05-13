@@ -1,0 +1,9 @@
+m = import("runtime_controls")
+
+v = m.set_step_limit(-123)
+assert_eq(v, 0)
+
+depth = m.set_max_call_depth(1)
+assert_eq(depth >= 16, true)
+
+print("OK: test_module_runtime_controls_negative")

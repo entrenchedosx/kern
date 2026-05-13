@@ -1,0 +1,33 @@
+// gamekit audio wrappers
+
+game = import("game")
+
+sounds = {}
+
+def load(path) {
+    if (game == null) { return -1 }
+    if (has(sounds, path)) { return sounds[path] }
+    let id = game.load_sound(path)
+    sounds[path] = id
+    return id
+}
+
+def play(path_or_id) {
+    if (game == null) { return false }
+    let id = -1
+    if (type(path_or_id) == "string") {
+        id = load(path_or_id)
+    } else {
+        id = path_or_id
+    }
+    if (id < 0) { return false }
+    game.play_sound(id)
+    return true
+}
+
+def set_master_volume(v) {
+    if (game == null) { return }
+    if (has(game, "set_master_volume")) {
+        game.set_master_volume(v)
+    }
+}

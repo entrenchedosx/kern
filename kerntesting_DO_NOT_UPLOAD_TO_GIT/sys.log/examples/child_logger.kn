@@ -1,0 +1,5 @@
+let slog = import("sys.log")
+let root = slog["create_logger"]({ "name": "gateway", "level": "debug", "format": "text" })
+let req = slog["child"](root, { "trace_id": "trc-123" })
+slog["debug"](req, "request started", { "path": "/v1/payments" })
+slog["warn"](req, "upstream latency high", { "ms": 940 })

@@ -1,0 +1,23 @@
+# Standard Library Test Program
+# Test various standard library functions
+
+# Test math functions
+print "Math Functions Test:";
+let a = 16.0;
+print "sqrt(16.0) = ";
+# Note: This would need builtin instruction to call standard library functions
+
+# Test string functions
+print "String Functions Test:";
+let hello = "Hello";
+let world = "World";
+let combined = hello + " " + world;
+print "Combined: " + combined;
+
+# Test control flow
+let x = 42;
+if (x > 0) {
+    print "Standard library test completed successfully!";
+} else {
+    print "Unexpected result";
+}

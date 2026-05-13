@@ -1,0 +1,24 @@
+// Minimal CSV: one row per line, comma-separated (no quoted commas).
+// import("lib/kern/stdlib/data/csv_read.kn")
+
+def csv_parse_line(line) {
+    return split(line, ",")
+}
+
+def csv_parse(s) {
+    let lines = split_lines(s)
+    let rows = array()
+    let i = 0
+    while (i < len(lines)) {
+        let ln = trim(lines[i])
+        if (len(ln) > 0) {
+            push(rows, csv_parse_line(ln))
+        }
+        i = i + 1
+    }
+    return rows
+}
+
+def csv_row_join(fields) {
+    return join(fields, ",")
+}

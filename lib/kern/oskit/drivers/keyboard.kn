@@ -1,0 +1,18 @@
+// oskit drivers/keyboard.kn
+
+port = import("lib/kern/oskit/cpu/port.kn")
+
+let _queue = []
+
+def poll_scancode() {
+    // cOM/PS2 style emulation path.
+    let v = port.read(96)
+    if (v != 0) { push(_queue, v) }
+    return v
+}
+
+def read_key() {
+    if (len(_queue) == 0) { poll_scancode() }
+    if (len(_queue) == 0) { return null }
+    return remove_at(_queue, 0)
+}

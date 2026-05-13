@@ -1,0 +1,37 @@
+// kern log utilities — import("lib/kern/log_utils.kn")
+// log_info_ts, log_warn_ts, log_error_ts, log_debug_ts, log_struct (uses log_*, time_format, time)
+
+def _now_iso() {
+    return time_format("%Y-%m-%d %H:%M:%S", time())
+}
+
+def log_info_ts(msg) {
+    log_info("[" + _now_iso() + "] " + str(msg))
+}
+
+def log_warn_ts(msg) {
+    log_warn("[" + _now_iso() + "] " + str(msg))
+}
+
+def log_error_ts(msg) {
+    log_error("[" + _now_iso() + "] " + str(msg))
+}
+
+def log_debug_ts(msg) {
+    log_debug("[" + _now_iso() + "] " + str(msg))
+}
+
+def log_struct(level, msg, data) {
+    let rec = { "ts": _now_iso(), "level": level, "msg": msg, "data": data }
+    let line = json_stringify(rec)
+    if (level == "info") {
+        log_info(line)
+    } else {
+        if (level == "warn") {
+            log_warn(line)
+        } else {
+            if (level == "error") { log_error(line) }
+            else { log_debug(line) }
+        }
+    }
+}

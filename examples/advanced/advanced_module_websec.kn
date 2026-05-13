@@ -1,0 +1,7 @@
+websec = import("websec")
+
+raw = "<script>alert(1)</script>"
+escaped = websec.html_escape(raw)
+san = websec.html_sanitize_strict(raw)
+print("escaped changed:", escaped != raw)
+print("sanitized:", san)

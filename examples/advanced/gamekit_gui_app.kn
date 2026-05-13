@@ -1,0 +1,40 @@
+// gamekit example: simple GUI app (button counter)
+
+kit = import("lib/kern/gamekit/module.kn")
+import "lib/kern/gamekit/input/input.kn"
+draw = kit.use_draw2d()
+ui = kit.use_ui()
+input = kit.use_input()
+
+count = 0
+enabled = true
+
+let window_ok = draw.create_window(880, 560, "Kern GameKit - GUI App")
+if (!window_ok) {
+    print("No 2D backend available for GUI app")
+}
+
+draw.set_target_fps(60)
+
+while (window_ok && draw.is_open()) {
+    draw.clear(15, 18, 28, 255)
+
+    ui.panel(120, 90, 640, 360, "GameKit GUI Demo")
+    ui.label("This uses importable ui/widgets.kn", 150, 140, 18)
+    ui.label("Counter: " + count, 150, 180, 22)
+
+    if (enabled && ui.button("Increment", 150, 240, 180, 44)) {
+        count = count + 1
+    }
+
+    enabled = ui.toggle("Enabled", enabled, 150, 300, 180, 44)
+
+    let m = input.mouse_pos()
+    ui.label("Mouse: (" + m.x + ", " + m.y + ")", 150, 370, 16)
+
+    draw.present()
+}
+
+
+
+

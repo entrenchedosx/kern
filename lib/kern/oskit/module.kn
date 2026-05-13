@@ -1,0 +1,19 @@
+// oskit module.kn
+
+def use_kernel() { return import("lib/kern/oskit/kernel/core.kn") }
+def use_asm() { return import("lib/kern/oskit/cpu/asm.kn") }
+def use_port() { return import("lib/kern/oskit/cpu/port.kn") }
+def use_serial() { return import("lib/kern/oskit/cpu/serial.kn") }
+def use_heap() { return import("lib/kern/oskit/memory/heap.kn") }
+def use_paging() { return import("lib/kern/oskit/memory/paging.kn") }
+def use_interrupts() { return import("lib/kern/oskit/interrupts/idt.kn") }
+def use_irq_controller() { return import("lib/kern/oskit/interrupts/controller.kn") }
+def use_threads() { return import("lib/kern/oskit/scheduler/threading.kn") }
+def use_sync() { return import("lib/kern/oskit/scheduler/sync.kn") }
+def use_screen() { return import("lib/kern/oskit/drivers/screen.kn") }
+def use_keyboard() { return import("lib/kern/oskit/drivers/keyboard.kn") }
+def use_timer() { return import("lib/kern/oskit/drivers/timer.kn") }
+def use_disk() { return import("lib/kern/oskit/drivers/disk.kn") }
+def use_fs() { return import("lib/kern/oskit/filesystem/vfs.kn") }
+def use_path() { return import("lib/kern/oskit/filesystem/path.kn") }
+def use_boot() { return import("lib/kern/oskit/boot/builder.kn") }

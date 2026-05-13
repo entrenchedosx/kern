@@ -1,0 +1,10 @@
+// Float comparison with epsilon.
+// import("lib/kern/stdlib/math/nearly.kn")
+
+def nearly_equal(a, b, eps) {
+    return abs(a - b) <= eps
+}
+
+def nearly_zero(x, eps) {
+    return abs(x) <= eps
+}

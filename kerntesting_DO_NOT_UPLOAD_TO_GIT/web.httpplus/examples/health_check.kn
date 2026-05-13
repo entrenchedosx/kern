@@ -1,0 +1,4 @@
+let httpx = import("web.httpplus")
+let r = httpx["get"]("https://httpbin.org/get")
+if (!r["ok"]) { panic(r["error"]) }
+print("bytes=" + str(len(r["value"])))

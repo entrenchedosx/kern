@@ -1,0 +1,39 @@
+# Kern repository layout manifest (metadata).
+# The build system is CMake at the repository root; this file does not replace CMake.
+# Authoritative architecture notes: docs/architecture.md
+
+[repository]
+name = "Kern"
+layout_version = 1
+
+# Canonical paths (CMake mirrors these in cmake/kern_paths.cmake).
+[paths]
+src = "src"
+cli = "kern/tools"
+modules = "kern/modules"
+core = "kern/core"
+compiler = "kern/core/compiler"
+bytecode = "kern/core/bytecode"
+diagnostics = "kern/core/diagnostics"
+errors = "kern/core/errors"
+platform = "kern/core/platform"
+pipeline = "kern/pipeline"
+backend = "kern/pipeline/backend"
+ir = "kern/pipeline/ir"
+analyzer = "kern/pipeline/analyzer"
+utils = "kern/core/utils"
+game_module = "kern/modules/game"
+runtime = "kern/runtime"
+vm = "kern/runtime/vm"
+stdlib = "lib/kern"
+examples = "examples"
+tests = "tests"
+documentation = "docs"
+scripts = "scripts"
+# Repo-root helpers (launchers, release scripts), not C++ CLI sources.
+tools = "tools"
+cmake_paths = "cmake/kern_paths.cmake"
+cmake_root = "."
+kern_to_exe = "kern-to-exe"
+kern_registry = "kern-registry"
+kern_ide = "Kern-IDE"

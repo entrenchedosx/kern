@@ -1,0 +1,12 @@
+timer = import("lib/kern/oskit/drivers/timer.kn")
+
+let hz = timer.setup(60)
+if (hz != 60) { throw "timer setup failed" }
+if (timer.ticks() != 0) { throw "timer reset failed" }
+
+timer.tick()
+timer.tick()
+if (timer.ticks() != 2) { throw "timer tick failed" }
+if (timer.ms() <= 0) { throw "timer ms failed" }
+
+print("test_oskit_timer_module: pass")

@@ -1,0 +1,7 @@
+{
+  "name": "sys.config",
+  "version": "1.0.2",
+  "main": "src/index.kn",
+  "description": "Layered configuration helpers (defaults, file, env) for Kern apps.",
+  "dependencies": {}
+}

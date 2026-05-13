@@ -1,0 +1,4 @@
+// import cache regression
+let m1 = import("math")
+print(m1 != null)
+print(m2 != null)

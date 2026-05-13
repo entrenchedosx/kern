@@ -1,0 +1,16 @@
+let g = import("g2d")
+if (g == null) {
+    print("skip-g2d")
+} else {
+    a = g.rectsOverlap(0, 0, 10, 10, 5, 5, 10, 10)
+    b = g.rectsOverlap(0, 0, 10, 10, 20, 20, 5, 5)
+    c = g.pointInRect(3, 4, 0, 0, 10, 10)
+    d = g.circlesOverlap(0, 0, 5, 8, 0, 5)
+
+    if (a && !b && c && d) {
+        print("g2d-collision-ok")
+    } else {
+        print("g2d-collision-fail")
+    }
+}
+

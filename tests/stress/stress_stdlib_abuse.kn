@@ -1,0 +1,12 @@
+// builtins with empty / extreme-ish args — must not crash VM
+let s = ""
+print(len(s))
+let m = {}
+print(len(m))
+let a = array()
+print(len(a))
+// math edge
+let math = import("math")
+if (math != null) {
+    print(math.sqrt(0))
+}

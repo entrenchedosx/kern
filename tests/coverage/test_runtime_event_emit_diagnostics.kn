@@ -1,0 +1,33 @@
+runtime_mod = import("lib/kern/runtime/modern/module.kn")
+events = import("lib/kern/runtime/modern/events.kn")
+
+let state = {}
+state["n"] = 0
+
+@event("on_command", priority=10, retries=2, stop_on_error=false)
+def flaky_listener(ctx, payload) {
+    state["n"] = int(state["n"]) + 1
+    if (int(state["n"]) < 3) {
+        throw Error("flaky fail", "LISTENER-FLAKY")
+    }
+    return null
+}
+
+@event("on_command", priority=1, timeout_ms=5, stop_on_error=false)
+def slow_listener(ctx, payload) {
+    sleep_ms(25)
+    return null
+}
+
+let rt = runtime_mod.create_runtime({})
+let res = events.emit(rt["events"], "on_command", rt["ctx"], {})
+
+assert_eq(res["delivered"], 1)
+assert_eq(res["attempts"], 4)
+assert_eq(res["retries_used"], 2)
+assert_eq(res["timeouts"], 1)
+assert_eq(len(res["errors"]), 1)
+assert_eq(len(res["listener_stats"]), 2)
+assert_eq(res["stopped"], false)
+assert_eq(res["last_error"] != null, true)
+print("ok")

@@ -1,0 +1,13 @@
+let g3 = import("g3d")
+if (g3 == null) {
+    print("skip-g3d")
+} else {
+    print("have-g3d")
+    // aPI surface smoke test (no window creation needed here)
+    g3.setProjection("perspective")
+    g3.setFov(60)
+    g3.setCameraMode("manual")
+    g3.showStats(false)
+    print("api-ok")
+}
+

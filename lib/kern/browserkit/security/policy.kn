@@ -1,0 +1,63 @@
+// browserkit security/policy.kn
+// sandbox + same-origin checks for script/resource access.
+
+http = import("lib/kern/browserkit/network/http.kn")
+
+sandbox_roots = ["."]
+
+def _bk_fail(code, message, hint) {
+    throw Error(code + ": " + message + " | Hint: " + hint, code)
+}
+
+def add_sandbox_root(path) {
+    push(sandbox_roots, _normalize(path))
+}
+
+def _starts_with(a, b) {
+    let sa = str(a)
+    let sb = str(b)
+    return starts_with(lower(sa), lower(sb))
+}
+
+def _normalize(p) {
+    let s = replace(str(p), "\\", "/")
+    while (starts_with(s, "./")) {
+        s = slice(s, 2, len(s))
+    }
+    return s
+}
+
+def can_access_file(path) {
+    let p = lower(_normalize(path))
+    let i = 0
+    while (i < len(sandbox_roots)) {
+        let root = lower(_normalize(sandbox_roots[i]))
+        if (_starts_with(p, root)) { return true }
+        i = i + 1
+    }
+    return false
+}
+
+def same_origin(url_a, url_b) {
+    let a = http.parse_url(url_a)
+    let b = http.parse_url(url_b)
+    return a["scheme"] == b["scheme"] && a["host"] == b["host"] && a["port"] == b["port"]
+}
+
+def enforce_same_origin(current_url, target_url) {
+    if (!same_origin(current_url, target_url)) {
+        throw "same-origin policy blocked: " + target_url
+    }
+    return true
+}
+
+def sandbox_eval(ctx, callback) {
+    // hook point for future bytecode isolation.
+    try {
+        return callback()
+    } catch (e) {
+        _bk_fail("BROWSERKIT-SANDBOX-EVAL-FAILED",
+            "sandbox_eval blocked callback execution: " + error_message(e),
+            "Handle the callback failure at call site or tighten sandbox policy inputs.")
+    }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "sys.config",
+  "version": "1.0.2",
+  "main": "src/index.kn",
+  "dependencies": {},
+  "trusted": false,
+  "dist": {
+    "tarball": "https://github.com/entrenchedosx/kern/releases/download/sys.config-v1.0.2/sys.config-1.0.2.tgz",
+    "shasum": "sha256-dd5f492d41dff91f9171f00860c381d25a6540f8d43911ce615bb9d4c5316b6d"
+  }
+}

@@ -1,0 +1,7 @@
+rc = import("runtime_controls")
+
+rc.set_step_limit(100000)
+rc.set_max_call_depth(1024)
+info = rc.runtime_info()
+print("step_limit:", info.step_limit)
+print("max_call_depth:", info.max_call_depth)

@@ -1,0 +1,14 @@
+{
+  "name": "web.rest",
+  "version": "1.0.1",
+  "main": "src/index.kn",
+  "dependencies": {
+    "web.httpplus": "^1.0.0",
+    "sec.auth": "^1.0.0"
+  },
+  "trusted": false,
+  "dist": {
+    "tarball": "https://github.com/entrenchedosx/kern/releases/download/web.rest-v1.0.1/web.rest-1.0.1.tgz",
+    "shasum": "sha256-227a694b4cb60e4ea97045f9ac8e2dbac2962d2114eb0698a48674b34dcc4c96"
+  }
+}

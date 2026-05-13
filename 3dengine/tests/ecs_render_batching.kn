@@ -1,0 +1,39 @@
+let u = import("src/index.kn")
+let ecs = u["ecs"]
+def v3(x, y, z) { return {"x": float(default(x, 0.0)), "y": float(default(y, 0.0)), "z": float(default(z, 0.0))} }
+
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let w = ecs["world_create"]()
+
+let e1 = ecs["world_create_entity"](w)
+let e2 = ecs["world_create_entity"](w)
+let e3 = ecs["world_create_entity"](w)
+
+ecs["world_add_transform"](w, e1, ecs["transform_make"](v3(0, 0, 0), null, null))
+ecs["world_add_transform"](w, e2, ecs["transform_make"](v3(60, 0, 0), null, null))
+ecs["world_add_transform"](w, e3, ecs["transform_make"](v3(120, 0, 0), null, null))
+
+ecs["world_add_mesh"](w, e1, ecs["mesh_make_quad"]())
+ecs["world_add_mesh"](w, e2, ecs["mesh_make_quad"]())
+ecs["world_add_mesh"](w, e3, ecs["mesh_make_quad"]())
+
+ecs["world_add_material"](w, e1, ecs["material_make"](v3(1, 0, 0), "m.red", null))
+ecs["world_add_material"](w, e2, ecs["material_make"](v3(1, 0, 0), "m.red", null))
+ecs["world_add_material"](w, e3, ecs["material_make"](v3(0, 0, 1), "m.blue", null))
+
+ecs["world_run_render_prep"](w)
+let _ = ecs["world_render"](w, {"rect": lambda (x, y, ww, hh, r, g, b, a) => { return null }})
+let stats = ecs["world_render_stats"](w)
+
+if (int(default(stats["command_count"], 0)) != 3) { panic("ecs_render_batching: command_count mismatch") }
+if (int(default(stats["draw_calls"], 0)) != 3) { panic("ecs_render_batching: draw_calls mismatch") }
+if (int(default(stats["batched_draw_calls"], 0)) != 2) { panic("ecs_render_batching: batched_draw_calls mismatch") }
+if (int(default(stats["unique_materials"], 0)) != 2) { panic("ecs_render_batching: unique_materials mismatch") }
+if (int(default(stats["mesh_registry_size"], 0)) != 1) { panic("ecs_render_batching: mesh_registry_size mismatch") }
+if (int(default(stats["material_registry_size"], 0)) != 2) { panic("ecs_render_batching: material_registry_size mismatch") }
+if (int(default(default(stats["batch_sizes"], [])[0], 0)) != 2) { panic("ecs_render_batching: first batch size mismatch") }
+if (int(default(default(stats["batch_sizes"], [])[1], 0)) != 1) { panic("ecs_render_batching: second batch size mismatch") }
+
+print("ecs_render_batching: ok")

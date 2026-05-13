@@ -1,0 +1,37 @@
+# Object files
+*.o
+*.obj
+
+# Executables
+*.exe
+*.dll
+*.pdb
+*.ilk
+*.exp
+*.lib
+
+# Build artifacts
+compile_errors.txt
+output.txt
+
+# Scripts (temporary/test)
+*.bat
+*.ps1
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Kern build output
+kern.zip
+
+# macOS
+.DS_Store
+
+# Backup files
+*_backup.cpp
+*_backup.hpp
+backup/

@@ -1,0 +1,13 @@
+{
+  "name": "ai.prompts",
+  "version": "1.0.0",
+  "main": "src/index.kn",
+  "dependencies": {
+    "ai.client": "^1.0.0"
+  },
+  "trusted": false,
+  "dist": {
+    "tarball": "../../../dist/ai.prompts/ai.prompts-1.0.0.tgz",
+    "shasum": "sha256-1de444ff48562e4ba3b3b76b5bea5b5139b4e2b92511ee4689715a966dd3c0cd"
+  }
+}

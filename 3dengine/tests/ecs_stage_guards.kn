@@ -1,0 +1,48 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+let vec3 = import("src/math/vec3.kn")
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let w = ecs["world_create"]()
+let e = ecs["world_create_entity"](w)
+ecs["world_add_transform"](w, e, ecs["transform_make"](vec3["zero"](), null, null))
+ecs["world_add_velocity"](w, e, ecs["velocity_make"](vec3["zero"](), 0.0))
+
+w["guard_block_struct"] = false
+w["guard_block_write"] = false
+w["guard_mask_write"] = false
+w["guard_struct_override"] = false
+
+let sys_block_struct = lambda (world, dt) => {
+    let e2 = ecs["world_create_entity"](world)
+    if (ecs["world_is_alive"](world, e2)) { world["guard_block_struct"] = false } else { world["guard_block_struct"] = true }
+}
+let sys_block_write = lambda (world, dt) => {
+    if (ecs["world_input_feed"](world, ["W"], [], [])) { world["guard_block_write"] = false } else { world["guard_block_write"] = true }
+}
+let sys_mask_write = lambda (world, dt) => {
+    world["guard_mask_write"] = ecs["world_input_feed"](world, ["A"], [], [])
+}
+let sys_struct_override = lambda (world, dt) => {
+    let e3 = ecs["world_create_entity"](world)
+    world["guard_struct_override"] = ecs["world_is_alive"](world, e3)
+}
+let opts_mask_write = {}
+opts_mask_write["write_mask"] = ["input"]
+let opts_struct_override = {}
+opts_struct_override["allow_structural_mutation"] = true
+
+if (!ecs["world_register_system"](w, "INPUT", "guard.block_struct", sys_block_struct, ["input"])) { panic("ecs_stage_guards: register block_struct failed") }
+if (!ecs["world_register_system"](w, "TRANSFORM", "guard.block_write", sys_block_write, ["transform_propagation"])) { panic("ecs_stage_guards: register block_write failed") }
+if (!ecs["world_register_system"](w, "POST_SIMULATION", "guard.mask_write", sys_mask_write, ["simulation"], opts_mask_write)) { panic("ecs_stage_guards: register mask_write failed") }
+if (!ecs["world_register_system"](w, "POST_SIMULATION", "guard.struct_override", sys_struct_override, ["guard.mask_write"], opts_struct_override)) { panic("ecs_stage_guards: register struct_override failed") }
+
+ecs["world_run_fixed_pipeline"](w, 1.0 / 60.0)
+
+if (!default(w["guard_block_struct"], false)) { panic("ecs_stage_guards: structural mutation should be blocked by stage policy") }
+if (!default(w["guard_block_write"], false)) { panic("ecs_stage_guards: input write should be blocked in TRANSFORM stage") }
+if (!default(w["guard_mask_write"], false)) { panic("ecs_stage_guards: write_mask override should allow input write") }
+if (!default(w["guard_struct_override"], false)) { panic("ecs_stage_guards: structural override should allow entity creation") }
+
+print("ecs_stage_guards: ok")

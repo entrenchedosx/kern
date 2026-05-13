@@ -1,0 +1,153 @@
+{
+  "_comment": "Kern Compile-Time Architecture Firewall - Allowed Dependency Graph",
+  "_version": "1.0.0",
+  "_date": "2026-05-10",
+  
+  "architecture_rules": {
+    "description": "Only upward dependencies allowed - no circular references",
+    "direction": "bottom_to_top",
+    "strict": true
+  },
+  
+  "modules": {
+    "core/value": {
+      "allowed_includes": [],
+      "description": "Foundation layer - no dependencies",
+      "forbidden_patterns": [
+        "runtime/",
+        "engine/",
+        "legacy/",
+        "modules/"
+      ]
+    },
+    
+    "runtime/vm": {
+      "allowed_includes": [
+        "core/value"
+      ],
+      "description": "VM layer - depends only on core/value",
+      "forbidden_patterns": [
+        "runtime/core",
+        "runtime/modules",
+        "runtime/bindings",
+        "engine/",
+        "legacy/"
+      ]
+    },
+    
+    "runtime/core": {
+      "allowed_includes": [
+        "runtime/vm",
+        "core/value"
+      ],
+      "description": "Runtime core - depends on VM and core/value",
+      "forbidden_patterns": [
+        "runtime/modules",
+        "engine/",
+        "legacy/",
+        "graphics/"
+      ]
+    },
+    
+    "runtime/bindings": {
+      "allowed_includes": [
+        "runtime/vm",
+        "runtime/core",
+        "core/value"
+      ],
+      "description": "Native bindings - depends on VM, runtime, core",
+      "forbidden_patterns": [
+        "runtime/modules",
+        "engine/",
+        "legacy/"
+      ]
+    },
+    
+    "runtime/modules/ecs": {
+      "allowed_includes": [
+        "runtime/core",
+        "runtime/vm",
+        "core/value"
+      ],
+      "description": "ECS module - depends on runtime, VM, core",
+      "forbidden_patterns": [
+        "engine/",
+        "legacy/",
+        "graphics/"
+      ]
+    },
+    
+    "runtime/modules/graphics": {
+      "allowed_includes": [
+        "runtime/core",
+        "runtime/vm",
+        "core/value"
+      ],
+      "description": "Graphics module - depends on runtime, VM, core",
+      "forbidden_patterns": [
+        "engine/",
+        "legacy/"
+      ]
+    },
+    
+    "hosts": {
+      "allowed_includes": [
+        "runtime/core",
+        "runtime/vm",
+        "runtime/modules",
+        "core/value"
+      ],
+      "description": "Host applications - can use all runtime layers",
+      "forbidden_patterns": [
+        "engine/",
+        "legacy/"
+      ]
+    }
+  },
+  
+  "global_forbidden_patterns": {
+    "description": "These patterns are forbidden EVERYWHERE except legacy/",
+    "patterns": [
+      "kern/engine/core",
+      "kern/core/entity",
+      "kern/core/component",
+      "kern/legacy"
+    ]
+  },
+  
+  "include_path_policy": {
+    "description": "No global includes - only explicit target includes",
+    "forbidden_cmake_commands": [
+      "include_directories(.)",
+      "include_directories(kern/)",
+      "include_directories(${CMAKE_SOURCE_DIR})"
+    ],
+    "required_cmake_pattern": "target_include_directories(<target> PRIVATE <explicit_paths>)"
+  },
+  
+  "build_matrix": {
+    "description": "Every component must compile independently",
+    "tests": [
+      {
+        "name": "VM_ONLY",
+        "command": "g++ -std=c++17 -c kern/runtime/vm/vm.cpp",
+        "success_criteria": "Compiles without runtime, modules, or legacy"
+      },
+      {
+        "name": "RUNTIME_CORE_ONLY",
+        "command": "g++ -std=c++17 -c kern/runtime/core/runtime.cpp",
+        "success_criteria": "Compiles without ECS, graphics, or legacy"
+      },
+      {
+        "name": "ECS_ONLY",
+        "command": "g++ -std=c++17 -c kern/runtime/modules/ecs/entity_system.cpp",
+        "success_criteria": "Compiles without runtime implementation"
+      },
+      {
+        "name": "FULL_INTEGRATION",
+        "command": "g++ -std=c++17 *.o -o kern_runtime",
+        "success_criteria": "Links all components without symbol conflicts"
+      }
+    ]
+  }
+}

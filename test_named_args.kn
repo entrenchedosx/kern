@@ -1,0 +1,2 @@
+func test(x: int, y: int) = x + y
+test(y: 42) // Missing x

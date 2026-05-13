@@ -1,0 +1,13 @@
+{
+  "name": "web.httpplus",
+  "version": "1.0.0",
+  "main": "src/index.kn",
+  "dependencies": {
+    "sys.log": "^1.0.0"
+  },
+  "trusted": false,
+  "dist": {
+    "tarball": "../../../dist/web.httpplus/web.httpplus-1.0.0.tgz",
+    "shasum": "sha256-b8a6df4ebbf8fbe52399f2c2627be92b9034985f670f3a8d4d927dcc7473c94d"
+  }
+}

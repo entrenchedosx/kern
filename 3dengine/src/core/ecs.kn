@@ -1,0 +1,405 @@
+// 3dengine ECS core (Phase 2): hybrid ECS with strict data core
+
+let _mat4 = import("src/math/mat4.kn")
+let _vec3 = import("src/math/vec3.kn")
+
+def _eid(index, generation) { return {"index": int(default(index, -1)), "generation": int(default(generation, 0))} }
+def _eid_null() { return {"index": -1, "generation": 0} }
+def _eid_is_null(e) { return int(default(e["index"], -1)) < 0 }
+def _idx_key(index) { return str(int(default(index, -1))) }
+def _lock_registry_write(world) { return bool(default(default(world["locks"], {})["registry_write"], false)) }
+def _require_registry_write(world) { return !_lock_registry_write(world) }
+
+def _store_make() { return {"dense_data": [], "dense_entities": [], "sparse": {}, "count": 0} }
+
+def _store_dense_index(store, entity) {
+    let key = _idx_key(entity["index"])
+    if (!has(store["sparse"], key)) { return -1 }
+    let di = int(default(store["sparse"][key], -1))
+    if (di < 0 || di >= int(default(store["count"], 0))) { return -1 }
+    let e = store["dense_entities"][di]
+    if (int(default(e["index"], -1)) != int(default(entity["index"], -1))) { return -1 }
+    if (int(default(e["generation"], -1)) != int(default(entity["generation"], -2))) { return -1 }
+    return di
+}
+
+def _store_has(store, entity) { return _store_dense_index(store, entity) >= 0 }
+
+def _store_add(store, entity, component) {
+    let di = _store_dense_index(store, entity)
+    if (di >= 0) { store["dense_data"][di] = component; return di }
+    let n = int(default(store["count"], 0))
+    store["dense_entities"][n] = entity
+    store["dense_data"][n] = component
+    store["sparse"][_idx_key(entity["index"])] = n
+    store["count"] = n + 1
+    return n
+}
+
+def _store_get(store, entity) {
+    let di = _store_dense_index(store, entity)
+    if (di < 0) { return null }
+    return store["dense_data"][di]
+}
+
+def _store_remove(store, entity) {
+    let di = _store_dense_index(store, entity)
+    if (di < 0) { return false }
+    let n = int(default(store["count"], 0))
+    let last = n - 1
+    let remove_key = _idx_key(entity["index"])
+    if (di != last) {
+        let moved_entity = store["dense_entities"][last]
+        let moved_data = store["dense_data"][last]
+        store["dense_entities"][di] = moved_entity
+        store["dense_data"][di] = moved_data
+        store["sparse"][_idx_key(moved_entity["index"])] = di
+    }
+    store["sparse"][remove_key] = -1
+    store["count"] = last
+    return true
+}
+
+def _entity_make_store() { return {"generations": [], "alive": [], "entity_count": 0, "next_index": 0, "free_indices": [], "free_count": 0} }
+def _entity_is_alive_raw(es, id) {
+    let idx = int(default(id["index"], -1))
+    if (idx < 0 || idx >= int(default(es["next_index"], 0))) { return false }
+    let g = int(default(es["generations"][idx], 0))
+    let alive = bool(default(es["alive"][idx], false))
+    return alive && g == int(default(id["generation"], -1))
+}
+def _entity_create(es) {
+    let idx = -1
+    let free_count = int(default(es["free_count"], 0))
+    if (free_count > 0) { idx = int(default(es["free_indices"][free_count - 1], -1)); es["free_count"] = free_count - 1 }
+    else {
+        idx = int(default(es["next_index"], 0))
+        es["next_index"] = idx + 1
+        if (es["generations"][idx] == null) { es["generations"][idx] = 0 }
+    }
+    es["alive"][idx] = true
+    es["entity_count"] = int(default(es["entity_count"], 0)) + 1
+    return _eid(idx, int(default(es["generations"][idx], 0)))
+}
+def _entity_destroy(es, id) {
+    if (!_entity_is_alive_raw(es, id)) { return false }
+    let idx = int(default(id["index"], -1))
+    es["alive"][idx] = false
+    es["generations"][idx] = int(default(es["generations"][idx], 0)) + 1
+    let free_count = int(default(es["free_count"], 0))
+    es["free_indices"][free_count] = idx
+    es["free_count"] = free_count + 1
+    es["entity_count"] = int(default(es["entity_count"], 0)) - 1
+    return true
+}
+
+def _transform_make(local_position, local_rotation, local_scale) {
+    return {"local_position": default(local_position, _vec3["zero"]()), "local_rotation": default(local_rotation, _vec3["zero"]()), "local_scale": default(local_scale, _vec3["one"]()), "world_matrix": _mat4["identity"](), "parent": _eid_null(), "first_child": _eid_null(), "next_sibling": _eid_null(), "dirty": true}
+}
+
+def _velocity_make(linear, input_move_speed) {
+    let s = float(default(input_move_speed, 0.0))
+    if (s < 0.0) { s = 0.0 }
+    return {"linear": default(linear, _vec3["zero"]()), "input_move_speed": s}
+}
+def _mesh_make(primitive) {
+    let p = str(default(primitive, "quad"))
+    if (p != "quad" && p != "cube") { p = "quad" }
+    if (p == "cube") {
+        return {"primitive_type": "cube", "vertices": [[-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0.5, 0.5, -0.5], [-0.5, 0.5, -0.5], [-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [0.5, 0.5, 0.5], [-0.5, 0.5, 0.5]], "indices": [0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4]}
+    }
+    return {"primitive_type": "quad", "vertices": [[-0.5, -0.5, 0.0], [0.5, -0.5, 0.0], [0.5, 0.5, 0.0], [-0.5, 0.5, 0.0]], "indices": [0, 1, 2, 2, 3, 0]}
+}
+def _material_make(color, material_id) { return {"color": default(color, _vec3["one"]()), "material_id": str(default(material_id, "default"))} }
+def _mesh_signature(mesh) {
+    let m = default(mesh, _mesh_make("quad"))
+    return str(default(m["primitive_type"], "quad")) + "|" + str(len(default(m["vertices"], []))) + "|" + str(len(default(m["indices"], [])))
+}
+def _material_signature(material) {
+    let m = default(material, _material_make(null, "default"))
+    let c = default(m["color"], _vec3["one"]())
+    let cx = 1.0
+    let cy = 1.0
+    let cz = 1.0
+    if (has(c, "x")) { cx = float(c["x"]) }
+    if (has(c, "y")) { cy = float(c["y"]) }
+    if (has(c, "z")) { cz = float(c["z"]) }
+    return str(default(m["material_id"], "default")) + "|" + str(cx) + "|" + str(cy) + "|" + str(cz)
+}
+def _input_keys_array_to_map(arr) {
+    let out = {}
+    let i = 0
+    let n = len(default(arr, []))
+    while (i < n) {
+        let k = str(default(arr[i], ""))
+        if (len(k) > 0) { out[k] = 1 }
+        i = i + 1
+    }
+    return out
+}
+
+def _world_make() {
+    return {"entities": _entity_make_store(), "components": {"transform": _store_make(), "velocity": _store_make()}, "registries": {"mesh_by_id": {}, "material_by_id": {}, "mesh_sig_to_id": {}, "material_sig_to_id": {}, "next_mesh_id": 1, "next_material_id": 1}, "input": {"held_keys": {}, "pressed_keys": {}, "released_keys": {}}, "locks": {"registry_write": false}, "systems": {"order": ["input", "simulation", "transform_propagation", "rendering_prep"]}}
+}
+
+def _world_is_alive(world, id) { return _entity_is_alive_raw(world["entities"], id) }
+
+def _world_create_entity(world) { return _entity_create(world["entities"]) }
+
+def _world_destroy_entity(world, id) {
+    if (!_world_is_alive(world, id)) { return false }
+    _store_remove(world["components"]["transform"], id)
+    _store_remove(world["components"]["velocity"], id)
+    return _entity_destroy(world["entities"], id)
+}
+
+def _world_add_transform(world, id, component) {
+    if (!_world_is_alive(world, id)) { return false }
+    _store_add(world["components"]["transform"], id, default(component, _transform_make(null, null, null)))
+    return true
+}
+
+def _world_add_velocity(world, id, component) {
+    if (!_world_is_alive(world, id)) { return false }
+    _store_add(world["components"]["velocity"], id, default(component, _velocity_make(null, 0.0)))
+    return true
+}
+
+def _world_register_mesh(world, mesh) {
+    let regs = world["registries"]
+    let m = default(mesh, _mesh_make("quad"))
+    let sig = _mesh_signature(m)
+    if (has(regs["mesh_sig_to_id"], sig)) { return regs["mesh_sig_to_id"][sig] }
+    if (!_require_registry_write(world)) { return "" }
+    let hid = "mesh." + str(int(default(regs["next_mesh_id"], 1)))
+    regs["next_mesh_id"] = int(default(regs["next_mesh_id"], 1)) + 1
+    if (has(regs["mesh_by_id"], hid)) { return "" }
+    regs["mesh_by_id"][hid] = m
+    regs["mesh_sig_to_id"][sig] = hid
+    return hid
+}
+def _world_register_material(world, material) {
+    let regs = world["registries"]
+    let m = default(material, _material_make(null, "default"))
+    let sig = _material_signature(m)
+    if (has(regs["material_sig_to_id"], sig)) { return regs["material_sig_to_id"][sig] }
+    if (!_require_registry_write(world)) { return "" }
+    let hid = "mat." + str(int(default(regs["next_material_id"], 1)))
+    regs["next_material_id"] = int(default(regs["next_material_id"], 1)) + 1
+    if (has(regs["material_by_id"], hid)) { return "" }
+    regs["material_by_id"][hid] = m
+    regs["material_sig_to_id"][sig] = hid
+    return hid
+}
+def _world_resolve_mesh(world, mesh_id) {
+    let id = str(default(mesh_id, ""))
+    if (!has(world["registries"]["mesh_by_id"], id)) { return null }
+    return world["registries"]["mesh_by_id"][id]
+}
+def _world_resolve_material(world, material_id) {
+    let id = str(default(material_id, ""))
+    if (!has(world["registries"]["material_by_id"], id)) { return null }
+    return world["registries"]["material_by_id"][id]
+}
+def _world_mesh_registry_size(world) { return len(keys(world["registries"]["mesh_by_id"])) }
+def _world_material_registry_size(world) { return len(keys(world["registries"]["material_by_id"])) }
+def _world_set_registry_write_lock(world, enabled) { world["locks"]["registry_write"] = bool(default(enabled, false)); return world["locks"]["registry_write"] }
+
+def _world_input_get(world) { return default(world["input"], {"held_keys": {}, "pressed_keys": {}, "released_keys": {}}) }
+def _world_input_feed(world, held_keys, pressed_keys, released_keys) {
+    let inp = _world_input_get(world)
+    inp["held_keys"] = _input_keys_array_to_map(held_keys)
+    inp["pressed_keys"] = _input_keys_array_to_map(pressed_keys)
+    inp["released_keys"] = _input_keys_array_to_map(released_keys)
+    world["input"] = inp
+    return true
+}
+def _input_key_held(world, key) { return has(_world_input_get(world)["held_keys"], str(default(key, ""))) }
+def _input_key_pressed(world, key) { return has(_world_input_get(world)["pressed_keys"], str(default(key, ""))) }
+def _input_key_released(world, key) { return has(_world_input_get(world)["released_keys"], str(default(key, ""))) }
+
+def _world_get_transform(world, id) { return _store_get(world["components"]["transform"], id) }
+def _world_get_velocity(world, id) { return _store_get(world["components"]["velocity"], id) }
+def _world_has_transform(world, id) { return _store_has(world["components"]["transform"], id) }
+def _world_has_velocity(world, id) { return _store_has(world["components"]["velocity"], id) }
+
+def _world_remove_transform(world, id) { return _store_remove(world["components"]["transform"], id) }
+def _world_remove_velocity(world, id) { return _store_remove(world["components"]["velocity"], id) }
+
+def _world_query_transform(world) {
+    let s = world["components"]["transform"]
+    return {"entities": s["dense_entities"], "components": s["dense_data"], "count": int(default(s["count"], 0))}
+}
+
+def _world_query_transform_velocity(world) {
+    let ts = world["components"]["transform"]
+    let vs = world["components"]["velocity"]
+    let out_t = []
+    let out_v = []
+    let out_e = []
+    let count = 0
+    let i = 0
+    while (i < int(default(vs["count"], 0))) {
+        let e = vs["dense_entities"][i]
+        let di = _store_dense_index(ts, e)
+        if (di >= 0) {
+            out_e[count] = e
+            out_t[count] = ts["dense_data"][di]
+            out_v[count] = vs["dense_data"][i]
+            count = count + 1
+        }
+        i = i + 1
+    }
+    return {"entities": out_e, "transform": out_t, "velocity": out_v, "count": count}
+}
+
+def _world_mark_dirty(world, id) {
+    let t = _world_get_transform(world, id)
+    if (t == null) { return false }
+    t["dirty"] = true
+    let child = t["first_child"]
+    while (!_eid_is_null(child)) {
+        _world_mark_dirty(world, child)
+        let ct = _world_get_transform(world, child)
+        if (ct == null) { child = _eid_null() } else { child = ct["next_sibling"] }
+    }
+    return true
+}
+
+def _world_detach_from_parent(world, child_id) {
+    let child_t = _world_get_transform(world, child_id)
+    if (child_t == null) { return false }
+    let parent_id = child_t["parent"]
+    if (_eid_is_null(parent_id)) { return true }
+    let parent_t = _world_get_transform(world, parent_id)
+    if (parent_t == null) {
+        child_t["parent"] = _eid_null()
+        return true
+    }
+    let first = parent_t["first_child"]
+    if (int(default(first["index"], -1)) == int(default(child_id["index"], -2)) && int(default(first["generation"], -1)) == int(default(child_id["generation"], -2))) {
+        parent_t["first_child"] = child_t["next_sibling"]
+        child_t["next_sibling"] = _eid_null()
+        child_t["parent"] = _eid_null()
+        return true
+    }
+    let cur = first
+    while (!_eid_is_null(cur)) {
+        let cur_t = _world_get_transform(world, cur)
+        if (cur_t == null) { return false }
+        let nx = cur_t["next_sibling"]
+        if (int(default(nx["index"], -1)) == int(default(child_id["index"], -2)) && int(default(nx["generation"], -1)) == int(default(child_id["generation"], -2))) {
+            cur_t["next_sibling"] = child_t["next_sibling"]
+            child_t["next_sibling"] = _eid_null()
+            child_t["parent"] = _eid_null()
+            return true
+        }
+        cur = nx
+    }
+    return true
+}
+
+def _world_set_parent(world, child_id, parent_id_or_null) {
+    let child_t = _world_get_transform(world, child_id)
+    if (child_t == null) { return false }
+    let parent_id = default(parent_id_or_null, _eid_null())
+    if (!_eid_is_null(parent_id) && !_world_has_transform(world, parent_id)) { return false }
+    if (!_eid_is_null(parent_id) && int(default(parent_id["index"], -1)) == int(default(child_id["index"], -2)) && int(default(parent_id["generation"], -1)) == int(default(child_id["generation"], -2))) { return false }
+    _world_detach_from_parent(world, child_id)
+    if (_eid_is_null(parent_id)) {
+        child_t["parent"] = _eid_null()
+        _world_mark_dirty(world, child_id)
+        return true
+    }
+    let parent_t = _world_get_transform(world, parent_id)
+    child_t["parent"] = parent_id
+    child_t["next_sibling"] = parent_t["first_child"]
+    parent_t["first_child"] = child_id
+    _world_mark_dirty(world, child_id)
+    return true
+}
+
+def _compose_local_matrix(transform) {
+    let t = _mat4["translate"](transform["local_position"])
+    let s = _mat4["scale"](transform["local_scale"])
+    return _mat4["mul"](t, s)
+}
+
+def _world_update_node_recursive(world, entity, parent_world, parent_dirty) {
+    let t = _world_get_transform(world, entity)
+    if (t == null) { return }
+    let dirty = parent_dirty || bool(default(t["dirty"], false))
+    if (dirty) {
+        let local = _compose_local_matrix(t)
+        if (parent_world == null) { t["world_matrix"] = local } else { t["world_matrix"] = _mat4["mul"](parent_world, local) }
+        t["dirty"] = false
+    }
+    let child = t["first_child"]
+    while (!_eid_is_null(child)) {
+        _world_update_node_recursive(world, child, t["world_matrix"], dirty)
+        let ct = _world_get_transform(world, child)
+        if (ct == null) { child = _eid_null() } else { child = ct["next_sibling"] }
+    }
+}
+
+def _system_input(world, fixed_dt) {
+    let q = _world_query_transform_velocity(world)
+    let i = 0
+    while (i < int(default(q["count"], 0))) {
+        let vel = q["velocity"][i]
+        let speed = float(default(vel["input_move_speed"], 0.0))
+        if (speed > 0.0) {
+            let x = 0.0
+            let y = 0.0
+            if (_input_key_held(world, "W")) { y = y + 1.0 }
+            if (_input_key_held(world, "S")) { y = y - 1.0 }
+            if (_input_key_held(world, "D")) { x = x + 1.0 }
+            if (_input_key_held(world, "A")) { x = x - 1.0 }
+            vel["linear"] = _vec3["make"](x * speed, y * speed, 0.0)
+        }
+        i = i + 1
+    }
+    return null
+}
+
+def _system_simulation(world, fixed_dt) {
+    let q = _world_query_transform_velocity(world)
+    let i = 0
+    while (i < int(default(q["count"], 0))) {
+        let tr = q["transform"][i]
+        let vel = q["velocity"][i]
+        tr["local_position"] = _vec3["add"](tr["local_position"], _vec3["scale"](vel["linear"], fixed_dt))
+        tr["dirty"] = true
+        i = i + 1
+    }
+}
+
+def _system_transform_propagation(world, fixed_dt) {
+    let q = _world_query_transform(world)
+    let i = 0
+    while (i < int(default(q["count"], 0))) {
+        let e = q["entities"][i]
+        let t = q["components"][i]
+        if (_eid_is_null(t["parent"])) {
+            _world_update_node_recursive(world, e, null, false)
+        }
+        i = i + 1
+    }
+}
+
+def _system_render_prep(world, fixed_dt) { return null }
+
+def _world_run_fixed_pipeline(world, fixed_dt) {
+    _system_input(world, fixed_dt)
+    _system_simulation(world, fixed_dt)
+    _system_transform_propagation(world, fixed_dt)
+    _system_render_prep(world, fixed_dt)
+}
+
+let ENTITY = {"null_id": _eid_null}
+let COMPONENT = {"transform_make": _transform_make, "velocity_make": _velocity_make, "mesh_make": _mesh_make, "material_make": _material_make}
+let WORLD = {"create": _world_make, "create_entity": _world_create_entity, "destroy_entity": _world_destroy_entity, "is_alive": _world_is_alive, "add_transform": _world_add_transform, "add_velocity": _world_add_velocity, "get_transform": _world_get_transform, "get_velocity": _world_get_velocity, "has_transform": _world_has_transform, "has_velocity": _world_has_velocity, "remove_transform": _world_remove_transform, "remove_velocity": _world_remove_velocity, "query_transform": _world_query_transform, "query_transform_velocity": _world_query_transform_velocity, "set_parent": _world_set_parent, "mark_dirty": _world_mark_dirty, "run_fixed_pipeline": _world_run_fixed_pipeline, "input_get": _world_input_get, "input_feed": _world_input_feed, "input_key_held": _input_key_held, "input_key_pressed": _input_key_pressed, "input_key_released": _input_key_released, "register_mesh": _world_register_mesh, "register_material": _world_register_material, "resolve_mesh": _world_resolve_mesh, "resolve_material": _world_resolve_material, "mesh_registry_size": _world_mesh_registry_size, "material_registry_size": _world_material_registry_size, "set_registry_write_lock": _world_set_registry_write_lock}
+
+def spec() {
+    return {"ecs_model": "hybrid_strict_data_core", "entity_id": "index_generation", "storage": "soa_dense_sparse", "pipeline": ["input", "simulation", "transform_propagation", "rendering_prep"], "transform_hierarchy": "parent_first_child_next_sibling_dirty_propagation", "input": "world.input held/pressed/released keys", "registry_ids": "append_only_no_reuse"}
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "kern",
+  "version-string": "1.0.2",
+  "description": "Kern language — optional Raylib (g2d/g3d/game) via the \"game\" manifest feature.",
+  "dependencies": [],
+  "features": {
+    "game": {
+      "description": "Raylib for g2d/g3d/game builtins",
+      "dependencies": [ "raylib" ]
+    }
+  },
+  "default-features": [ "game" ]
+}

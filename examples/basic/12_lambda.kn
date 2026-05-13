@@ -1,0 +1,7 @@
+// lambda: single-arg and call
+let mul = lambda (x) => x * 10
+print("lambda(3)*10 =", mul(3))
+let add_one = lambda (n) => n + 1
+print("add_one(5) =", add_one(5))
+
+

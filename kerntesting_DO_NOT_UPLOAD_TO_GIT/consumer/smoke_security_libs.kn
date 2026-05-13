@@ -1,0 +1,21 @@
+let crypto = import("sec.crypto")
+let auth = import("sec.auth")
+let perm = import("sec.perm")
+
+let digest = crypto["hash_sha256"]("abc")
+if (len(digest) != 64) { panic("sec.crypto hash_sha256 failed") }
+
+let msg = "hello"
+let secret = "top-secret"
+let sig = crypto["sign_message"](msg, secret)
+if (!crypto["verify_signature"](msg, secret, sig)) { panic("sec.crypto signature failed") }
+
+let token = auth["issue_token"]({ "sub": "user-1" }, secret, 60)
+let checked = auth["verify_token"](token, secret)
+if (!checked["ok"]) { panic("sec.auth token verify failed") }
+
+perm["ensure"]("fs.readonly")
+let meta = perm["describe"]()
+if (!has(meta, "granted_count")) { panic("sec.perm describe failed") }
+
+print("smoke_security_libs: pass")

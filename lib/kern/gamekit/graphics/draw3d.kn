@@ -1,0 +1,68 @@
+// gamekit 3D rendering helpers (g3d wrappers)
+
+g3 = import("g3d")
+
+def available() { return g3 != null }
+
+def create_window(w, h, title) {
+    if (g3 == null) { return false }
+    g3.createWindow(w, h, title)
+    return true
+}
+
+def setup_camera(px, py, pz, tx, ty, tz) {
+    if (g3 == null) { return }
+    g3.setProjection("perspective")
+    g3.setFov(60)
+    g3.setCamera(px, py, pz, tx, ty, tz)
+}
+
+def load_model(path) {
+    if (g3 == null) { return -1 }
+    return g3.loadModel(path)
+}
+
+def cube(size) {
+    if (g3 == null) { return -1 }
+    return g3.createObject("cube", size)
+}
+
+def sphere(radius) {
+    if (g3 == null) { return -1 }
+    return g3.createObject("sphere", radius)
+}
+
+def plane(w, h) {
+    if (g3 == null) { return -1 }
+    return g3.createObject("plane", w, h)
+}
+
+def set_texture(object_id, path) {
+    if (g3 == null) { return }
+    g3.setTexture(object_id, path)
+}
+
+def set_position(object_id, x, y, z) {
+    if (g3 == null) { return }
+    g3.setPosition(object_id, x, y, z)
+}
+
+def set_rotation(object_id, x, y, z) {
+    if (g3 == null) { return }
+    g3.setRotation(object_id, x, y, z)
+}
+
+def set_color(object_id, r, g, b) {
+    if (g3 == null) { return }
+    g3.setObjectColor(object_id, r, g, b)
+}
+
+def draw_all() {
+    if (g3 == null) { return }
+    g3.drawAll()
+}
+
+def run(update_fn, draw_fn) {
+    if (g3 == null) { return }
+    g3.run(update_fn, draw_fn)
+}

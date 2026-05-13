@@ -1,0 +1,248 @@
+// 01_sorting.kn - Sorting algorithms
+
+print("=== Sorting Algorithms ===")
+
+// Utility function to check if array is sorted
+def isSorted(arr) {
+    for i in range(1, len(arr)) {
+        if (arr[i] < arr[i - 1]) {
+            return false
+        }
+    }
+    return true
+}
+
+// Utility function to print array
+def printArray(arr, label) {
+    let s = label + ": ["
+    for i in range(len(arr)) {
+        s = s + arr[i]
+        if (i < len(arr) - 1) {
+            s = s + ", "
+        }
+    }
+    s = s + "]"
+    print(s)
+}
+
+print("")
+print("=== Bubble Sort ===")
+
+def bubbleSort(arr) {
+    let n = len(arr)
+    let result = arr  // Copy would be better
+    
+    for i in range(n) {
+        for j in range(0, n - i - 1) {
+            if (result[j] > result[j + 1]) {
+                // Swap
+                let temp = result[j]
+                result[j] = result[j + 1]
+                result[j + 1] = temp
+            }
+        }
+    }
+    
+    return result
+}
+
+let data1 = [64, 34, 25, 12, 22, 11, 90]
+printArray(data1, "Before bubble sort")
+let sorted1 = bubbleSort(data1)
+printArray(sorted1, "After bubble sort")
+print("Is sorted: " + isSorted(sorted1))
+
+print("")
+print("=== Selection Sort ===")
+
+def selectionSort(arr) {
+    let n = len(arr)
+    let result = []
+    for x in arr { result.append(x) }
+    
+    for i in range(n) {
+        let minIdx = i
+        for j in range(i + 1, n) {
+            if (result[j] < result[minIdx]) {
+                minIdx = j
+            }
+        }
+        // Swap
+        let temp = result[i]
+        result[i] = result[minIdx]
+        result[minIdx] = temp
+    }
+    
+    return result
+}
+
+let data2 = [64, 25, 12, 22, 11]
+printArray(data2, "Before selection sort")
+let sorted2 = selectionSort(data2)
+printArray(sorted2, "After selection sort")
+
+print("")
+print("=== Insertion Sort ===")
+
+def insertionSort(arr) {
+    let result = []
+    for x in arr { result.append(x) }
+    
+    for i in range(1, len(result)) {
+        let key = result[i]
+        let j = i - 1
+        
+        while (j >= 0 && result[j] > key) {
+            result[j + 1] = result[j]
+            j = j - 1
+        }
+        result[j + 1] = key
+    }
+    
+    return result
+}
+
+let data3 = [12, 11, 13, 5, 6]
+printArray(data3, "Before insertion sort")
+let sorted3 = insertionSort(data3)
+printArray(sorted3, "After insertion sort")
+
+print("")
+print("=== Merge Sort ===")
+
+def merge(left, right) {
+    let result = []
+    let i = 0, j = 0
+    
+    while (i < len(left) && j < len(right)) {
+        if (left[i] <= right[j]) {
+            result.append(left[i])
+            i = i + 1
+        } else {
+            result.append(right[j])
+            j = j + 1
+        }
+    }
+    
+    while (i < len(left)) {
+        result.append(left[i])
+        i = i + 1
+    }
+    
+    while (j < len(right)) {
+        result.append(right[j])
+        j = j + 1
+    }
+    
+    return result
+}
+
+def mergeSort(arr) {
+    if (len(arr) <= 1) {
+        return arr
+    }
+    
+    let mid = len(arr) / 2
+    let left = []
+    let right = []
+    
+    for i in range(0, mid) {
+        left.append(arr[i])
+    }
+    for i in range(mid, len(arr)) {
+        right.append(arr[i])
+    }
+    
+    left = mergeSort(left)
+    right = mergeSort(right)
+    
+    return merge(left, right)
+}
+
+let data4 = [38, 27, 43, 3, 9, 82, 10]
+printArray(data4, "Before merge sort")
+let sorted4 = mergeSort(data4)
+printArray(sorted4, "After merge sort")
+
+print("")
+print("=== Quick Sort ===")
+
+def quickSort(arr) {
+    if (len(arr) <= 1) {
+        return arr
+    }
+    
+    let pivot = arr[len(arr) / 2]
+    let left = []
+    let middle = []
+    let right = []
+    
+    for x in arr {
+        if (x < pivot) {
+            left.append(x)
+        } else if (x == pivot) {
+            middle.append(x)
+        } else {
+            right.append(x)
+        }
+    }
+    
+    left = quickSort(left)
+    right = quickSort(right)
+    
+    let result = left
+    for x in middle { result.append(x) }
+    for x in right { result.append(x) }
+    
+    return result
+}
+
+let data5 = [10, 7, 8, 9, 1, 5]
+printArray(data5, "Before quick sort")
+let sorted5 = quickSort(data5)
+printArray(sorted5, "After quick sort")
+
+print("")
+print("=== Built-in Sort ===")
+
+let data6 = [3, 1, 4, 1, 5, 9, 2, 6]
+printArray(data6, "Before built-in sort")
+let sorted6 = data6.sort()
+printArray(sorted6, "After built-in sort")
+
+print("")
+print("=== Sorting Objects ===")
+
+let people = [
+    {name: "Alice", age: 30},
+    {name: "Bob", age: 25},
+    {name: "Carol", age: 35}
+]
+
+// Sort by age
+def sortByAge(a, b) {
+    return a["age"] - b["age"]
+}
+
+// If custom comparator not available, extract and sort:
+let ages = []
+for p in people { ages.append(p["age"]) }
+ages = ages.sort()
+print("Sorted ages: " + ages)
+
+print("")
+print("=== Performance Comparison ===")
+
+// Note: These are simplified comparisons
+// Real performance testing would use large datasets
+
+let testData = []
+for i in range(100) {
+    testData.append(randomInt(1, 1000))
+}
+
+// print("Bubble sort O(n²) - slow for large data")
+// print("Merge sort O(n log n) - consistent performance")
+// print("Quick sort O(n log n) - fastest in practice")
+
+print("Done!")

@@ -1,0 +1,14 @@
+{
+  "name": "sec.secrets",
+  "version": "1.0.1",
+  "main": "src/index.kn",
+  "dependencies": {
+    "sec.crypto": "^1.0.0",
+    "sys.config": "^1.0.0"
+  },
+  "trusted": false,
+  "dist": {
+    "tarball": "https://github.com/entrenchedosx/kern/releases/download/sec.secrets-v1.0.1/sec.secrets-1.0.1.tgz",
+    "shasum": "sha256-9a6b53325bfab7c538bba18f15ec58bdd57c9026acc39adcba4365300b34fe12"
+  }
+}

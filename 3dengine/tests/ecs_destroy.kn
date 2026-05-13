@@ -1,0 +1,23 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+let vec3 = import("src/math/vec3.kn")
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let w = ecs["world_create"]()
+let parent = ecs["world_create_entity"](w)
+let child = ecs["world_create_entity"](w)
+
+ecs["world_add_transform"](w, parent, ecs["transform_make"](vec3["zero"](), null, null))
+ecs["world_add_transform"](w, child, ecs["transform_make"](vec3["zero"](), null, null))
+ecs["world_set_parent"](w, child, parent)
+
+if (!ecs["world_destroy_entity"](w, parent)) { panic("ecs_destroy: parent destroy failed") }
+if (ecs["world_is_alive"](w, parent)) { panic("ecs_destroy: parent should be dead") }
+if (!ecs["world_is_alive"](w, child)) { panic("ecs_destroy: child should survive as root") }
+
+let ct = ecs["world_get_transform"](w, child)
+if (ct == null) { panic("ecs_destroy: child transform missing") }
+if (int(ct["parent"]["index"]) >= 0) { panic("ecs_destroy: child should be detached to root") }
+
+print("ecs_destroy: ok")

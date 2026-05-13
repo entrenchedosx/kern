@@ -1,0 +1,10 @@
+automation = import("automation")
+
+cmd = automation.which("cmd")
+print("cmd available:", cmd != null)
+
+status = automation.exec_args(["cmd", "/c", "echo kern-automation-step"])
+print("step status:", status)
+
+
+

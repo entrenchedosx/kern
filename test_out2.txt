@@ -1,0 +1,138 @@
+=== Struct V1 Test ===
+--- Source ---
+
+struct Entity { x: float, y: float }
+let e = Entity(x: 10.0, y: 25.0)
+print("e.y =")
+print(e.y)
+
+--- Parsed OK, generating bytecode ---
+--- Bytecode (53 instructions) ---
+  0: 8 "struct_define"
+  1: 2 "Entity"
+  2: 2 "x"
+  3: 0 8
+  4: 0 8
+  5: 55 n=3
+  6: 2 "y"
+  7: 0 8
+  8: 0 8
+  9: 55 n=3
+  10: 55 n=2
+  11: 44 argc=2
+  12: 10
+  13: 33 ->32
+  14: 54
+  15: 11
+  16: 2 "struct"
+  17: 58 "__kind"
+  18: 10
+  19: 11
+  20: 2 "Entity"
+  21: 58 "__name"
+  22: 10
+  23: 11
+  24: 6
+  25: 58 "x"
+  26: 10
+  27: 11
+  28: 6
+  29: 58 "y"
+  30: 10
+  31: 45
+  32: 46
+  33: 48
+  34: 50 "Entity"
+  35: 49 "x,y"
+  36: 52
+  37: 9 "Entity"
+  38: 8 "Entity"
+  39: 1 10
+  40: 1 25
+  41: 44 argc=2
+  42: 9 "e"
+  43: 8 "print"
+  44: 2 "e.y ="
+  45: 44 argc=1
+  46: 10
+  47: 8 "print"
+  48: 8 "e"
+  49: 57 "y"
+  50: 44 argc=1
+  51: 10
+  52: 78
+--- Running VM ---
+[Kern] Runtime Error [2]: Invalid call target: value is not callable
+--- VM finished ---
+
+=== Result ? Operator Test ===
+--- Source ---
+def divide(a, b) {
+    if (b == 0) { return err("Div by zero"); }
+    return ok(a / b);
+}
+def do_math() {
+    let val = divide(10, 0)?;
+    return ok(val + 5);
+}
+let res = do_math();
+print(res.error);
+
+--- Parsed OK, generating bytecode ---
+--- Bytecode (53 instructions) ---
+  0: 33 ->17
+  1: 6
+  2: 0 0
+  3: 19
+  4: 34 ->10
+  5: 8 "err"
+  6: 2 "Div by zero"
+  7: 44 argc=1
+  8: 45
+  9: 33 ->10
+  10: 8 "ok"
+  11: 6
+  12: 6
+  13: 15
+  14: 44 argc=1
+  15: 45
+  16: 45
+  17: 46
+  18: 48
+  19: 50 "divide"
+  20: 49 "a,b"
+  21: 9 "divide"
+  22: 33 ->40
+  23: 8 "divide"
+  24: 0 10
+  25: 0 0
+  26: 44 argc=2
+  27: 11
+  28: 57 "is_ok"
+  29: 35 ->31
+  30: 45
+  31: 57 "value"
+  32: 7
+  33: 8 "ok"
+  34: 6
+  35: 0 5
+  36: 12
+  37: 44 argc=1
+  38: 45
+  39: 45
+  40: 46
+  41: 48
+  42: 50 "do_math"
+  43: 9 "do_math"
+  44: 8 "do_math"
+  45: 44 argc=0
+  46: 9 "res"
+  47: 8 "print"
+  48: 8 "res"
+  49: 57 "error"
+  50: 44 argc=1
+  51: 10
+  52: 78
+--- Running VM ---
+[Kern] Runtime Error [2]: Invalid call target: value is not callable
+--- VM finished ---

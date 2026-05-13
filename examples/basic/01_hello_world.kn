@@ -1,0 +1,2 @@
+// first program: statements run at the top level (no main() required)
+print("Hello, Kern")

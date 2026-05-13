@@ -1,0 +1,33 @@
+// Parse KEY=VALUE lines (first = separates).
+// import("lib/kern/stdlib/data/kv_lines.kn")
+
+def kv_parse_lines(s) {
+    let lines = split_lines(s)
+    let m = {}
+    let i = 0
+    while (i < len(lines)) {
+        let ln = trim(lines[i])
+        if (len(ln) == 0 or starts_with(ln, "#")) { i = i + 1; continue }
+        let j = 0
+        while (j < len(ln) and ln[j] != "=") { j = j + 1 }
+        if (j >= len(ln) or j == 0) { i = i + 1; continue }
+        let k = trim(slice(ln, 0, j))
+        let v = trim(slice(ln, j + 1, len(ln)))
+        m[k] = v
+        i = i + 1
+    }
+    return m
+}
+
+def kv_format_lines(m) {
+    let ks = keys(m)
+    sort(ks)
+    let out = array()
+    let i = 0
+    while (i < len(ks)) {
+        let k = ks[i]
+        push(out, str(k) + "=" + str(m[k]))
+        i = i + 1
+    }
+    return join(out, "\n")
+}

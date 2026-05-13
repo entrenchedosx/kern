@@ -1,0 +1,36 @@
+// numeric semver-style compare (dot-separated integers) — import("lib/kern/semver.kn")
+// compare_version(a, b) -> -1 | 0 | 1; valid_version(s) -> bool
+
+def _seg_int(parts, i) {
+    if (i >= len(parts)) { return 0 }
+    let v = parse_int(parts[i])
+    if (v == null) { return 0 }
+    return v
+}
+
+def compare_version(a, b) {
+    let pa = split(str(a), ".")
+    let pb = split(str(b), ".")
+    let n = len(pa)
+    if (len(pb) > n) { n = len(pb) }
+    let i = 0
+    while (i < n) {
+        let x = _seg_int(pa, i)
+        let y = _seg_int(pb, i)
+        if (x < y) { return -1 }
+        if (x > y) { return 1 }
+        i = i + 1
+    }
+    return 0
+}
+
+def valid_version(s) {
+    let parts = split(trim(str(s)), ".")
+    if (len(parts) == 0) { return false }
+    let i = 0
+    while (i < len(parts)) {
+        if (parse_int(parts[i]) == null) { return false }
+        i = i + 1
+    }
+    return true
+}

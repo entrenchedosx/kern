@@ -1,0 +1,88 @@
+// html_unescape, strip_html, xml/css/js escapes, build_query, url_resolve, mime, data URLs
+
+let u = html_unescape("&lt;p&gt;Tom &amp; Jerry&#39;s&nbsp;ok&#x2e;</p>")
+assert_eq(regex_match(u, "<p>"), true)
+assert_eq(regex_match(u, "&"), true)
+assert_eq(regex_match(u, "'s"), true)
+
+let plain = strip_html("<!-- hide --><div class=\"x\">Hi <b>there</b></div>")
+assert_eq(plain, "Hi there")
+
+assert_eq(xml_escape("a & b"), "a &amp; b")
+assert_eq(css_escape("line\nbreak\"quote"), "line\\A break\\\"quote")
+assert_eq(js_escape("a\"b\\c"), "a\\\"b\\\\c")
+
+// use a real map value (json_parse); global map is the array .map() higher-order function, not {}.
+let qm = json_parse("{\"z\":\"2\",\"a\":\"1 2\"}")
+let q = build_query(qm)
+assert_eq(regex_match(q, "^a="), true)
+assert_eq(regex_match(q, "z=2"), true)
+
+assert_eq(url_resolve("http://ex.com/a/b/c?x=1", "../d"), "http://ex.com/a/d")
+assert_eq(url_resolve("http://ex.com/foo/", "bar"), "http://ex.com/foo/bar")
+
+assert_eq(mime_type_guess("app.JS"), "text/javascript; charset=utf-8")
+assert_eq(mime_type_guess("x.unknownext"), "application/octet-stream")
+
+let du = parse_data_url("data:text/plain;charset=utf-8;base64,SGk=")
+assert_eq(du.ok, true)
+assert_eq(du.is_base64, true)
+assert_eq(du.data, "Hi")
+
+let w = import("web")
+assert_eq(w.html_escape("x<x"), html_escape("x<x"))
+assert_eq(w.parse_cookie_header("s=1")["s"], "1")
+assert_eq(w.set_cookie_fields({ "name": "n", "value": "v" }), "n=v")
+
+assert_eq(css_url_escape("a b()"), "a%20b%28%29")
+
+let raw_req = "GET /hello?x=1 HTTP/1.1\r\nHost: ex.com\r\n\r\nbody"
+let pr = http_parse_request(raw_req)
+assert_eq(pr.ok, true)
+assert_eq(pr.method, "GET")
+assert_eq(pr.path, "/hello?x=1")
+assert_eq(pr.headers["host"], "ex.com")
+assert_eq(pr.body, "body")
+
+let links = parse_link_header("</api?page=2>; rel=\"next\", </prev>; rel=prev")
+assert_eq(len(links) >= 2, true)
+assert_eq(links[0]["url"], "/api?page=2")
+assert_eq(links[0]["rel"], "next")
+
+let cd = parse_content_disposition("attachment; filename=\"my;file.pdf\"")
+assert_eq(cd.ok, true)
+assert_eq(cd.disposition, "attachment")
+assert_eq(cd.filename, "my;file.pdf")
+
+assert_eq(url_normalize("HTTP://Ex.COM:80/a/../b/"), "http://ex.com/b/")
+
+let safe = html_sanitize_strict("<p onclick=x>Hi<script>bad()</script></p><b>x</b>", array("p", "b"))
+assert_eq(regex_match(safe, "<p>"), true)
+assert_eq(regex_match(safe, "<script>"), false)
+assert_eq(regex_match(safe, "<b>"), true)
+
+let resp = http_build_response(404, { "Content-Type": "text/plain" }, "nope")
+assert_eq(regex_match(resp, "HTTP/1.1 404"), true)
+assert_eq(regex_match(resp, "Content-Type: text/plain"), true)
+assert_eq(regex_match(resp, "nope"), true)
+
+assert_eq(html_nl2br("a<b>\nok"), "a&lt;b&gt;<br>ok")
+
+assert_eq(url_path_join("/api/", "/v1"), "/api/v1")
+assert_eq(url_path_join("http://x.com/a", "b"), "http://x.com/a/b")
+
+let uq = merge_query("https://x.com?q=1", { "a": "2", "q": "3" })
+assert_eq(regex_match(uq, "q=3"), true)
+assert_eq(regex_match(uq, "a=2"), true)
+
+let langs = parse_accept_language("en-GB;q=0.8, da, en;q=0.9")
+assert_eq(langs[0]["language"], "da")
+assert_eq(langs[1]["language"], "en")
+
+let basic = "Basic " + base64_encode("alice:pw")
+let authm = parse_authorization_basic(basic)
+assert_eq(authm.ok, true)
+assert_eq(authm.username, "alice")
+assert_eq(authm.password, "pw")
+
+print("OK: test_web_html_css_js")

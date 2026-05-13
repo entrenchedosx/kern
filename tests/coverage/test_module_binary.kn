@@ -1,0 +1,8 @@
+b = import("binary")
+assert_eq(has(b, "read_le32"), true)
+assert_eq(has(b, "write_le32"), true)
+assert_eq(has(b, "string_to_bytes"), true)
+assert_eq(has(b, "bytes_to_string"), true)
+bo = b.get_endianness()
+assert_eq(type(bo), "string")
+print("OK: test_module_binary")

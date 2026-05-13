@@ -1,0 +1,19 @@
+// regression: deferred *user* functions must start at entryPoint (not entryPoint-1).
+let log = []
+def record(x) {
+    push(log, x)
+}
+def main_work() {
+    defer record("cleanup")
+    record("body")
+}
+main_work()
+if len(log) != 2 {
+    print("FAIL expected 2 log entries got", len(log))
+} else {
+    if log[0] != "body" || log[1] != "cleanup" {
+        print("FAIL order", log)
+    } else {
+        print("defer_user_fn OK")
+    }
+}

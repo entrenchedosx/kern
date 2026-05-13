@@ -1,0 +1,118 @@
+// kern test helpers — import("lib/kern/testing.kn")
+// run_test(name, f) | run_tests([[name, f], ...]) returns fail count
+// assert_throws(f) | assert_throws_msg(f, substring) | assert_true(cond) | assert_true_msg(cond, msg)
+// assert_near(a, b) | assert_near_eps(a, b, eps) | skip_test(name, f) | test_suite(name, f)
+// use builtin assert_eq(a, b, msg?) for equality checks.
+
+def _string_contains(s, sub) {
+    if (len(sub) == 0) { return true }
+    let n = len(s)
+    let m = len(sub)
+    if (m > n) { return false }
+    let i = 0
+    while (i <= n - m) {
+        if (slice(s, i, i + m) == sub) { return true }
+        i = i + 1
+    }
+    return false
+}
+
+// run a single test: run_test("name", f). Calls f(); prints " name: pass" or fails with throw.
+def run_test(name, f) {
+    f()
+    print("  " + name + ": pass")
+}
+
+// assert that f() throws. Optional second arg: message must contain this substring.
+def assert_throws(f) {
+    try {
+        f()
+        throw "assert_throws: expected function to throw"
+    } catch (e) {
+        return
+    }
+}
+
+def assert_throws_msg(f, expected_sub) {
+    try {
+        f()
+        throw "assert_throws: expected function to throw"
+    } catch (e) {
+        let msg = str(e)
+        if (!_string_contains(msg, expected_sub)) {
+            throw "assert_throws: message should contain '" + expected_sub + "', got: " + msg
+        }
+        return
+    }
+}
+
+// run multiple tests: run_tests([["name1", f1], ["name2", f2], ...]). Returns number of failures.
+def run_tests(tests) {
+    let failed = 0
+    let i = 0
+    while (i < len(tests)) {
+        let pair = tests[i]
+        let name = pair[0]
+        let f = pair[1]
+        try {
+            f()
+            print("  " + name + ": pass")
+        } catch (e) {
+            failed = failed + 1
+            print("  " + name + ": FAIL - " + str(e))
+        }
+        i = i + 1
+    }
+    return failed
+}
+
+// assert_true(cond, msg?) – throw if cond is false
+def assert_true(cond) {
+    if (!cond) { throw "assert_true failed: expected true" }
+}
+def assert_true_msg(cond, msg) {
+    if (!cond) { throw "assert_true failed: " + msg }
+}
+
+// assert_near(a, b, epsilon?) – throw if |a - b| > epsilon (default 1e-9)
+def assert_near(a, b) {
+    let eps = 0.000000001
+    if (abs(a - b) > eps) { throw "assert_near failed: " + str(a) + " ~= " + str(b) }
+}
+def assert_near_eps(a, b, eps) {
+    if (abs(a - b) > eps) { throw "assert_near failed: " + str(a) + " ~= " + str(b) + " (eps " + str(eps) + ")" }
+}
+
+// skip_test(name, f) – run f(); on throw, print " name: skip" and continue (returns true if skipped)
+def skip_test(name, f) {
+    try {
+        f()
+        return false
+    } catch (e) {
+        print("  " + name + ": skip - " + str(e))
+        return true
+    }
+}
+
+// test_suite(name, f) – run f(); print "=== name ===" before, "name: N passed" after
+def test_suite(name, f) {
+    print("=== " + name + " ===")
+    f()
+    print(name + ": passed")
+}
+
+def expect_true(cond) {
+    if (!cond) { throw "expect_true failed" }
+}
+
+def expect_false(cond) {
+    if (cond) { throw "expect_false failed" }
+}
+
+def expect_null(x) {
+    if (x != null) { throw "expect_null failed: got " + str(x) }
+}
+
+def expect_not_null(x) {
+    if (x == null) { throw "expect_not_null failed" }
+}

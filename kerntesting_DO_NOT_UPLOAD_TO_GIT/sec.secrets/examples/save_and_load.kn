@@ -1,0 +1,5 @@
+let sec = import("sec.secrets")
+let s1 = sec["save_store"]("./secrets.local.json", { "API_KEY": "key_123", "DB_PASS": "pw_abc" }, "master-1")
+if (!s1["ok"]) { panic(s1["error"]) }
+let s2 = sec["load_store"]("./secrets.local.json", "master-1")
+print(json_stringify(s2, 2))

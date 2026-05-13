@@ -1,0 +1,521 @@
+# On version tag (v*): build Windows + Linux + macOS with Raylib (g2d/g3d); attach archives to GitHub Release.
+# Windows also builds an NSIS installer (kern-windows-x64-v*-installer.exe) from the same fresh Release binaries as the zip.
+# Also ships a Node-based Kargo bundle (optional; tar.gz + SHA256SUMS) for legacy users. Native `kargo.exe` is built with CMake and included in the portable bundle.
+# Optional: job `publish-installer-src-portable` mirrors the portable quartet + kern-SHA256SUMS to entrenchedosx/kern-installer-src when secret KERN_INSTALLER_SRC_TOKEN is set.
+# workflow_dispatch: build + artifacts only (no release unless ref is a tag).
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      KERN_SKIP_FILE_ASSOCIATION: "1"
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache vcpkg installed tree
+        uses: actions/cache@v4
+        with:
+          path: _vcpkg/installed
+          key: vcpkg-installed-${{ runner.os }}-x64-windows-static-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-installed-${{ runner.os }}-x64-windows-static-
+
+      - name: Fetch + bootstrap vcpkg
+        shell: cmd
+        run: |
+          if exist vcpkg\vcpkg.exe (
+            echo vcpkg already present
+          ) else (
+            git clone https://github.com/microsoft/vcpkg.git vcpkg
+            cd vcpkg
+            call bootstrap-vcpkg.bat
+            cd ..
+          )
+
+      - name: Install Raylib (static)
+        shell: cmd
+        run: |
+          "%GITHUB_WORKSPACE%\vcpkg\vcpkg.exe" install --triplet x64-windows-static --x-manifest-root="%GITHUB_WORKSPACE%" --x-install-root="%GITHUB_WORKSPACE%\_vcpkg\installed"
+
+      - name: Configure CMake
+        shell: cmd
+        run: |
+          cmake -B build -G "Visual Studio 17 2022" -A x64 ^
+            -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static ^
+            -DKERN_BUILD_GAME=ON ^
+            -DKERN_PREFER_STATIC_RAYLIB=ON
+
+      - name: Build
+        shell: cmd
+        run: cmake --build build --config Release --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize kargo --parallel 4
+
+      - name: Verify
+        shell: cmd
+        env:
+          # Trusted release CI: smoke tests touch std/process/fs paths that need broad caps.
+          KERN_ENFORCE_PERMISSIONS: "0"
+        run: |
+          build\Release\kern.exe --version | findstr /C:"graphics: g2d+g3d+game (Raylib linked)"
+          build\Release\kern.exe --scan --registry-only
+          build\Release\kern.exe tests\std_v1_builtins_smoke.kn
+          build\Release\kern.exe examples\basic\01_hello_world.kn
+
+      # Headless runner: skip g2d/g3d .kn tests even when Raylib is linked (no GPU/display).
+      - name: Stable suite (contract, golden, coverage)
+        shell: pwsh
+        continue-on-error: true
+        env:
+          KERN_COVERAGE_SKIP_GRAPHICS: "1"
+        run: pwsh -NoProfile -File ./tests/run_stable.ps1
+
+      - name: Install registry CLI deps for portable bundle
+        shell: pwsh
+        run: npm ci --prefix kern-registry --omit=dev
+
+      - name: Package zip
+        id: zip
+        shell: pwsh
+        run: |
+          $ver = (Get-Content -Raw KERN_VERSION.txt).Trim()
+          $out = "kern-windows-x64-v$ver.zip"
+          New-Item -ItemType Directory -Path pkg/kern-${ver}-win64 | Out-Null
+          Copy-Item build/Release/kern.exe pkg/kern-${ver}-win64/
+          # Windows: real compiler is kern-impl.exe; kernc.exe in build/ is a dev launcher (cmake + exec). Ship impl as kernc.exe for portable use.
+          Copy-Item build/Release/kern-impl.exe pkg/kern-${ver}-win64/kernc.exe
+          Copy-Item build/Release/kern-scan.exe pkg/kern-${ver}-win64/
+          Copy-Item build/Release/kern_game.exe pkg/kern-${ver}-win64/
+          Copy-Item build/Release/kern_repl.exe pkg/kern-${ver}-win64/
+          Copy-Item build/Release/kern_lsp.exe pkg/kern-${ver}-win64/
+          Copy-Item build/Release/kern_contract_humanize.exe pkg/kern-${ver}-win64/
+          Copy-Item LICENSE pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
+          Copy-Item README.md pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
+          Copy-Item KERN_VERSION.txt pkg/kern-${ver}-win64/ -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path pkg/kern-${ver}-win64/kern-registry | Out-Null
+          Copy-Item kern-registry/cli pkg/kern-${ver}-win64/kern-registry/ -Recurse -Force
+          Copy-Item kern-registry/node_modules pkg/kern-${ver}-win64/kern-registry/ -Recurse -Force
+          Copy-Item kern-registry/package.json pkg/kern-${ver}-win64/kern-registry/ -Force
+          Copy-Item kern-registry/package-lock.json pkg/kern-${ver}-win64/kern-registry/ -Force
+          Compress-Archive -Path pkg/kern-${ver}-win64 -DestinationPath $out -Force
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "zip_path=$out"
+
+      - name: SHA256 fragment (Kern Windows zip)
+        shell: pwsh
+        run: |
+          $out = "${{ steps.zip.outputs.zip_path }}"
+          $bn = Split-Path $out -Leaf
+          $h = (Get-FileHash $out -Algorithm SHA256).Hash.ToLowerInvariant()
+          "${h} *${bn}" | Set-Content -Encoding ascii kern-SHA256.partial-windows
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Portable env assets (kern-core.exe, kern-runtime.zip, kern-portable.exe, kargo.exe)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path portable-out | Out-Null
+          Copy-Item build/Release/kern.exe "portable-out/kern-core.exe"
+          Copy-Item build/Release/kargo.exe "portable-out/kargo.exe"
+          $rtRoot = "portable-runtime-stage"
+          New-Item -ItemType Directory -Force -Path "$rtRoot/kern-registry" | Out-Null
+          Copy-Item kern-registry/cli "$rtRoot/kern-registry/" -Recurse -Force
+          Copy-Item kern-registry/node_modules "$rtRoot/kern-registry/" -Recurse -Force
+          Copy-Item kern-registry/package.json, kern-registry/package-lock.json "$rtRoot/kern-registry/" -Force
+          New-Item -ItemType Directory -Force -Path "$rtRoot/lib/kern" | Out-Null
+          Copy-Item lib/kern/* "$rtRoot/lib/kern/" -Recurse -Force
+          Compress-Archive -Path $rtRoot -DestinationPath "portable-out/kern-runtime.zip" -Force
+          Remove-Item -Recurse -Force $rtRoot
+          cargo build --release --manifest-path kern-portable-bootstrap/Cargo.toml
+          Copy-Item "kern-portable-bootstrap/target/release/kern-portable.exe" "portable-out/kern-portable.exe"
+
+      - name: SHA256 fragment (portable bundle)
+        shell: pwsh
+        run: |
+          $lines = @()
+          foreach ($f in @("portable-out/kern-core.exe", "portable-out/kern-runtime.zip", "portable-out/kern-portable.exe", "portable-out/kargo.exe")) {
+            $bn = Split-Path $f -Leaf
+            $h = (Get-FileHash $f -Algorithm SHA256).Hash.ToLowerInvariant()
+            $lines += "${h} *${bn}"
+          }
+          $lines | Set-Content -Encoding ascii kern-SHA256.partial-portable
+
+      - name: Install NSIS
+        run: choco install nsis -y
+
+      - name: Build Windows NSIS installer (fresh binaries, same layout as build.ps1 + installer.nsi)
+        id: nsis
+        shell: pwsh
+        run: pwsh -NoProfile -File ./scripts/package-windows-nsis-release.ps1
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kern-release-windows
+          path: |
+            ${{ steps.zip.outputs.zip_path }}
+            ${{ steps.nsis.outputs.installer_path }}
+            kern-SHA256.partial-windows
+            portable-out/kern-core.exe
+            portable-out/kern-runtime.zip
+            portable-out/kern-portable.exe
+            portable-out/kargo.exe
+            kern-SHA256.partial-portable
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache FetchContent (Raylib under build/_deps)
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: release-linux-fetchdeps-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Install Raylib build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libasound2-dev \
+            libx11-dev \
+            libxrandr-dev \
+            libxi-dev \
+            libxcursor-dev \
+            libxinerama-dev \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev
+
+      - name: Configure & build (Release, graphics)
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release \
+            -DKERN_BUILD_GAME=ON \
+            -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF
+          cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize kargo
+
+      - name: Verify
+        env:
+          KERN_ENFORCE_PERMISSIONS: "0"
+        run: |
+          ./build/kern --version | grep -F "graphics: g2d+g3d+game (Raylib linked)"
+          ./build/kern --scan --registry-only
+          ./build/kern tests/std_v1_builtins_smoke.kn
+          ./build/kern examples/basic/01_hello_world.kn
+
+      # Headless runner: skip g2d/g3d .kn coverage (same as Windows release).
+      - name: Stable suite (contract, golden, coverage)
+        continue-on-error: true
+        env:
+          KERN_COVERAGE_SKIP_GRAPHICS: "1"
+        run: pwsh -NoProfile -File ./tests/run_stable.ps1
+
+      - name: Package tarball
+        id: tgz
+        run: |
+          ver=$(tr -d ' \t\r\n' < KERN_VERSION.txt)
+          out="kern-linux-x64-v${ver}.tar.gz"
+          mkdir -p "pkg/kern-${ver}-linux-x64"
+          chmod +x build/kern build/kernc build/kern-scan build/kern_game build/kern_repl build/kern_lsp build/kern_contract_humanize
+          cp build/kern build/kernc build/kern-scan build/kern_game build/kern_repl build/kern_lsp build/kern_contract_humanize "pkg/kern-${ver}-linux-x64/"
+          cp LICENSE README.md KERN_VERSION.txt "pkg/kern-${ver}-linux-x64/" 2>/dev/null || true
+          tar -czvf "$out" -C pkg "kern-${ver}-linux-x64"
+          echo "tgz_path=$out" >> "$GITHUB_OUTPUT"
+
+      - name: SHA256 fragment (Kern linux archive)
+        run: |
+          out="${{ steps.tgz.outputs.tgz_path }}"
+          bn=$(basename "$out")
+          h=$(sha256sum "$out" | awk '{print $1}')
+          echo "$h *$bn" > kern-SHA256.partial-linux
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kern-release-linux
+          path: |
+            ${{ steps.tgz.outputs.tgz_path }}
+            kern-SHA256.partial-linux
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install MkDocs
+        run: pip install mkdocs
+
+      - name: Build docs (strict) + postprocess
+        run: |
+          mkdocs build --strict
+          python tools/postprocess_site.py
+
+  # Apple Silicon + Intel slices: bootstrapper picks kern-macos-arm64-v* vs kern-macos-x64-v* by host CPU; legacy kern-macos-v* remains a fallback for old releases.
+  macos:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cpu: arm64
+            build_dir: build
+            cmake_extra: "-DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF"
+            pkg_suffix: macos-arm64
+            artifact_prefix: kern-macos-arm64-v
+            partial_file: kern-SHA256.partial-macos-arm64
+            full_test: true
+          - cpu: x64
+            build_dir: build-x64
+            cmake_extra: "-DCMAKE_OSX_ARCHITECTURES=x86_64 -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF"
+            pkg_suffix: macos-x64
+            artifact_prefix: kern-macos-x64-v
+            partial_file: kern-SHA256.partial-macos-x64
+            full_test: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache FetchContent (Raylib under ${{ matrix.build_dir }}/_deps)
+        uses: actions/cache@v4
+        with:
+          path: ${{ matrix.build_dir }}/_deps
+          key: release-macos-${{ matrix.cpu }}-fetchdeps-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Configure & build (Release, graphics)
+        run: |
+          cmake -B "${{ matrix.build_dir }}" -DCMAKE_BUILD_TYPE=Release \
+            -DKERN_BUILD_GAME=ON \
+            ${{ matrix.cmake_extra }}
+          cmake --build "${{ matrix.build_dir }}" --parallel 4 --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize kargo
+
+      - name: Verify
+        env:
+          KERN_ENFORCE_PERMISSIONS: "0"
+        run: |
+          BD="${{ matrix.build_dir }}"
+          ./"$BD/kern" --version | grep -F "graphics: g2d+g3d+game (Raylib linked)"
+          ./"$BD/kern" --scan --registry-only
+          ./"$BD/kern" tests/std_v1_builtins_smoke.kn
+          ./"$BD/kern" examples/basic/01_hello_world.kn
+
+      - name: Stable suite (contract, golden, coverage)
+        if: matrix.full_test
+        continue-on-error: true
+        env:
+          KERN_COVERAGE_SKIP_GRAPHICS: "1"
+        run: pwsh -NoProfile -File ./tests/run_stable.ps1 -BuildDir "${{ matrix.build_dir }}"
+
+      - name: Package tarball
+        id: tgz
+        run: |
+          set -euo pipefail
+          ver=$(tr -d ' \t\r\n' < KERN_VERSION.txt)
+          out="${{ matrix.artifact_prefix }}${ver}.tar.gz"
+          pkgdir="kern-${ver}-${{ matrix.pkg_suffix }}"
+          mkdir -p "pkg/$pkgdir"
+          BD="${{ matrix.build_dir }}"
+          chmod +x "$BD/kern" "$BD/kernc" "$BD/kern-scan" "$BD/kern_game" "$BD/kern_repl" "$BD/kern_lsp" "$BD/kern_contract_humanize"
+          cp "$BD/kern" "$BD/kernc" "$BD/kern-scan" "$BD/kern_game" "$BD/kern_repl" "$BD/kern_lsp" "$BD/kern_contract_humanize" "pkg/$pkgdir/"
+          cp LICENSE README.md KERN_VERSION.txt "pkg/$pkgdir/" 2>/dev/null || true
+          tar -czvf "$out" -C pkg "$pkgdir"
+          echo "tgz_path=$out" >> "$GITHUB_OUTPUT"
+
+      - name: SHA256 fragment (Kern macOS archive)
+        run: |
+          out="${{ steps.tgz.outputs.tgz_path }}"
+          bn=$(basename "$out")
+          h=$(shasum -a 256 "$out" | awk '{print $1}')
+          echo "$h *$bn" > "${{ matrix.partial_file }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kern-release-macos-${{ matrix.cpu }}
+          path: |
+            ${{ steps.tgz.outputs.tgz_path }}
+            ${{ matrix.partial_file }}
+
+  kargo-dist:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: kargo/package-lock.json
+
+      - name: Package Kargo release bundle
+        run: |
+          chmod +x kargo/scripts/package-release.sh
+          kargo/scripts/package-release.sh "${{ github.ref_name }}" .
+
+      - name: Verify checksum + smoke
+        run: |
+          sha256sum -c kargo-SHA256SUMS
+          mkdir -p _kargo_smoke
+          tar -xzf "kargo-${{ github.ref_name }}.tar.gz" -C _kargo_smoke
+          node "_kargo_smoke/kargo-${{ github.ref_name }}/cli/entry.js" --version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kargo-release-dist
+          path: |
+            kargo-${{ github.ref_name }}.tar.gz
+            kargo-SHA256SUMS
+            kargo-release.json
+
+  kern-bootstrap:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            suffix: linux-x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            suffix: windows-x64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            suffix: macos-arm64
+          # Intel slice: cross-compile from Apple Silicon (macos-13 runner removed upstream).
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            suffix: macos-x64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build kern-bootstrap
+        run: cargo build --release --manifest-path kern-bootstrap/Cargo.toml --target ${{ matrix.target }}
+
+      - name: Stage binary for release
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          V="${TAG#v}"
+          mkdir -p _kern_bs_out
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            src="kern-bootstrap/target/${{ matrix.target }}/release/kern-bootstrap.exe"
+            cp "$src" "_kern_bs_out/kern-bootstrap-${V}-${{ matrix.suffix }}.exe"
+          else
+            src="kern-bootstrap/target/${{ matrix.target }}/release/kern-bootstrap"
+            cp "$src" "_kern_bs_out/kern-bootstrap-${V}-${{ matrix.suffix }}"
+            chmod +x "_kern_bs_out/kern-bootstrap-${V}-${{ matrix.suffix }}"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kern-bootstrap-${{ matrix.suffix }}
+          path: _kern_bs_out/*
+
+  publish:
+    needs: [windows, linux, macos]  # docs, kargo-dist, kern-bootstrap made optional
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Merge Kern SHA256SUMS
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-assets
+          if compgen -G "kern-SHA256.partial-*" > /dev/null; then
+            cat kern-SHA256.partial-* > kern-SHA256SUMS
+          fi
+          if [[ ! -f kern-SHA256SUMS ]]; then
+            echo "kern-SHA256SUMS missing (creating from partials)"
+            touch kern-SHA256SUMS
+          fi
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: false  # Preserve custom release notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Portable Windows quartet + checksums: canonical home is entrenchedosx/kern-installer-src (see RELEASE.md).
+  publish-installer-src-portable:
+    name: Mirror portable assets to kern-installer-src
+    needs: [windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: kern-release-windows
+          path: win-art
+
+      - name: Upload portable bundle to entrenchedosx/kern-installer-src
+        env:
+          INSTALLER_TOKEN: ${{ secrets.KERN_INSTALLER_SRC_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${INSTALLER_TOKEN:-}" ]; then
+            echo "::notice::KERN_INSTALLER_SRC_TOKEN not set — skipping mirror to kern-installer-src. Add a fine-grained PAT (Contents: write) on entrenchedosx/kern-installer-src to publish the portable bundle there automatically."
+            exit 0
+          fi
+          cd win-art
+          pick() {
+            local n="$1"
+            local p
+            p=$(find . -name "$n" -type f | head -1)
+            if [ -z "$p" ]; then
+              echo "::error::could not find $n under win-art"
+              find . -type f | head -50 || true
+              exit 1
+            fi
+            echo "$p"
+          }
+          KERN_CORE=$(pick kern-core.exe)
+          RUNTIME=$(pick kern-runtime.zip)
+          PORTABLE=$(pick kern-portable.exe)
+          KARGO=$(pick kargo.exe)
+          PARTIAL=$(pick kern-SHA256.partial-portable)
+          cp -f "$PARTIAL" kern-SHA256SUMS
+          export GH_TOKEN="$INSTALLER_TOKEN"
+          if ! gh release view "$TAG" --repo entrenchedosx/kern-installer-src >/dev/null 2>&1; then
+            gh release create "$TAG" --repo entrenchedosx/kern-installer-src \
+              --title "Portable $TAG" \
+              --notes "Windows portable bundle (mirrored from [entrenchedosx/kern $TAG](https://github.com/entrenchedosx/kern/releases/tag/$TAG))."
+          fi
+          gh release upload "$TAG" --repo entrenchedosx/kern-installer-src --clobber \
+            "$KERN_CORE" "$RUNTIME" "$PORTABLE" "$KARGO" kern-SHA256SUMS

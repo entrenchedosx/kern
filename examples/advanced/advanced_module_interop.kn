@@ -1,0 +1,5 @@
+interop = import("interop")
+
+info = interop.runtime_info()
+print("interop available:", has(interop, "ffi_call"))
+print("runtime ffi_enabled:", info.ffi_enabled)

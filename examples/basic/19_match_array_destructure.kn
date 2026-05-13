@@ -1,0 +1,31 @@
+// match with array patterns (avoid combining generator for-in + inner match if your build hits VM verify limits).
+
+let row = [10, 20, 30]
+match row {
+    case [a, b, c] => {
+        print("destructured sum =", a + b + c)
+    }
+    _ => {
+        print("no match")
+    }
+}
+
+let pr1 = [1, "one"]
+match pr1 {
+    case [n, label] => {
+        print(n, "->", label)
+    }
+    _ => {
+        print("unexpected row")
+    }
+}
+
+let pr2 = [2, "two"]
+match pr2 {
+    case [n2, label2] => {
+        print(n2, "->", label2)
+    }
+    _ => {
+        print("unexpected row")
+    }
+}

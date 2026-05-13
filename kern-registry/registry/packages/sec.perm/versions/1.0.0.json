@@ -1,0 +1,11 @@
+{
+  "name": "sec.perm",
+  "version": "1.0.0",
+  "main": "src/index.kn",
+  "dependencies": {},
+  "trusted": false,
+  "dist": {
+    "tarball": "../../../dist/sec.perm/sec.perm-1.0.0.tgz",
+    "shasum": "sha256-6b393982f0d1690204b0fd0dc93300c55817247abe348d96b26fe801fdf87a43"
+  }
+}

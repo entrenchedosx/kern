@@ -1,0 +1,13 @@
+import "math" as m
+
+if (m == null) {
+    throw Error("import alias binding is null", "TEST-FAIL")
+}
+
+// make sure the alias name is bound, not only the module name.
+if (m.PI <= 3.0) {
+    throw Error("import alias did not resolve module exports", "TEST-FAIL")
+}
+
+print("OK: import_alias_as")
+

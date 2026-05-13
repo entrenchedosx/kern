@@ -1,0 +1,53 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+def edge_type_rank(t) {
+    let x = str(default(t, ""))
+    if (x == "dependency") { return 0 }
+    if (x == "write_conflict") { return 1 }
+    return 9
+}
+
+let w = ecs["world_create"]()
+let pass = lambda (world, dt) => { return null }
+
+if (!ecs["world_register_system"](w, "POST_SIMULATION", "n.a", pass, [], {"write_mask": ["transform"]})) { panic("ecs_conflict_graph_normalized: register n.a failed") }
+if (!ecs["world_register_system"](w, "POST_SIMULATION", "n.b", pass, [], {"write_mask": ["transform"]})) { panic("ecs_conflict_graph_normalized: register n.b failed") }
+if (!ecs["world_register_system"](w, "POST_SIMULATION", "n.c", pass, ["n.a"], {"write_mask": ["registry"]})) { panic("ecs_conflict_graph_normalized: register n.c failed") }
+
+let raw = ecs["world_scheduler_conflict_graph"](w)
+let g1 = ecs["world_scheduler_conflict_graph_normalized"](w)
+let g2 = ecs["world_scheduler_conflict_graph_normalized"](w)
+let i = 0
+
+if (len(keys(default(g1["nodes"], {}))) != len(keys(default(raw["nodes"], {})))) { panic("ecs_conflict_graph_normalized: node count mismatch") }
+if (len(default(g1["edges"], [])) != len(default(raw["edges"], []))) { panic("ecs_conflict_graph_normalized: edge count mismatch") }
+
+let e1 = default(g1["edges"], [])
+let e2 = default(g2["edges"], [])
+if (len(e1) != len(e2)) { panic("ecs_conflict_graph_normalized: idempotence edge length mismatch") }
+
+i = 0
+while (i < len(e1)) {
+    let a = default(e1[i], {})
+    let b = default(e2[i], {})
+    if (str(default(a["type"], "")) != str(default(b["type"], "")) || str(default(a["from"], "")) != str(default(b["from"], "")) || str(default(a["to"], "")) != str(default(b["to"], "")) || str(default(a["stage"], "")) != str(default(b["stage"], ""))) { panic("ecs_conflict_graph_normalized: normalized output not stable") }
+    i = i + 1
+}
+
+i = 1
+while (i < len(e1)) {
+    let p = default(e1[i - 1], {})
+    let c = default(e1[i], {})
+    let pt = edge_type_rank(p["type"])
+    let ct = edge_type_rank(c["type"])
+    if (pt > ct) { panic("ecs_conflict_graph_normalized: edge type rank order violated") }
+    i = i + 1
+}
+
+let sb = default(g1["stage_batches"], [])
+if (len(sb) == 0) { panic("ecs_conflict_graph_normalized: stage_batches missing") }
+
+print("ecs_conflict_graph_normalized: ok")

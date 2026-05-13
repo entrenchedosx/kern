@@ -1,0 +1,9 @@
+obs = import("observability")
+
+runtime = obs.runtime_info()
+trace = obs.stack_trace_array()
+
+print("runtime version:", runtime.version)
+print("debug mode:", runtime.debug_mode)
+print("stack frames:", len(trace))
+obs.log_info("observability health probe completed")

@@ -1,0 +1,6 @@
+// String helpers from the string module.
+import "string"
+let s = "  hello, world  "
+print("trim:", string.trim(s))
+let parts = string.split("a|b|c", "|")
+print("join:", string.join(parts, "/"))

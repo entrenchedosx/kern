@@ -1,0 +1,58 @@
+# Build Kern on macOS with Raylib (g2d/g3d) — same language graphics as Windows.
+name: macOS Kern
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: macos-kern-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-smoke:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache FetchContent (Raylib under build/_deps)
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: macos-kern-fetchdeps-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Configure (Release, graphics + no doc demo)
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release \
+            -DKERN_BUILD_GAME=ON \
+            -DKERN_BUILD_DOC_FRAMEWORK_DEMO=OFF
+
+      - name: Build
+        run: cmake --build build --parallel 4 --target kern kernc kern-scan kern_game kern_repl kern_lsp kern_contract_humanize kargo
+
+      - name: Smoke
+        run: |
+          ./build/kern --version | grep -F "graphics: g2d+g3d+game (Raylib linked)"
+          ./build/kern docs
+          ./build/kern build
+          ./build/kern --scan --registry-only
+          ./build/kern graph --json tests/compile_pipeline_fixture/main.kn
+          ./build/kern --allow=filesystem.read tests/coverage/test_g3d_api_surface_vnext_source.kn
+          ./build/kern tests/coverage/test_system_access_30_surface.kn
+          ./build/kern tests/std_v1_builtins_smoke.kn
+          ./build/kern examples/basic/01_hello_world.kn
+
+      # Some macOS images omit pwsh from PATH; install via Homebrew only when missing.
+      - name: Ensure PowerShell (pwsh)
+        run: |
+          if ! command -v pwsh >/dev/null 2>&1; then
+            brew install powershell
+          fi
+          pwsh --version
+
+      - name: Stable suite (contract, bytecode golden, coverage)
+        env:
+          KERN_COVERAGE_SKIP_GRAPHICS: "1"
+        run: pwsh -NoProfile -File tests/run_stable.ps1

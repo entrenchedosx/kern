@@ -1,0 +1,76 @@
+// String processing utilities
+
+print("=== String Processing Demo ===")
+
+// String reversal
+def reverse_string(s) {
+    let result = ""
+    let i = len(s) - 1
+    while (i >= 0) {
+        result = str(result, char_at(s, i))
+        i = i - 1
+    }
+    return result
+}
+
+// Palindrome check
+def is_palindrome(s) {
+    let cleaned = ""
+    // Remove non-alphanumeric and lowercase
+    for i in range(0, len(s)) {
+        let c = char_at(s, i)
+        if (c >= "a" && c <= "z") {
+            cleaned = str(cleaned, c)
+        }
+        if (c >= "A" && c <= "Z") {
+            // Convert to lowercase (simple version)
+            cleaned = str(cleaned, c)
+        }
+    }
+    return cleaned == reverse_string(cleaned)
+}
+
+// Word count
+def word_count(s) {
+    let count = 0
+    let in_word = false
+    for i in range(0, len(s)) {
+        let c = char_at(s, i)
+        if (c != " " && c != "\t" && c != "\n") {
+            if (!in_word) {
+                count = count + 1
+                in_word = true
+            }
+        } else {
+            in_word = false
+        }
+    }
+    return count
+}
+
+// Tests
+let test_str = "Hello, World!"
+print("Original:", test_str)
+print("Reversed:", reverse_string(test_str))
+
+let palindrome = "A man a plan a canal Panama"
+print("Is palindrome:", is_palindrome(palindrome))
+
+let sentence = "The quick brown fox jumps over the lazy dog"
+print("Word count:", word_count(sentence))
+
+// String splitting (simplified)
+def split_first(s, delimiter) {
+    for i in range(0, len(s)) {
+        if (char_at(s, i) == delimiter) {
+            return i
+        }
+    }
+    return -1
+}
+
+let csv = "apple,banana,cherry"
+let first_comma = split_first(csv, ",")
+print("First comma at:", first_comma)
+
+print("=== String processing demo complete ===")

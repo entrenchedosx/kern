@@ -1,0 +1,6 @@
+// Selective stdlib import: from "math" import sqrt, cos
+from "math" import sqrt, cos
+let x = sqrt(4.0)
+let y = cos(0.0)
+print(x)
+print(y)

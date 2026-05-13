@@ -1,0 +1,54 @@
+// kern iterator-style utilities — import("lib/kern/iter_utils.kn")
+// enumerate, reversed_arr, cycle_take, repeat_value
+
+def enumerate(arr) {
+    let out = array()
+    let i = 0
+    while (i < len(arr)) {
+        push(out, array(i, arr[i]))
+        i = i + 1
+    }
+    return out
+}
+
+def reversed_arr(arr) {
+    let out = array()
+    let i = len(arr) - 1
+    while (i >= 0) {
+        push(out, arr[i])
+        i = i - 1
+    }
+    return out
+}
+
+def cycle_take(arr, n) {
+    if (len(arr) == 0) { return array() }
+    let out = array()
+    let i = 0
+    while (i < n) {
+        push(out, arr[i % len(arr)])
+        i = i + 1
+    }
+    return out
+}
+
+def repeat_value(x, n) {
+    let out = array()
+    let i = 0
+    while (i < n) {
+        push(out, x)
+        i = i + 1
+    }
+    return out
+}
+
+def sliding_window(arr, size) {
+    if (size <= 0 or len(arr) < size) { return array() }
+    let out = array()
+    let i = 0
+    while (i <= len(arr) - size) {
+        push(out, slice(arr, i, i + size))
+        i = i + 1
+    }
+    return out
+}

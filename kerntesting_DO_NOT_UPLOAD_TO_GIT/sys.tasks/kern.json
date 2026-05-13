@@ -1,0 +1,9 @@
+{
+  "name": "sys.tasks",
+  "version": "1.0.1",
+  "main": "src/index.kn",
+  "description": "Task orchestration helpers (backoff, idempotency, schedule windows).",
+  "dependencies": {
+    "sys.log": "^1.0.0"
+  }
+}

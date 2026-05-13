@@ -1,0 +1,13 @@
+// Hamming distance for equal-length strings.
+// import("lib/kern/stdlib/text/hamming.kn")
+
+def hamming(a, b) {
+    if (len(a) != len(b)) { throw "hamming: strings must have equal length" }
+    let d = 0
+    let i = 0
+    while (i < len(a)) {
+        if (a[i] != b[i]) { d = d + 1 }
+        i = i + 1
+    }
+    return d
+}

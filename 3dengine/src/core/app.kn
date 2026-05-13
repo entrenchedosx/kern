@@ -1,0 +1,138 @@
+// 3dengine app lifecycle and hybrid loop (self-contained)
+
+let _g2d = import("g2d")
+let _game = import("game")
+
+def _use_g2d() { return _g2d != null }
+def _use_game() { return !_use_g2d() && _game != null }
+def _now() { return float(monotonic_time()) }
+def _clamp_dt(dt, max_dt) {
+    let d = float(default(dt, 0.0))
+    if (d < 0.0) { return 0.0 }
+    let md = float(default(max_dt, 0.25))
+    if (d > md) { return md }
+    return d
+}
+def _fixed_dt(hz) {
+    let h = float(default(hz, 60.0))
+    if (h <= 0.0) { return 1.0 / 60.0 }
+    return 1.0 / h
+}
+def _alpha(acc, step) {
+    if (step <= 0.0) { return 0.0 }
+    let a = acc / step
+    if (a < 0.0) { return 0.0 }
+    if (a > 1.0) { return 1.0 }
+    return a
+}
+
+def _create_window(config) {
+    let cfg = default(config, {})
+    let title = str(default(cfg["title"], "3dengine"))
+    let width = int(default(cfg["width"], 1280))
+    let height = int(default(cfg["height"], 720))
+    let out = {}
+
+    if (_use_g2d()) {
+        _g2d.createWindow(width, height, title)
+        out["ok"] = true
+        out["backend"] = "g2d"
+        out["set_target_fps"] = lambda (fps) => { _g2d.setTargetFps(int(default(fps, 60))) }
+        out["clear"] = lambda (r, g, b, a) => { _g2d.clear(int(default(r, 0)), int(default(g, 0)), int(default(b, 0)), int(default(a, 255))) }
+        out["rect"] = lambda (x, y, w, h, r, g, b, a) => { _g2d.fillRect(int(default(x, 0)), int(default(y, 0)), int(default(w, 1)), int(default(h, 1)), int(default(r, 255)), int(default(g, 255)), int(default(b, 255)), int(default(a, 255))) }
+        out["text"] = lambda (s, x, y, size, r, g, b) => { _g2d.text(str(default(s, "")), int(default(x, 0)), int(default(y, 0)), int(default(size, 20)), int(default(r, 255)), int(default(g, 255)), int(default(b, 255))) }
+        out["present"] = lambda () => { _g2d.present() }
+        out["is_open"] = lambda () => { return _g2d.isOpen() }
+        out["close"] = lambda () => { _g2d.closeWindow() }
+        return out
+    }
+
+    if (_use_game()) {
+        _game.window_create(width, height, title)
+        out["ok"] = true
+        out["backend"] = "game"
+        out["set_target_fps"] = lambda (fps) => { _game.set_target_fps(int(default(fps, 60))) }
+        out["clear"] = lambda (r, g, b, a) => { _game.clear(int(default(r, 0)), int(default(g, 0)), int(default(b, 0))) }
+        out["rect"] = lambda (x, y, w, h, r, g, b, a) => { _game.draw_rect(int(default(x, 0)), int(default(y, 0)), int(default(w, 1)), int(default(h, 1)), int(default(r, 255)), int(default(g, 255)), int(default(b, 255)), int(default(a, 255))) }
+        out["text"] = lambda (s, x, y, size, r, g, b) => { _game.draw_text(str(default(s, "")), int(default(x, 0)), int(default(y, 0)), int(default(size, 20)), int(default(r, 255)), int(default(g, 255)), int(default(b, 255))) }
+        out["present"] = lambda () => { _game.present() }
+        out["is_open"] = lambda () => { return _game.window_open() }
+        out["close"] = lambda () => { _game.window_close() }
+        return out
+    }
+
+    out["ok"] = false
+    out["backend"] = "none"
+    out["set_target_fps"] = lambda (fps) => { return null }
+    out["clear"] = lambda (r, g, b, a) => { return null }
+    out["rect"] = lambda (x, y, w, h, r, g, b, a) => { return null }
+    out["text"] = lambda (s, x, y, size, r, g, b) => { return null }
+    out["present"] = lambda () => { return null }
+    out["is_open"] = lambda () => { return false }
+    out["close"] = lambda () => { return null }
+    return out
+}
+
+def _defaults(config) {
+    let c = default(config, {})
+    return {"title": str(default(c["title"], "3dengine")), "width": int(default(c["width"], 1280)), "height": int(default(c["height"], 720)), "target_fps": int(default(c["target_fps"], 60)), "fixed_hz": float(default(c["fixed_hz"], 60.0)), "max_frame_dt": float(default(c["max_frame_dt"], 0.25)), "max_fixed_steps": int(default(c["max_fixed_steps"], 8)), "time_scale": float(default(c["time_scale"], 1.0)), "clear_color": default(c["clear_color"], {"r": 20, "g": 24, "b": 34, "a": 255})}
+}
+
+def create_state(config, gfx) {
+    let ts = float(default(config["time_scale"], 1.0))
+    if (ts < 0.0) { ts = 0.0 }
+    return {"running": true, "config": config, "gfx": gfx, "time": {"frame": 0, "sim_frame": 0, "raw_dt": 0.0, "frame_dt": 0.0, "sim_time": 0.0, "fixed_dt": _fixed_dt(config["fixed_hz"]), "alpha": 0.0, "time_scale": ts}, "user": {}}
+}
+
+def stop(state) { state["running"] = false }
+def set_time_scale(state, scale) {
+    let s = float(default(scale, 1.0))
+    if (s < 0.0) { s = 0.0 }
+    state["time"]["time_scale"] = s
+    return s
+}
+
+def run(config, on_fixed, on_frame) {
+    let cfg = _defaults(config)
+    let gfx = _create_window(cfg)
+    if (!gfx["ok"]) {
+        print("3dengine: graphics backend unavailable (need g2d or game module in this Kern build)")
+        return {"ok": false, "reason": "no_backend"}
+    }
+
+    gfx["set_target_fps"](cfg["target_fps"])
+    let st = create_state(cfg, gfx)
+    let prev = _now()
+    let acc = 0.0
+    let fixed = st["time"]["fixed_dt"]
+
+    while (st["running"] && gfx["is_open"]()) {
+        let now_t = _now()
+        let raw_dt = _clamp_dt(now_t - prev, cfg["max_frame_dt"])
+        prev = now_t
+        st["time"]["raw_dt"] = raw_dt
+        let frame_dt = raw_dt * float(default(st["time"]["time_scale"], 1.0))
+        acc = acc + frame_dt
+        st["time"]["frame_dt"] = frame_dt
+
+        let steps = 0
+        while (acc >= fixed && steps < cfg["max_fixed_steps"]) {
+            if (on_fixed != null) { on_fixed(st, fixed) }
+            acc = acc - fixed
+            steps = steps + 1
+            st["time"]["sim_time"] = st["time"]["sim_time"] + fixed
+            st["time"]["sim_frame"] = int(st["time"]["sim_frame"]) + 1
+        }
+        if (steps >= cfg["max_fixed_steps"] && acc >= fixed) { acc = 0.0 }
+
+        st["time"]["alpha"] = _alpha(acc, fixed)
+        let cc = cfg["clear_color"]
+        gfx["clear"](int(default(cc["r"], 0)), int(default(cc["g"], 0)), int(default(cc["b"], 0)), int(default(cc["a"], 255)))
+        if (on_frame != null) { on_frame(st, frame_dt, st["time"]["alpha"]) }
+        gfx["present"]()
+        st["time"]["frame"] = int(st["time"]["frame"]) + 1
+    }
+
+    gfx["close"]()
+    return {"ok": true, "backend": gfx["backend"], "frames": st["time"]["frame"]}
+}

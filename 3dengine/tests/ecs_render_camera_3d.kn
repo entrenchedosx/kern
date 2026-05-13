@@ -1,0 +1,22 @@
+let u = import("src/index.kn")
+let ecs = u["ecs"]
+def v3(x, y, z) { return {"x": float(default(x, 0.0)), "y": float(default(y, 0.0)), "z": float(default(z, 0.0))} }
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let w = ecs["world_create"]()
+let e = ecs["world_create_entity"](w)
+ecs["world_add_transform"](w, e, ecs["transform_make"](v3(0, 0, 5), null, null))
+ecs["world_add_mesh"](w, e, ecs["mesh_make_cube"]())
+ecs["world_add_material"](w, e, ecs["material_make"](v3(0.8, 0.8, 0.8), "m.gray", null))
+ecs["world_set_camera"](w, {"position": v3(0, 0, 0), "zoom": 1.0, "projection": "perspective", "mode": "3d"})
+ecs["world_run_fixed_pipeline"](w, 1.0 / 60.0)
+
+let stats = ecs["world_render_stats"](w)
+if (int(default(stats["command_count"], 0)) != 1) { panic("ecs_render_camera_3d: command_count mismatch") }
+let cmd = default(default(w["render"]["commands"], [])[0], {})
+if (float(default(cmd["depth_value"], -1)) != 5.0) { panic("ecs_render_camera_3d: depth_value mismatch") }
+let sc = default(cmd["screen"], {})
+if (sc["x"] == null || sc["y"] == null) { panic("ecs_render_camera_3d: projected screen coordinates missing") }
+
+print("ecs_render_camera_3d: ok")

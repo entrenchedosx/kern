@@ -1,0 +1,13 @@
+// try / catch with explicit throw
+let e = null
+try {
+    throw "Something went wrong"
+    print("not reached")
+} catch (e) {
+    print("Caught:", error_message(e))
+}
+print("Done.")
+sleep_ms(1000)
+
+
+

@@ -1,0 +1,33 @@
+runtime_mod = import("lib/kern/runtime/modern/module.kn")
+events = import("lib/kern/runtime/modern/events.kn")
+
+let state = {}
+state["attempts"] = 0
+state["after"] = 0
+
+@event("on_command", priority=100, max_failures=1, cooldown_ms=120, stop_on_error=false)
+def unstable_listener(ctx, payload) {
+    state["attempts"] = int(state["attempts"]) + 1
+    throw Error("boom", "LISTENER-BOOM")
+}
+
+@event("on_command", priority=1)
+def after_listener(ctx, payload) {
+    state["after"] = int(state["after"]) + 1
+    return null
+}
+
+let rt = runtime_mod.create_runtime({})
+
+let r1 = events.emit(rt["events"], "on_command", rt["ctx"], {})
+let r2 = events.emit(rt["events"], "on_command", rt["ctx"], {})
+sleep_ms(140)
+let r3 = events.emit(rt["events"], "on_command", rt["ctx"], {})
+
+assert_eq(state["attempts"], 2)
+assert_eq(state["after"], 3)
+assert_eq(r1["circuit_skips"], 0)
+assert_eq(r2["circuit_skips"], 1)
+assert_eq(r3["circuit_skips"], 0)
+assert_eq(len(r2["errors"]), 0)
+print("ok")

@@ -1,0 +1,236 @@
+// 01_lighting_demo.kn - Advanced lighting and materials
+
+use g3d
+
+print("=== Advanced Lighting Demo ===")
+
+// Configure app
+App.configure(
+    title = "Lighting Demo",
+    width = 1280,
+    height = 720,
+    backgroundColor = (20, 20, 30)
+)
+
+// Scene setup
+let scene = {
+    objects: [],
+    lights: [],
+    time: 0
+}
+
+// Create material showcase objects
+def createMaterialShowcase() {
+    let materials = [
+        {name: "Shiny Metal", color: (200, 200, 220), metallic: 0.9, roughness: 0.1},
+        {name: "Matte Plastic", color: (255, 100, 100), metallic: 0.0, roughness: 0.8},
+        {name: "Gold", color: (255, 215, 0), metallic: 1.0, roughness: 0.2},
+        {name: "Rubber", color: (50, 50, 50), metallic: 0.0, roughness: 0.9},
+        {name: "Polished Wood", color: (139, 90, 43), metallic: 0.1, roughness: 0.4},
+        {name: "Glass", color: (200, 240, 255), metallic: 0.0, roughness: 0.0, transparent: true}
+    ]
+    
+    for i in range(len(materials)) {
+        let mat = materials[i]
+        let x = (i % 3) * 3 - 3
+        let z = (i / 3) * 3 - 1.5
+        
+        let obj = Entity(
+            model = "sphere",
+            position = (x, 1, z),
+            color = mat.color,
+            scale = 1.0
+        )
+        
+        // Set material properties if API supports it
+        // obj.setMetallic(mat.metallic)
+        // obj.setRoughness(mat.roughness)
+        
+        scene.objects.append({entity: obj, material: mat})
+        print("Created: " + mat.name)
+    }
+}
+
+// Multiple light types
+def setupLighting() {
+    // Ambient
+    App.ambientLight = 0.2
+    
+    // Directional light (sun)
+    let sun = Light(
+        type = DIRECTIONAL,
+        position = (10, 20, 10),
+        color = (255, 250, 240),
+        intensity = 1.0
+    )
+    scene.lights.append(sun)
+    
+    // Point lights
+    let point1 = Light(
+        type = POINT,
+        position = (-5, 5, -5),
+        color = (255, 100, 100),  // Red
+        intensity = 0.8,
+        range = 15
+    )
+    scene.lights.append(point1)
+    
+    let point2 = Light(
+        type = POINT,
+        position = (5, 5, 5),
+        color = (100, 100, 255),  // Blue
+        intensity = 0.8,
+        range = 15
+    )
+    scene.lights.append(point2)
+    
+    // Spot light
+    let spot = Light(
+        type = SPOT,
+        position = (0, 10, 0),
+        color = (255, 255, 200),
+        intensity = 1.2,
+        range = 20
+        // angle: 30  // degrees
+    )
+    // spot.lookAt((0, 0, 0))
+    scene.lights.append(spot)
+    
+    print("Lighting setup complete with " + len(scene.lights) + " lights")
+}
+
+// Create ground plane
+def createEnvironment() {
+    let ground = Entity(
+        model = "plane",
+        position = (0, 0, 0),
+        color = (40, 40, 40),
+        scale = (20, 1, 20)
+    )
+    
+    // Grid pattern using multiple small cubes (inefficient but visual)
+    for x in range(-10, 11, 2) {
+        for z in range(-10, 11, 2) {
+            let grid = Entity(
+                model = "cube",
+                position = (x, 0.05, z),
+                color = (60, 60, 60),
+                scale = (1.9, 0.1, 1.9)
+            )
+        }
+    }
+}
+
+// Camera controller
+def setupCamera() {
+    let camera = Camera(
+        position = (8, 8, 8),
+        enableWASD = false,
+        enableMouseLook = false
+    )
+    // camera.setAsMain()
+    return camera
+}
+
+// Animation update
+def update(dt) {
+    scene.time = scene.time + dt
+    
+    // Rotate point lights
+    let radius = 8
+    let speed = 0.5
+    
+    // Red light orbits
+    let angle1 = scene.time * speed
+    scene.lights[1].position = (
+        cos(angle1) * radius,
+        5,
+        sin(angle1) * radius
+    )
+    
+    // Blue light orbits opposite
+    let angle2 = scene.time * speed + 3.14159
+    scene.lights[2].position = (
+        cos(angle2) * radius,
+        5,
+        sin(angle2) * radius
+    )
+    
+    // Spot light sweeps
+    let spotAngle = scene.time * 0.3
+    scene.lights[3].position = (
+        cos(spotAngle) * 10,
+        10,
+        sin(spotAngle) * 10
+    )
+    
+    // Rotate objects slowly
+    for obj in scene.objects {
+        // obj.entity.rotation_y = obj.entity.rotation_y + 20 * dt
+    }
+    
+    // Cycle colors on some materials
+    // let hue = (scene.time * 0.5) % 1.0
+    // scene.objects[1].entity.setColor(hsvToRgb(hue, 1, 1))
+}
+
+// Helper: cosine
+def cos(angle) {
+    // Approximation or use math module
+    return 0  // Placeholder
+}
+
+// Helper: sine
+def sin(angle) {
+    return 0  // Placeholder
+}
+
+// Helper: HSV to RGB conversion
+def hsvToRgb(h, s, v) {
+    // Simplified HSV to RGB
+    // h: 0-1, s: 0-1, v: 0-1
+    let r = v
+    let g = v * (1 - s * (1 - h))
+    let b = v * (1 - s * h)
+    return (r * 255, g * 255, b * 255)
+}
+
+// Main
+def main() {
+    print("Initializing lighting demo...")
+    
+    createMaterialShowcase()
+    setupLighting()
+    createEnvironment()
+    let camera = setupCamera()
+    
+    // Camera animation
+    let camAngle = 0
+    def updateCamera(dt) {
+        camAngle = camAngle + dt * 0.2
+        let camRadius = 12
+        camera.position = (
+            cos(camAngle) * camRadius,
+            6,
+            sin(camAngle) * camRadius
+        )
+        camera.lookAt((0, 1, 0))
+    }
+    
+    // Combined update
+    def combinedUpdate(dt) {
+        update(dt)
+        updateCamera(dt)
+        
+        if (input.pressed(input.Key.SPACE)) {
+            print("Time: " + scene.time)
+        }
+    }
+    
+    App.onUpdate(combinedUpdate)
+    App.run()
+    
+    print("Demo complete!")
+}
+
+main()

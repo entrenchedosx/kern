@@ -1,0 +1,521 @@
+// 03_data_structures.kn - Stack, Queue, Linked List, Tree implementations
+
+print("=== Data Structures ===")
+
+print("")
+print("=== Stack (LIFO) ===")
+
+// Stack implementation using array
+let stack = {
+    data: [],
+    
+    push: def (item) {
+        data.append(item)
+    },
+    
+    pop: def () {
+        if (len(data) == 0) {
+            return null
+        }
+        let item = data[len(data) - 1]
+        data.pop()
+        return item
+    },
+    
+    peek: def () {
+        if (len(data) == 0) {
+            return null
+        }
+        return data[len(data) - 1]
+    },
+    
+    isEmpty: def () {
+        return len(data) == 0
+    },
+    
+    size: def () {
+        return len(data)
+    }
+}
+
+// Test stack
+stack.push(10)
+stack.push(20)
+stack.push(30)
+print("Stack after pushes: " + stack.data)
+print("Peek: " + stack.peek())
+print("Pop: " + stack.pop())
+print("Pop: " + stack.pop())
+print("Size: " + stack.size())
+
+print("")
+print("=== Queue (FIFO) ===")
+
+// Queue implementation
+let queue = {
+    data: [],
+    head: 0,
+    
+    enqueue: def (item) {
+        data.append(item)
+    },
+    
+    dequeue: def () {
+        if (head >= len(data)) {
+            return null
+        }
+        let item = data[head]
+        head = head + 1
+        
+        // Compact array when half empty
+        if (head > len(data) / 2) {
+            let newData = []
+            for i in range(head, len(data)) {
+                newData.append(data[i])
+            }
+            data = newData
+            head = 0
+        }
+        
+        return item
+    },
+    
+    peek: def () {
+        if (head >= len(data)) {
+            return null
+        }
+        return data[head]
+    },
+    
+    isEmpty: def () {
+        return head >= len(data)
+    },
+    
+    size: def () {
+        return len(data) - head
+    }
+}
+
+// Test queue
+queue.enqueue("Alice")
+queue.enqueue("Bob")
+queue.enqueue("Carol")
+print("Queue size: " + queue.size())
+print("Dequeue: " + queue.dequeue())
+print("Dequeue: " + queue.dequeue())
+print("Peek: " + queue.peek())
+
+print("")
+print("=== Priority Queue ===")
+
+def createPriorityQueue() {
+    return {
+        items: [],
+        
+        enqueue: def (item, priority) {
+            let element = {item: item, priority: priority}
+            let added = false
+            
+            for i in range(len(items)) {
+                if (priority < items[i].priority) {
+                    items.insert(i, element)
+                    added = true
+                    break
+                }
+            }
+            
+            if (!added) {
+                items.append(element)
+            }
+        },
+        
+        dequeue: def () {
+            if (len(items) == 0) {
+                return null
+            }
+            return items.removeAt(0).item
+        },
+        
+        peek: def () {
+            if (len(items) == 0) {
+                return null
+            }
+            return items[0].item
+        },
+        
+        isEmpty: def () {
+            return len(items) == 0
+        }
+    }
+}
+
+let pq = createPriorityQueue()
+pq.enqueue("Low priority task", 5)
+pq.enqueue("High priority task", 1)
+pq.enqueue("Medium priority task", 3)
+pq.enqueue("Urgent task", 0)
+
+print("Priority queue processing:")
+while (!pq.isEmpty()) {
+    print("  " + pq.dequeue())
+}
+
+print("")
+print("=== Linked List ===")
+
+// Node constructor
+def createNode(value, next) {
+    return {value: value, next: next}
+}
+
+// Linked list
+let linkedList = {
+    head: null,
+    size: 0,
+    
+    prepend: def (value) {
+        head = createNode(value, head)
+        size = size + 1
+    },
+    
+    append: def (value) {
+        if (head == null) {
+            head = createNode(value, null)
+        } else {
+            let current = head
+            while (current.next != null) {
+                current = current.next
+            }
+            current.next = createNode(value, null)
+        }
+        size = size + 1
+    },
+    
+    remove: def (value) {
+        if (head == null) {
+            return false
+        }
+        
+        if (head.value == value) {
+            head = head.next
+            size = size - 1
+            return true
+        }
+        
+        let current = head
+        while (current.next != null) {
+            if (current.next.value == value) {
+                current.next = current.next.next
+                size = size - 1
+                return true
+            }
+            current = current.next
+        }
+        
+        return false
+    },
+    
+    find: def (value) {
+        let current = head
+        while (current != null) {
+            if (current.value == value) {
+                return true
+            }
+            current = current.next
+        }
+        return false
+    },
+    
+    toArray: def () {
+        let result = []
+        let current = head
+        while (current != null) {
+            result.append(current.value)
+            current = current.next
+        }
+        return result
+    }
+}
+
+// Test linked list
+linkedList.append(10)
+linkedList.append(20)
+linkedList.prepend(5)
+linkedList.append(30)
+print("Linked list: " + linkedList.toArray())
+print("Contains 20: " + linkedList.find(20))
+linkedList.remove(20)
+print("After removing 20: " + linkedList.toArray())
+
+print("")
+print("=== Binary Search Tree ===")
+
+def createBST() {
+    return {
+        root: null,
+        
+        insert: def (value) {
+            root = insertNode(root, value)
+        },
+        
+        find: def (value) {
+            return findNode(root, value)
+        },
+        
+        inOrder: def () {
+            let result = []
+            inOrderTraversal(root, result)
+            return result
+        },
+        
+        min: def () {
+            if (root == null) return null
+            let node = root
+            while (node.left != null) {
+                node = node.left
+            }
+            return node.value
+        },
+        
+        max: def () {
+            if (root == null) return null
+            let node = root
+            while (node.right != null) {
+                node = node.right
+            }
+            return node.value
+        }
+    }
+}
+
+def insertNode(node, value) {
+    if (node == null) {
+        return {value: value, left: null, right: null}
+    }
+    
+    if (value < node.value) {
+        node.left = insertNode(node.left, value)
+    } else if (value > node.value) {
+        node.right = insertNode(node.right, value)
+    }
+    
+    return node
+}
+
+def findNode(node, value) {
+    if (node == null) {
+        return false
+    }
+    
+    if (value == node.value) {
+        return true
+    }
+    
+    if (value < node.value) {
+        return findNode(node.left, value)
+    } else {
+        return findNode(node.right, value)
+    }
+}
+
+def inOrderTraversal(node, result) {
+    if (node != null) {
+        inOrderTraversal(node.left, result)
+        result.append(node.value)
+        inOrderTraversal(node.right, result)
+    }
+}
+
+// Test BST
+let bst = createBST()
+bst.insert(50)
+bst.insert(30)
+bst.insert(70)
+bst.insert(20)
+bst.insert(40)
+bst.insert(60)
+bst.insert(80)
+
+print("BST in-order: " + bst.inOrder())
+print("Find 40: " + bst.find(40))
+print("Find 100: " + bst.find(100))
+print("Min: " + bst.min())
+print("Max: " + bst.max())
+
+print("")
+print("=== Graph (Adjacency List) ===")
+
+let graph = {
+    adjacencyList: {},
+    
+    addVertex: def (vertex) {
+        if (adjacencyList[vertex] == null) {
+            adjacencyList[vertex] = []
+        }
+    },
+    
+    addEdge: def (v1, v2) {
+        if (adjacencyList[v1] == null) {
+            addVertex(v1)
+        }
+        if (adjacencyList[v2] == null) {
+            addVertex(v2)
+        }
+        adjacencyList[v1].append(v2)
+        adjacencyList[v2].append(v1)  // Undirected
+    },
+    
+    dfs: def (start) {
+        let result = []
+        let visited = {}
+        dfsRecursive(start, visited, result)
+        return result
+    },
+    
+    bfs: def (start) {
+        let result = []
+        let visited = {}
+        let queue = [start]
+        visited[start] = true
+        
+        while (len(queue) > 0) {
+            let vertex = queue.removeAt(0)
+            result.append(vertex)
+            
+            for neighbor in adjacencyList[vertex] {
+                if (visited[neighbor] == null) {
+                    visited[neighbor] = true
+                    queue.append(neighbor)
+                }
+            }
+        }
+        
+        return result
+    }
+}
+
+def dfsRecursive(vertex, visited, result) {
+    visited[vertex] = true
+    result.append(vertex)
+    
+    for neighbor in graph.adjacencyList[vertex] {
+        if (visited[neighbor] == null) {
+            dfsRecursive(neighbor, visited, result)
+        }
+    }
+}
+
+// Test graph
+graph.addEdge("A", "B")
+graph.addEdge("A", "C")
+graph.addEdge("B", "D")
+graph.addEdge("B", "E")
+graph.addEdge("C", "F")
+graph.addEdge("E", "F")
+
+print("Graph adjacency list: " + graph.adjacencyList)
+print("DFS from A: " + graph.dfs("A"))
+print("BFS from A: " + graph.bfs("A"))
+
+print("")
+print("=== Hash Table / Hash Map ===")
+
+// Using built-in map as hash table
+// For custom implementation:
+
+def createHashTable(size) {
+    return {
+        buckets: [],
+        size: size,
+        count: 0,
+        
+        // Simple hash function
+        _hash: def (key) {
+            let hash = 0
+            for c in key {
+                hash = (hash * 31 + c) % size
+            }
+            return hash
+        },
+        
+        set: def (key, value) {
+            let index = _hash(key)
+            
+            if (buckets[index] == null) {
+                buckets[index] = []
+            }
+            
+            // Check if key exists
+            for pair in buckets[index] {
+                if (pair.key == key) {
+                    pair.value = value
+                    return
+                }
+            }
+            
+            // Add new key-value pair
+            buckets[index].append({key: key, value: value})
+            count = count + 1
+        },
+        
+        get: def (key) {
+            let index = _hash(key)
+            
+            if (buckets[index] == null) {
+                return null
+            }
+            
+            for pair in buckets[index] {
+                if (pair.key == key) {
+                    return pair.value
+                }
+            }
+            
+            return null
+        },
+        
+        remove: def (key) {
+            let index = _hash(key)
+            
+            if (buckets[index] == null) {
+                return false
+            }
+            
+            for i in range(len(buckets[index])) {
+                if (buckets[index][i].key == key) {
+                    buckets[index].removeAt(i)
+                    count = count - 1
+                    return true
+                }
+            }
+            
+            return false
+        },
+        
+        keys: def () {
+            let result = []
+            for bucket in buckets {
+                if (bucket != null) {
+                    for pair in bucket {
+                        result.append(pair.key)
+                    }
+                }
+            }
+            return result
+        }
+    }
+}
+
+// Test hash table
+let ht = createHashTable(10)
+ht.set("name", "Alice")
+ht.set("age", 30)
+ht.set("city", "NYC")
+
+print("Hash table keys: " + ht.keys())
+print("Get name: " + ht.get("name"))
+print("Get age: " + ht.get("age"))
+ht.remove("age")
+print("After removing age: " + ht.keys())
+
+print("Done!")

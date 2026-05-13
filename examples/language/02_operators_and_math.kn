@@ -1,0 +1,81 @@
+// 02_operators_and_math.kn - Arithmetic, comparison, and logical operators
+
+print("=== Arithmetic Operators ===")
+
+let a = 15
+let b = 4
+
+print(a + " + " + b + " = " + (a + b))    // Addition: 19
+print(a + " - " + b + " = " + (a - b))    // Subtraction: 11
+print(a + " * " + b + " = " + (a * b))    // Multiplication: 60
+print(a + " / " + b + " = " + (a / b))    // Division: 3.75
+print(a + " % " + b + " = " + (a % b))    // Modulo: 3
+
+print("")
+print("=== Compound Assignment ===")
+
+let val = 10
+val += 5   // val = 15
+print("After += 5: " + val)
+val -= 3   // val = 12
+print("After -= 3: " + val)
+val *= 2   // val = 24
+print("After *= 2: " + val)
+val /= 4   // val = 6
+print("After /= 4: " + val)
+
+print("")
+print("=== Comparison Operators ===")
+
+let x = 10, y = 20, z = 10
+
+print(x + " == " + z + ": " + (x == z))   // true
+print(x + " != " + y + ": " + (x != y))   // true
+print(x + " < " + y + ": " + (x < y))     // true
+print(x + " > " + y + ": " + (x > y))     // false
+print(x + " <= " + z + ": " + (x <= z))   // true
+print(x + " >= " + y + ": " + (x >= y))   // false
+
+print("")
+print("=== Logical Operators ===")
+
+let p = true, q = false
+
+print("true && false: " + (p && q))   // false
+print("true || false: " + (p || q))   // true
+print("!true: " + (!p))              // false
+print("!false: " + (!q))             // true
+
+// Combined logic
+let age = 25
+let hasLicense = true
+let canDrive = (age >= 16) && hasLicense
+print("Can drive (age>=16 && hasLicense): " + canDrive)
+
+print("")
+print("=== Math Functions ===")
+
+// Absolute value
+let neg = -42
+print("Absolute of " + neg + ": " + abs(neg))
+
+// Min/Max
+print("Min of 10 and 5: " + min(10, 5))
+print("Max of 10 and 5: " + max(10, 5))
+
+// Power and root
+print("2^10 = " + pow(2, 10))
+print("Square root of 16: " + sqrt(16))
+
+// Trigonometry (if available)
+// print("Sin(90): " + sin(90))
+// print("Cos(0): " + cos(0))
+
+// Random numbers
+print("Random 0-1: " + random())
+print("Random 1-100: " + randomInt(1, 100))
+
+print("")
+print("=== Bitwise (if supported) ===")
+// let bitwise = 5 & 3
+// print("5 & 3 = " + bitwise)

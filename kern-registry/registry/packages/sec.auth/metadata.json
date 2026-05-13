@@ -1,0 +1,11 @@
+{
+  "name": "sec.auth",
+  "description": "Authentication helpers: token + session utilities for Kern.",
+  "trusted": false,
+  "latest": "1.0.0",
+  "versions": {
+    "1.0.0": {
+      "manifest": "versions/1.0.0.json"
+    }
+  }
+}

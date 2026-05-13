@@ -1,0 +1,12 @@
+// Enumerate pairs [index, value] for arrays.
+// import("lib/kern/stdlib/iter/enumerate.kn")
+
+def enumerate(arr) {
+    let out = array()
+    let i = 0
+    while (i < len(arr)) {
+        push(out, array(i, arr[i]))
+        i = i + 1
+    }
+    return out
+}

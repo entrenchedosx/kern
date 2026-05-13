@@ -1,0 +1,4 @@
+// Minimal expressions + print (smoke test for toolchain / CI lists).
+let a = 1 + 2 * 3
+print(a)
+print("ok")

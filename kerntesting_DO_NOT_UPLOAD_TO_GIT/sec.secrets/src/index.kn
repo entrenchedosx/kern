@@ -1,0 +1,53 @@
+// sec.secrets - encrypted secret store helpers
+
+let _crypto = import("sec.crypto")
+let _cfg = import("sys.config")
+
+def _ok(value) { return { "ok": true, "value": value, "error": "", "code": "ok" } }
+def _err(code, message) { return { "ok": false, "value": null, "error": str(default(message, "")), "code": str(default(code, "error")) } }
+
+def encrypt_value(plain_text, master_key) {
+    return _crypto["encrypt_xor_base64"](str(default(plain_text, "")), str(default(master_key, "")))
+}
+
+def decrypt_value(cipher_text, master_key) {
+    let v = _crypto["decrypt_xor_base64"](str(default(cipher_text, "")), str(default(master_key, "")))
+    if (v == null) { return _err("decrypt.failed", "unable to decrypt secret") }
+    return _ok(v)
+}
+
+def save_store(path, secret_map, master_key) {
+    require("filesystem.write")
+    let encrypted = {}
+    for k in keys(default(secret_map, {})) {
+        encrypted[k] = encrypt_value(default(secret_map, {})[k], master_key)
+    }
+    let doc = { "version": 1, "updated_at": int(time()), "data": encrypted }
+    let ok = write_file(str(default(path, "")), json_stringify(doc, 2))
+    if (!ok) { return _err("write.failed", "failed writing secret store") }
+    return _ok(true)
+}
+
+def load_store(path, master_key) {
+    let rr = _cfg["read_json_file"](path)
+    if (!rr["ok"]) { return rr }
+    let doc = rr["value"]
+    if (!has(doc, "data")) { return _err("store.invalid", "missing data field") }
+    let out = {}
+    for k in keys(doc["data"]) {
+        let dv = decrypt_value(doc["data"][k], master_key)
+        if (!dv["ok"]) { return _err("decrypt.failed", "failed for key: " + str(k)) }
+        out[k] = dv["value"]
+    }
+    return _ok(out)
+}
+
+def rotate_master_key(path, old_key, new_key) {
+    let loaded = load_store(path, old_key)
+    if (!loaded["ok"]) { return loaded }
+    return save_store(path, loaded["value"], new_key)
+}
+
+def from_env(prefix, key_names) {
+    return _cfg["from_env"](prefix, key_names)
+}

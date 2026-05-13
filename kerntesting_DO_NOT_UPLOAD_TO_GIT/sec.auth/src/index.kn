@@ -1,0 +1,122 @@
+// sec.auth - token/session helpers for Kern applications
+
+let _crypto = import("sec.crypto")
+
+def _now_unix() {
+    return int(time())
+}
+
+def _parse_json_safe(raw) {
+    try {
+        return json_parse(raw)
+    } catch (e) {
+        return null
+    }
+}
+
+def _sign_payload(payload_json, secret) {
+    return _crypto["sign_message"](payload_json, secret)
+}
+
+def hash_password(password, salt) {
+    return _crypto["hash_password"](password, salt)
+}
+
+def verify_password(password, salt, expected_hash) {
+    return _crypto["verify_password"](password, salt, expected_hash)
+}
+
+def issue_token(claims, secret, ttl_seconds) {
+    let payload = default(claims, {})
+    let ttl = int(default(ttl_seconds, 3600))
+    if (ttl <= 0) { ttl = 3600 }
+    payload["iat"] = _now_unix()
+    payload["exp"] = _now_unix() + ttl
+    payload["jti"] = uuid()
+    let payload_json = json_stringify(payload)
+    let payload_b64 = base64_encode(payload_json)
+    let sig = _sign_payload(payload_json, secret)
+    return payload_b64 + "." + sig
+}
+
+def verify_token(token, secret) {
+    let out = {
+        "ok": false,
+        "reason": "",
+        "payload": null
+    }
+    if (token == null) {
+        out["reason"] = "token-empty"
+        return out
+    }
+
+    let parts = split(str(token), ".")
+    if (len(parts) != 2) {
+        out["reason"] = "token-format"
+        return out
+    }
+
+    let payload_json = ""
+    try {
+        payload_json = base64_decode(parts[0])
+    } catch (e) {
+        out["reason"] = "token-base64"
+        return out
+    }
+
+    let expected = _sign_payload(payload_json, secret)
+    if (parts[1] != expected) {
+        out["reason"] = "token-signature"
+        return out
+    }
+
+    let payload = _parse_json_safe(payload_json)
+    if (payload == null) {
+        out["reason"] = "token-json"
+        return out
+    }
+
+    if (has(payload, "exp") && int(payload["exp"]) < _now_unix()) {
+        out["reason"] = "token-expired"
+        out["payload"] = payload
+        return out
+    }
+
+    out["ok"] = true
+    out["reason"] = "ok"
+    out["payload"] = payload
+    return out
+}
+
+def refresh_token(token, secret, ttl_seconds) {
+    let check = verify_token(token, secret)
+    if (!check["ok"]) { return null }
+    let payload = check["payload"]
+    payload["jti"] = uuid()
+    return issue_token(payload, secret, ttl_seconds)
+}
+
+def session_create(user_id, ttl_seconds) {
+    let ttl = int(default(ttl_seconds, 86400))
+    if (ttl <= 0) { ttl = 86400 }
+    return {
+        "id": "sess-" + uuid(),
+        "user_id": str(default(user_id, "")),
+        "issued_at": _now_unix(),
+        "expires_at": _now_unix() + ttl,
+        "revoked": false
+    }
+}
+
+def session_revoke(session_obj) {
+    if (session_obj == null) { return false }
+    session_obj["revoked"] = true
+    return true
+}
+
+def session_is_valid(session_obj) {
+    if (session_obj == null) { return false }
+    if (has(session_obj, "revoked") && session_obj["revoked"] == true) { return false }
+    if (!has(session_obj, "expires_at")) { return false }
+    return int(session_obj["expires_at"]) >= _now_unix()
+}

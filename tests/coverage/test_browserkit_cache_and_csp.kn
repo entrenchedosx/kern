@@ -1,0 +1,14 @@
+cache = import("lib/kern/browserkit/network/cache.kn")
+csp = import("lib/kern/browserkit/security/csp.kn")
+
+cache.clear()
+cache.put("cache_key", "<html/>", 5000)
+let v = cache.get("cache_key")
+if (v == null) { throw "cache get failed" }
+
+csp.set_directive("img-src", ["self", "https://cdn.example.com"])
+if (!csp.allows("img-src", "self")) { throw "csp self allow failed" }
+if (!csp.allows("img-src", "https://cdn.example.com")) { throw "csp host allow failed" }
+if (csp.allows("img-src", "https://evil.example.com")) { throw "csp deny failed" }
+
+print("test_browserkit_cache_and_csp: pass")

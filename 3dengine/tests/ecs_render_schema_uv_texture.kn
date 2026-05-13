@@ -1,0 +1,59 @@
+let u = import("src/index.kn")
+let ecs = u["ecs"]
+def v3(x, y, z) { return {"x": float(default(x, 0.0)), "y": float(default(y, 0.0)), "z": float(default(z, 0.0))} }
+
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+// 1) Built-in quad/cube meshes expose uvs aligned with vertices
+let mq = ecs["mesh_make_quad"]()
+if (len(default(mq["vertices"], [])) != len(default(mq["uvs"], []))) { panic("ecs_render_schema: quad vertex/uv count mismatch") }
+let mc = ecs["mesh_make_cube"]()
+if (len(default(mc["vertices"], [])) != len(default(mc["uvs"], []))) { panic("ecs_render_schema: cube vertex/uv count mismatch") }
+
+// 2) Invalid uv length rejected at registry (non-debug: empty id)
+let w = ecs["world_create"]()
+let bad_mesh = ecs["mesh_make_quad"]()
+bad_mesh["uvs"] = [[0.0, 0.0]]
+let bad_id = ecs["world_register_mesh"](w, bad_mesh)
+if (str(default(bad_id, "")) != "") { panic("ecs_render_schema: expected invalid uvs to reject register") }
+
+// 3) Texture handle required before material references it
+let t_ok = ecs["world_register_texture"](w, ecs["texture_make"](16, 16, null, "stub_a"))
+if (str(default(t_ok, "")) == "") { panic("ecs_render_schema: texture register failed") }
+let mat_no_tex = ecs["world_register_material"](w, ecs["material_make"](v3(1, 1, 1), "m.bad", "tex.missing"))
+if (str(default(mat_no_tex, "")) != "") { panic("ecs_render_schema: material should reject unknown texture_id") }
+
+let m_tex = ecs["world_register_material"](w, ecs["material_make"](v3(1, 0.5, 0.25), "m.with_tex", t_ok))
+if (str(default(m_tex, "")) == "") { panic("ecs_render_schema: material with valid texture should register") }
+
+let e = ecs["world_create_entity"](w)
+ecs["world_add_transform"](w, e, ecs["transform_make"](v3(0, 0, 0), null, null))
+ecs["world_add_mesh_handle"](w, e, ecs["world_register_mesh"](w, ecs["mesh_make_quad"]()))
+ecs["world_add_material_handle"](w, e, m_tex)
+ecs["world_run_render_prep"](w)
+let cmd = default(default(w["render"]["commands"], [])[0], {})
+if (str(default(cmd["texture_id"], "")) != str(t_ok)) { panic("ecs_render_schema: command texture_id not propagated") }
+
+// 4) Different textures split batches even when base color matches
+let w2 = ecs["world_create"]()
+let ta = ecs["world_register_texture"](w2, ecs["texture_make"](8, 8, null, "a"))
+let tb = ecs["world_register_texture"](w2, ecs["texture_make"](8, 8, null, "b"))
+let ma = ecs["world_register_material"](w2, ecs["material_make"](v3(1, 0, 0), "m.samecolor", ta))
+let mb = ecs["world_register_material"](w2, ecs["material_make"](v3(1, 0, 0), "m.samecolor", tb))
+let p1 = ecs["world_create_entity"](w2)
+let p2 = ecs["world_create_entity"](w2)
+let qh = ecs["world_register_mesh"](w2, ecs["mesh_make_quad"]())
+ecs["world_add_transform"](w2, p1, ecs["transform_make"](v3(0, 0, 0), null, null))
+ecs["world_add_transform"](w2, p2, ecs["transform_make"](v3(50, 0, 0), null, null))
+ecs["world_add_mesh_handle"](w2, p1, qh)
+ecs["world_add_mesh_handle"](w2, p2, qh)
+ecs["world_add_material_handle"](w2, p1, ma)
+ecs["world_add_material_handle"](w2, p2, mb)
+ecs["world_run_render_prep"](w2)
+let _ = ecs["world_render"](w2, {"rect": lambda (x, y, ww, hh, r, g, b, a) => { return null }})
+let st = ecs["world_render_stats"](w2)
+if (int(default(st["batched_draw_calls"], 0)) != 2) { panic("ecs_render_schema: texture should split material batches") }
+if (int(default(st["texture_registry_size"], 0)) != 2) { panic("ecs_render_schema: texture_registry_size mismatch") }
+
+print("ecs_render_schema_uv_texture: ok")

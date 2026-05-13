@@ -1,0 +1,3 @@
+let prompts = import("ai.prompts")
+let parsed = prompts["extract_json"]("{\"ok\":true,\"count\":2}")
+print(json_stringify(parsed, 2))

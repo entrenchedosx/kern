@@ -1,0 +1,3 @@
+def mul2(x) {
+    return x * 2
+}

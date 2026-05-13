@@ -1,0 +1,210 @@
+// kern Pong (2D). Uses import("g2d"): createWindow, clear, fillRect, drawLine, text, rectsOverlap, isKeyDown, isKeyPressed, run.
+// note: import("g3d") is the 3D/scene API; classic 2D Pong fits g2d. Requires Raylib game build (KERN_BUILD_GAME=ON).
+
+def main() {
+    let g = import("g2d")
+    if (g == null) {
+        print("g2d unavailable in this build (need Raylib / KERN_BUILD_GAME)")
+        return null
+    }
+
+    let W = 960
+    let H = 540
+    let pw = 16
+    let ph = 110
+    let bs = 12
+    let win_to = 10
+    let pad_spd = 8
+    let ai_max = 5
+
+    g.createWindow(W, H, "Kern Pong")
+    g.setTargetFps(60)
+
+    // all mutable game state in one map (lambdas capture and mutate).
+    let s = {}
+    s["pw"] = pw
+    s["ph"] = ph
+    s["bs"] = bs
+    s["px"] = 32
+    s["py"] = int(H / 2) - int(ph / 2)
+    s["aix"] = W - 32 - pw
+    s["aiy"] = int(H / 2) - int(ph / 2)
+    s["bx"] = int(W / 2) - int(bs / 2)
+    s["by"] = int(H / 2) - int(bs / 2)
+    s["bvx"] = 6
+    s["bvy"] = 3
+    s["ps"] = 0
+    s["ais"] = 0
+    s["started"] = false
+    s["over"] = false
+    s["winner"] = ""
+    s["base_spd"] = 6
+
+    let reset_ball = lambda () => {
+        s["bx"] = int(W / 2) - int(bs / 2)
+        s["by"] = int(H / 2) - int(bs / 2)
+        let dir = 1
+        if (int(monotonic_time() * 1000) % 2 == 0) { dir = -1 }
+        s["bvx"] = dir * int(s["base_spd"])
+        let r = (int(monotonic_time() * 1000) % 7) - 3
+        if (r == 0) { r = 2 }
+        s["bvy"] = r
+    }
+
+    let clamp_ai = lambda () => {
+        if (s["aiy"] < 0) { s["aiy"] = 0 }
+        if (s["aiy"] + ph > H) { s["aiy"] = H - ph }
+    }
+
+    let clamp_player = lambda () => {
+        if (s["py"] < 0) { s["py"] = 0 }
+        if (s["py"] + ph > H) { s["py"] = H - ph }
+    }
+
+    let on_left_hit = lambda () => {
+        let spd = int(s["base_spd"])
+        if (spd < 12) { spd = spd + 1 }
+        s["base_spd"] = spd
+        s["bvx"] = spd
+        let cy = float(s["py"]) + float(ph) * 0.5
+        let hit = (float(s["by"]) + float(bs) * 0.5 - cy) / (float(ph) * 0.5)
+        if (hit > 1.0) { hit = 1.0 }
+        if (hit < -1.0) { hit = -1.0 }
+        s["bvy"] = int(float(s["bvy"]) + hit * 5.0)
+        if (s["bvy"] > 10) { s["bvy"] = 10 }
+        if (s["bvy"] < -10) { s["bvy"] = -10 }
+    }
+
+    let on_right_hit = lambda () => {
+        let spd = int(s["base_spd"])
+        if (spd < 12) { spd = spd + 1 }
+        s["base_spd"] = spd
+        s["bvx"] = -spd
+        let cy = float(s["aiy"]) + float(ph) * 0.5
+        let hit = (float(s["by"]) + float(bs) * 0.5 - cy) / (float(ph) * 0.5)
+        if (hit > 1.0) { hit = 1.0 }
+        if (hit < -1.0) { hit = -1.0 }
+        s["bvy"] = int(float(s["bvy"]) + hit * 5.0)
+        if (s["bvy"] > 10) { s["bvy"] = 10 }
+        if (s["bvy"] < -10) { s["bvy"] = -10 }
+    }
+
+    let update = lambda () => {
+        if (s["over"] == true) {
+            if (g.isKeyPressed("SPACE")) {
+                s["ps"] = 0
+                s["ais"] = 0
+                s["over"] = false
+                s["winner"] = ""
+                s["started"] = false
+                s["base_spd"] = 6
+                s["py"] = int(H / 2) - int(ph / 2)
+                s["aiy"] = int(H / 2) - int(ph / 2)
+                reset_ball()
+            }
+            return null
+        }
+
+        if (s["started"] != true) {
+            if (g.isKeyPressed("SPACE")) {
+                s["started"] = true
+                reset_ball()
+            }
+            return null
+        }
+
+        if (g.isKeyDown("W")) { s["py"] = int(s["py"]) - pad_spd }
+        if (g.isKeyDown("S")) { s["py"] = int(s["py"]) + pad_spd }
+        clamp_player()
+
+        let bcy = float(s["by"]) + float(bs) * 0.5
+        let aicy = float(s["aiy"]) + float(ph) * 0.5
+        if (bcy < aicy - float(ai_max)) {
+            s["aiy"] = int(s["aiy"]) - ai_max
+        } else {
+            if (bcy > aicy + float(ai_max)) {
+                s["aiy"] = int(s["aiy"]) + ai_max
+            }
+        }
+        clamp_ai()
+
+        s["bx"] = int(s["bx"]) + int(s["bvx"])
+        s["by"] = int(s["by"]) + int(s["bvy"])
+
+        if (int(s["by"]) <= 0) {
+            s["by"] = 0
+            s["bvy"] = -int(s["bvy"])
+        }
+        if (int(s["by"]) + bs >= H) {
+            s["by"] = H - bs
+            s["bvy"] = -int(s["bvy"])
+        }
+
+        if (g.rectsOverlap(float(s["bx"]), float(s["by"]), float(bs), float(bs), float(s["px"]), float(s["py"]), float(pw), float(ph))) {
+            if (int(s["bvx"]) < 0) {
+                s["bx"] = int(s["px"]) + pw
+                on_left_hit()
+            }
+        }
+        if (g.rectsOverlap(float(s["bx"]), float(s["by"]), float(bs), float(bs), float(s["aix"]), float(s["aiy"]), float(pw), float(ph))) {
+            if (int(s["bvx"]) > 0) {
+                s["bx"] = int(s["aix"]) - bs
+                on_right_hit()
+            }
+        }
+
+        if (int(s["bx"]) + bs < 0) {
+            s["ais"] = int(s["ais"]) + 1
+            if (int(s["ais"]) >= win_to) {
+                s["over"] = true
+                s["winner"] = "AI"
+            }
+            reset_ball()
+        }
+        if (int(s["bx"]) > W) {
+            s["ps"] = int(s["ps"]) + 1
+            if (int(s["ps"]) >= win_to) {
+                s["over"] = true
+                s["winner"] = "Player"
+            }
+            reset_ball()
+        }
+
+        return null
+    }
+
+    let draw = lambda () => {
+        g.clear(8, 10, 18, 255)
+
+        let mid = int(W / 2)
+        let yy = 0
+        while (yy < H) {
+            g.fillRect(mid - 2, yy, 4, 14, 40, 50, 70, 255)
+            yy = yy + 22
+        }
+
+        g.fillRect(int(s["px"]), int(s["py"]), pw, ph, 220, 240, 255, 255)
+        g.fillRect(int(s["aix"]), int(s["aiy"]), pw, ph, 255, 180, 120, 255)
+        g.fillRect(int(s["bx"]), int(s["by"]), bs, bs, 250, 250, 120, 255)
+
+        let score = str(s["ps"]) + "  -  " + str(s["ais"])
+        g.text(score, mid - 40, 24, 28, 255, 255, 255)
+
+        g.text("W / S = move", 16, H - 36, 18, 160, 170, 190)
+
+        if (s["started"] != true) {
+            g.text("Press SPACE to start", mid - 140, int(H / 2) - 20, 22, 255, 255, 255)
+        }
+        if (s["over"] == true) {
+            g.text(str(s["winner"]) + " wins!", mid - 80, int(H / 2) + 20, 26, 255, 90, 90)
+            g.text("SPACE = rematch", mid - 100, int(H / 2) + 56, 20, 200, 200, 200)
+        }
+
+        return null
+    }
+
+    g.run(update, draw)
+    return null
+}
+
+main()

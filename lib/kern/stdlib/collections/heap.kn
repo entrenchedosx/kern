@@ -1,0 +1,64 @@
+// Binary min-heap on array (0-based). Values must be comparable with <.
+// import("lib/kern/stdlib/collections/heap.kn")
+
+def _heap_parent(i) {
+    return int((i - 1) / 2)
+}
+
+def _heap_left(i) {
+    return 2 * i + 1
+}
+
+def _heap_right(i) {
+    return 2 * i + 2
+}
+
+def _heap_swap(a, i, j) {
+    let t = a[i]
+    a[i] = a[j]
+    a[j] = t
+}
+
+def heap_heapify_up(a, i) {
+    while (i > 0) {
+        let p = _heap_parent(i)
+        if (a[p] <= a[i]) { return }
+        _heap_swap(a, p, i)
+        i = p
+    }
+}
+
+def heap_heapify_down(a, n, i) {
+    while (true) {
+        let l = _heap_left(i)
+        let r = _heap_right(i)
+        let smallest = i
+        if (l < n and a[l] < a[smallest]) { smallest = l }
+        if (r < n and a[r] < a[smallest]) { smallest = r }
+        if (smallest == i) { return }
+        _heap_swap(a, i, smallest)
+        i = smallest
+    }
+}
+
+def heap_push(a, x) {
+    push(a, x)
+    heap_heapify_up(a, len(a) - 1)
+}
+
+def heap_pop(a) {
+    if (len(a) == 0) { throw "heap: pop empty" }
+    let top = a[0]
+    let n = len(a)
+    let last = a[n - 1]
+    remove_at(a, n - 1)
+    if (len(a) == 0) { return top }
+    a[0] = last
+    heap_heapify_down(a, len(a), 0)
+    return top
+}
+
+def heap_peek(a) {
+    if (len(a) == 0) { return null }
+    return a[0]
+}

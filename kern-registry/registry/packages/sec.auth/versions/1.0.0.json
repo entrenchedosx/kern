@@ -1,0 +1,13 @@
+{
+  "name": "sec.auth",
+  "version": "1.0.0",
+  "main": "src/index.kn",
+  "dependencies": {
+    "sec.crypto": "^1.0.0"
+  },
+  "trusted": false,
+  "dist": {
+    "tarball": "../../../dist/sec.auth/sec.auth-1.0.0.tgz",
+    "shasum": "sha256-102e2ba922796a4c23fcd2ad97aea253fc31340097b23c5eb497fc9ae96f663b"
+  }
+}

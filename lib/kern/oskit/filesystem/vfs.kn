@@ -1,0 +1,30 @@
+// oskit filesystem/vfs.kn
+
+let _files = {}
+let _dirs = {}
+_dirs["/"] = true
+
+def mkdir(path) {
+    _dirs[str(path)] = true
+    return true
+}
+
+def write(path, content) {
+    _files[str(path)] = str(content)
+    return true
+}
+
+def read(path) {
+    let k = str(path)
+    if (!has(_files, k)) { return null }
+    return _files[k]
+}
+
+def list(prefix) {
+    let p = str(prefix)
+    let out = []
+    for k in keys(_files) {
+        if (starts_with(k, p)) { push(out, k) }
+    }
+    return out
+}

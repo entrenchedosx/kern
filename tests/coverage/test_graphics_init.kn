@@ -1,0 +1,8 @@
+// graphics init coverage
+let g = import("g2d")
+if (g == null) {
+    print("g2d-missing")
+} else {
+    print("g2d-ok")
+}
+

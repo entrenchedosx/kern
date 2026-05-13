@@ -1,0 +1,13 @@
+// Split / merge bytes into high/low nibbles.
+// import("lib/kern/stdlib/bytes/nibble.kn")
+
+def byte_to_nibbles(b) {
+    let n = int(b) & 255
+    let hi = int(n / 16)
+    let lo = n % 16
+    return array(hi, lo)
+}
+
+def nibbles_to_byte(hi, lo) {
+    return (int(hi) & 15) * 16 + (int(lo) & 15)
+}

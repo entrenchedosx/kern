@@ -1,0 +1,34 @@
+dom = import("lib/kern/browserkit/dom/tree.kn")
+layout = import("lib/kern/browserkit/render/layout.kn")
+q = import("lib/kern/browserkit/dom/query.kn")
+
+doc = dom.element("document")
+body = dom.element("body")
+panel = dom.element("div")
+panel["attrs"]["id"] = "root"
+dom.append_child(panel, dom.text_node("BrowserKit Demo"))
+p = dom.element("p")
+dom.append_child(p, dom.text_node("Mini browser engine in Kern"))
+dom.append_child(body, panel)
+dom.append_child(body, p)
+dom.append_child(doc, body)
+
+panel["computed_style"]["background"] = "#1f2a44"
+panel["computed_style"]["padding"] = "8"
+panel["computed_style"]["margin"] = "6"
+p["computed_style"]["background"] = "#2f3f5f"
+p["computed_style"]["padding"] = "6"
+p["computed_style"]["margin"] = "6"
+
+layout.layout_tree(doc, 960)
+
+root = q.query_one(doc, "#root")
+para = q.query_one(doc, "p")
+assert_eq(root != null, true)
+assert_eq(para != null, true)
+assert_eq(root["layout"]["w"] > 0, true)
+assert_eq(root["layout"]["h"] > 0, true)
+assert_eq(para["layout"]["w"] > 0, true)
+assert_eq(para["layout"]["h"] > 0, true)
+
+print("test_browserkit_layout_snapshot: pass")

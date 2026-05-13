@@ -1,0 +1,29 @@
+// oskit memory/heap.kn
+
+let _allocs = {}
+
+def alloc_bytes(size) {
+    let p = alloc(size)
+    if (p != null) { _allocs[str(ptr_address(p))] = int(size) }
+    return p
+}
+
+def free_bytes(p) {
+    if (p == null) { return false }
+    let k = str(ptr_address(p))
+    if (has(_allocs, k)) { _allocs[k] = null }
+    free(p)
+    return true
+}
+
+def realloc_bytes(p, size) {
+    let p2 = realloc(p, size)
+    if (p2 != null) { _allocs[str(ptr_address(p2))] = int(size) }
+    return p2
+}
+
+def stats() {
+    let s = {}
+    s["tracked"] = len(keys(_allocs))
+    return s
+}

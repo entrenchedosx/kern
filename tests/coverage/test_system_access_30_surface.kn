@@ -1,0 +1,46 @@
+let std = import("std.v1")
+if (std == null) { panic("std.v1 missing") }
+
+let fs = std.fs
+let proc = std.process
+let net = std.net
+let os = std.os
+let sig = std.signal
+
+if type(fs["fd_open"]) != "function" { panic("fd_open missing") }
+if type(fs["fd_close"]) != "function" { panic("fd_close missing") }
+if type(fs["statx"]) != "function" { panic("statx missing") }
+if type(fs["atomic_write"]) != "function" { panic("atomic_write missing") }
+if type(fs["watch"]) != "function" { panic("watch missing") }
+if type(fs["space"]) != "function" { panic("space missing") }
+if type(fs["mounts"]) != "function" { panic("mounts missing") }
+
+if type(proc["spawn_v2"]) != "function" { panic("spawn_v2 missing") }
+if type(proc["wait"]) != "function" { panic("process.wait missing") }
+if type(proc["kill_tree"]) != "function" { panic("kill_tree missing") }
+if type(proc["list"]) != "function" { panic("process.list missing") }
+if type(proc["job_create"]) != "function" { panic("job_create missing") }
+
+if type(net["tcp_server"]) != "function" { panic("tcp_server missing") }
+if type(net["tcp_poll"]) != "function" { panic("tcp_poll missing") }
+if type(net["dns_lookup"]) != "function" { panic("dns_lookup missing") }
+if type(net["tls_connect"]) != "function" { panic("tls_connect missing") }
+if type(net["ws_connect"]) != "function" { panic("ws_connect missing") }
+
+if type(os["runtime_limits"]) != "function" { panic("runtime_limits missing") }
+if type(os["features"]) != "function" { panic("os.features missing") }
+if type(sig["trap"]) != "function" { panic("signal trap missing") }
+if type(sig["untrap"]) != "function" { panic("signal untrap missing") }
+
+unsafe {
+    let p = proc.list()
+    if type(p) != "array" { panic("process.list unsafe failed") }
+    let s = fs.space(".")
+    if type(s) != "dictionary" { panic("fs.space unsafe failed") }
+    let d = net.dns_lookup("localhost")
+    if type(d) != "dictionary" { panic("dns_lookup unsafe failed") }
+    let f = os.features()
+    if type(f) != "dictionary" { panic("os.features unsafe failed") }
+}
+
+print("test_system_access_30_surface: pass")

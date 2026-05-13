@@ -1,0 +1,83 @@
+// gamekit example: simple player movement game (2D)
+
+kit = import("lib/kern/gamekit/module.kn")
+import "lib/kern/gamekit/ecs/world.kn"
+import "lib/kern/gamekit/input/input.kn"
+ecs = kit.use_ecs()
+input = kit.use_input()
+draw = kit.use_draw2d()
+math3 = kit.use_math()
+phys = kit.use_physics()
+dbg = kit.use_debug()
+loop = kit.use_loop()
+
+world = ecs.create_world()
+player = ecs.create_entity(world, "Player")
+
+ecs.add_component(world, player, "Transform", {"x": 120.0, "y": 120.0})
+ecs.add_component(world, player, "Velocity", {"x": 0.0, "y": 0.0})
+ecs.add_component(world, player, "Collider", phys.aabb(120.0, 120.0, 36.0, 36.0))
+
+speed = 220.0
+
+def movement_system(w, entities, dt) {
+    let i = 0
+    while (i < len(entities)) {
+        let eid = entities[i]
+        let tr = ecs.get_component(w, eid, "Transform")
+        let vel = ecs.get_component(w, eid, "Velocity")
+
+        vel.x = 0.0
+        vel.y = 0.0
+        if (input.key_down("a")) { vel.x = vel.x - speed }
+        if (input.key_down("d")) { vel.x = vel.x + speed }
+        if (input.key_down("w")) { vel.y = vel.y - speed }
+        if (input.key_down("s")) { vel.y = vel.y + speed }
+
+        let p = math3.vec2(tr.x, tr.y)
+        let v = math3.vec2(vel.x, vel.y)
+        let np = phys.integrate_velocity(p, v, dt)
+
+        tr.x = np.x
+        tr.y = np.y
+
+        if (tr.x < 20) { tr.x = 20 }
+        if (tr.y < 20) { tr.y = 20 }
+        if (tr.x > draw.width() - 56) { tr.x = draw.width() - 56 }
+        if (tr.y > draw.height() - 56) { tr.y = draw.height() - 56 }
+
+        let c = ecs.get_component(w, eid, "Collider")
+        c.x = tr.x
+        c.y = tr.y
+        i = i + 1
+    }
+}
+
+ecs.add_system(world, "Movement", ["Transform", "Velocity"], movement_system)
+
+def app_update(dt, state) {
+    ecs.update(world, dt)
+    if (input.key_pressed("escape")) {
+        dbg.info("Press window close to exit")
+    }
+}
+
+def app_render(state) {
+    let tr = ecs.get_component(world, player, "Transform")
+    draw.rect(int(tr.x), int(tr.y), 36, 36, 255, 210, 90, 255)
+    draw.text("WASD move | ESC log", 20, 20, 20, 230, 235, 250)
+}
+
+app = {}
+// build window map stepwise — older Kern builds (e.g. some IDE bundles) mishandled 3+ entries in one { } literal.
+let win = {}
+win["w"] = 1000
+win["h"] = 700
+win["title"] = "Kern GameKit - Simple Game"
+app["window"] = win
+app["update"] = app_update
+app["render"] = app_render
+
+loop.run(app)
+
+

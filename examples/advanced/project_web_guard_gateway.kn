@@ -1,0 +1,15 @@
+netops = import("netops")
+websec = import("websec")
+security = import("security")
+
+url = "https://example.com/path?q=<script>alert(1)</script>"
+parsed = netops.url_parse(url)
+query = netops.parse_query("q=<script>alert(1)</script>")
+clean = websec.html_sanitize_strict(query.q)
+sig = security.hash_fnv(clean)
+
+print("scheme:", parsed.scheme)
+print("cleaned:", clean)
+print("sig:", sig)
+
+

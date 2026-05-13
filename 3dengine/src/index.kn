@@ -1,0 +1,2260 @@
+// 3dengine package entry (Phase 1, self-contained)
+
+let VERSION = "0.1.0"
+let CONVENTIONS = {"handedness": "right_handed", "world_up": "y_up", "ndc_depth": "minus_one_to_one", "matrix_layout": "row_major"}
+
+def _vec2_make(x, y) { return {"x": float(default(x, 0.0)), "y": float(default(y, 0.0))} }
+def _vec2_zero() { return {"x": 0.0, "y": 0.0} }
+def _vec2_one() { return {"x": 1.0, "y": 1.0} }
+def _vec2_add(a, b) { return {"x": float(default(a["x"], 0.0)) + float(default(b["x"], 0.0)), "y": float(default(a["y"], 0.0)) + float(default(b["y"], 0.0))} }
+def _vec2_sub(a, b) { return {"x": float(default(a["x"], 0.0)) - float(default(b["x"], 0.0)), "y": float(default(a["y"], 0.0)) - float(default(b["y"], 0.0))} }
+def _vec2_scale(v, s) {
+    let k = float(default(s, 1.0))
+    return {"x": float(default(v["x"], 0.0)) * k, "y": float(default(v["y"], 0.0)) * k}
+}
+def _vec2_dot(a, b) { return float(default(a["x"], 0.0)) * float(default(b["x"], 0.0)) + float(default(a["y"], 0.0)) * float(default(b["y"], 0.0)) }
+def _vec2_length_sq(v) {
+    let x = float(default(v["x"], 0.0))
+    let y = float(default(v["y"], 0.0))
+    return x * x + y * y
+}
+def _vec2_length(v) { return sqrt(_vec2_length_sq(v)) }
+def _vec2_normalize(v) {
+    let m2 = _vec2_length_sq(v)
+    if (m2 <= 0.0000000001) { return _vec2_zero() }
+    let inv = 1.0 / sqrt(m2)
+    return {"x": float(default(v["x"], 0.0)) * inv, "y": float(default(v["y"], 0.0)) * inv}
+}
+def _vec2_lerp(a, b, t) {
+    let k = float(default(t, 0.0))
+    return {"x": float(default(a["x"], 0.0)) + (float(default(b["x"], 0.0)) - float(default(a["x"], 0.0))) * k, "y": float(default(a["y"], 0.0)) + (float(default(b["y"], 0.0)) - float(default(a["y"], 0.0))) * k}
+}
+def _vec2_distance(a, b) { return _vec2_length(_vec2_sub(a, b)) }
+
+def _vec3_make(x, y, z) { return {"x": float(default(x, 0.0)), "y": float(default(y, 0.0)), "z": float(default(z, 0.0))} }
+def _vec3_zero() { return {"x": 0.0, "y": 0.0, "z": 0.0} }
+def _vec3_one() { return {"x": 1.0, "y": 1.0, "z": 1.0} }
+def _vec3_add(a, b) {
+    return {"x": float(default(a["x"], 0.0)) + float(default(b["x"], 0.0)), "y": float(default(a["y"], 0.0)) + float(default(b["y"], 0.0)), "z": float(default(a["z"], 0.0)) + float(default(b["z"], 0.0))}
+}
+def _vec3_sub(a, b) {
+    return {"x": float(default(a["x"], 0.0)) - float(default(b["x"], 0.0)), "y": float(default(a["y"], 0.0)) - float(default(b["y"], 0.0)), "z": float(default(a["z"], 0.0)) - float(default(b["z"], 0.0))}
+}
+def _vec3_scale(v, s) {
+    let k = float(default(s, 1.0))
+    return {"x": float(default(v["x"], 0.0)) * k, "y": float(default(v["y"], 0.0)) * k, "z": float(default(v["z"], 0.0)) * k}
+}
+def _vec3_dot(a, b) {
+    return float(default(a["x"], 0.0)) * float(default(b["x"], 0.0)) + float(default(a["y"], 0.0)) * float(default(b["y"], 0.0)) + float(default(a["z"], 0.0)) * float(default(b["z"], 0.0))
+}
+def _vec3_cross(a, b) {
+    let ax = float(default(a["x"], 0.0))
+    let ay = float(default(a["y"], 0.0))
+    let az = float(default(a["z"], 0.0))
+    let bx = float(default(b["x"], 0.0))
+    let by = float(default(b["y"], 0.0))
+    let bz = float(default(b["z"], 0.0))
+    return {"x": ay * bz - az * by, "y": az * bx - ax * bz, "z": ax * by - ay * bx}
+}
+def _vec3_length_sq(v) {
+    let x = float(default(v["x"], 0.0))
+    let y = float(default(v["y"], 0.0))
+    let z = float(default(v["z"], 0.0))
+    return x * x + y * y + z * z
+}
+def _vec3_length(v) { return sqrt(_vec3_length_sq(v)) }
+def _vec3_normalize(v) {
+    let m2 = _vec3_length_sq(v)
+    if (m2 <= 0.0000000001) { return _vec3_zero() }
+    let inv = 1.0 / sqrt(m2)
+    return {"x": float(default(v["x"], 0.0)) * inv, "y": float(default(v["y"], 0.0)) * inv, "z": float(default(v["z"], 0.0)) * inv}
+}
+def _vec3_lerp(a, b, t) {
+    let k = float(default(t, 0.0))
+    return {"x": float(default(a["x"], 0.0)) + (float(default(b["x"], 0.0)) - float(default(a["x"], 0.0))) * k, "y": float(default(a["y"], 0.0)) + (float(default(b["y"], 0.0)) - float(default(a["y"], 0.0))) * k, "z": float(default(a["z"], 0.0)) + (float(default(b["z"], 0.0)) - float(default(a["z"], 0.0))) * k}
+}
+
+def _mat4_identity() { return [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0] }
+def _mat4_zero() { return [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] }
+def _mat4_copy(m) {
+    return [float(default(m[0], 0.0)), float(default(m[1], 0.0)), float(default(m[2], 0.0)), float(default(m[3], 0.0)), float(default(m[4], 0.0)), float(default(m[5], 0.0)), float(default(m[6], 0.0)), float(default(m[7], 0.0)), float(default(m[8], 0.0)), float(default(m[9], 0.0)), float(default(m[10], 0.0)), float(default(m[11], 0.0)), float(default(m[12], 0.0)), float(default(m[13], 0.0)), float(default(m[14], 0.0)), float(default(m[15], 0.0))]
+}
+def _mat4_mul(a, b) {
+    let out = _mat4_zero()
+    let r = 0
+    while (r < 4) {
+        let c = 0
+        while (c < 4) {
+            let i = r * 4 + c
+            out[i] = float(default(a[r * 4 + 0], 0.0)) * float(default(b[0 * 4 + c], 0.0)) + float(default(a[r * 4 + 1], 0.0)) * float(default(b[1 * 4 + c], 0.0)) + float(default(a[r * 4 + 2], 0.0)) * float(default(b[2 * 4 + c], 0.0)) + float(default(a[r * 4 + 3], 0.0)) * float(default(b[3 * 4 + c], 0.0))
+            c = c + 1
+        }
+        r = r + 1
+    }
+    return out
+}
+def _mat4_translate(v) {
+    let m = _mat4_identity()
+    m[3] = float(default(v["x"], 0.0))
+    m[7] = float(default(v["y"], 0.0))
+    m[11] = float(default(v["z"], 0.0))
+    return m
+}
+def _mat4_scale(v) {
+    let m = _mat4_identity()
+    m[0] = float(default(v["x"], 1.0))
+    m[5] = float(default(v["y"], 1.0))
+    m[10] = float(default(v["z"], 1.0))
+    return m
+}
+def _mat4_ortho(left, right, bottom, top, near, far) {
+    let m = _mat4_zero()
+    let rl = float(right) - float(left)
+    let tb = float(top) - float(bottom)
+    let depth_span = float(far) - float(near)
+    if (rl == 0.0 || tb == 0.0 || depth_span == 0.0) { return _mat4_identity() }
+    m[0] = 2.0 / rl
+    m[5] = 2.0 / tb
+    m[10] = -2.0 / depth_span
+    m[3] = -(float(right) + float(left)) / rl
+    m[7] = -(float(top) + float(bottom)) / tb
+    m[11] = -(float(far) + float(near)) / depth_span
+    m[15] = 1.0
+    return m
+}
+def _mat4_perspective(fov_y_rad, aspect, near, far) {
+    let m = _mat4_zero()
+    let f = 1.0 / tan(float(fov_y_rad) * 0.5)
+    let nf = float(near) - float(far)
+    if (nf == 0.0) { return _mat4_identity() }
+    m[0] = f / float(aspect)
+    m[5] = f
+    m[10] = (float(far) + float(near)) / nf
+    m[11] = (2.0 * float(far) * float(near)) / nf
+    m[14] = -1.0
+    return m
+}
+def _mat4_transform_point(m, v) {
+    let x = float(default(v["x"], 0.0))
+    let y = float(default(v["y"], 0.0))
+    let z = float(default(v["z"], 0.0))
+    let tx = x * float(default(m[0], 0.0)) + y * float(default(m[1], 0.0)) + z * float(default(m[2], 0.0)) + float(default(m[3], 0.0))
+    let ty = x * float(default(m[4], 0.0)) + y * float(default(m[5], 0.0)) + z * float(default(m[6], 0.0)) + float(default(m[7], 0.0))
+    let tz = x * float(default(m[8], 0.0)) + y * float(default(m[9], 0.0)) + z * float(default(m[10], 0.0)) + float(default(m[11], 0.0))
+    let tw = x * float(default(m[12], 0.0)) + y * float(default(m[13], 0.0)) + z * float(default(m[14], 0.0)) + float(default(m[15], 1.0))
+    if (tw == 0.0) { return {"x": tx, "y": ty, "z": tz} }
+    return {"x": tx / tw, "y": ty / tw, "z": tz / tw}
+}
+
+let vec2 = {"make": _vec2_make, "zero": _vec2_zero, "one": _vec2_one, "add": _vec2_add, "sub": _vec2_sub, "scale": _vec2_scale, "dot": _vec2_dot, "length_sq": _vec2_length_sq, "length": _vec2_length, "normalize": _vec2_normalize, "lerp": _vec2_lerp, "distance": _vec2_distance}
+let vec3 = {"make": _vec3_make, "zero": _vec3_zero, "one": _vec3_one, "add": _vec3_add, "sub": _vec3_sub, "scale": _vec3_scale, "dot": _vec3_dot, "cross": _vec3_cross, "length_sq": _vec3_length_sq, "length": _vec3_length, "normalize": _vec3_normalize, "lerp": _vec3_lerp}
+let mat4 = {"identity": _mat4_identity, "zero": _mat4_zero, "copy": _mat4_copy, "mul": _mat4_mul, "translate": _mat4_translate, "scale": _mat4_scale, "ortho": _mat4_ortho, "perspective": _mat4_perspective, "transform_point": _mat4_transform_point}
+
+def _time_now() { return float(monotonic_time()) }
+def _time_clamp_dt(dt, max_dt) {
+    let d = float(default(dt, 0.0))
+    if (d < 0.0) { return 0.0 }
+    let md = float(default(max_dt, 0.25))
+    if (d > md) { return md }
+    return d
+}
+def _time_fixed_dt(hz) {
+    let h = float(default(hz, 60.0))
+    if (h <= 0.0) { return 1.0 / 60.0 }
+    return 1.0 / h
+}
+def _time_next_accumulator(accumulator, dt, max_dt) { return float(default(accumulator, 0.0)) + _time_clamp_dt(dt, max_dt) }
+def _time_alpha(accumulator, step) {
+    let s = float(default(step, 0.0166666667))
+    if (s <= 0.0) { return 0.0 }
+    let a = float(default(accumulator, 0.0)) / s
+    if (a < 0.0) { return 0.0 }
+    if (a > 1.0) { return 1.0 }
+    return a
+}
+def _time_create_state(fixed_hz, time_scale) {
+    let hz = float(default(fixed_hz, 60.0))
+    let scale = float(default(time_scale, 1.0))
+    if (scale < 0.0) { scale = 0.0 }
+    return {"frame_count": 0, "sim_frame_count": 0, "sim_time": 0.0, "raw_dt": 0.0, "delta_time": 0.0, "fixed_delta_time": _time_fixed_dt(hz), "alpha": 0.0, "time_scale": scale}
+}
+def _time_set_scale(state, scale) {
+    let s = float(default(scale, 1.0))
+    if (s < 0.0) { s = 0.0 }
+    state["time_scale"] = s
+    return s
+}
+def _time_begin_frame(state, raw_dt, max_dt) {
+    let clamped_raw = _time_clamp_dt(raw_dt, max_dt)
+    let scaled = clamped_raw * float(default(state["time_scale"], 1.0))
+    state["raw_dt"] = clamped_raw
+    state["delta_time"] = scaled
+    state["frame_count"] = int(default(state["frame_count"], 0)) + 1
+    return scaled
+}
+def _time_did_fixed_step(state, step) {
+    state["sim_time"] = float(default(state["sim_time"], 0.0)) + float(default(step, 0.0))
+    state["sim_frame_count"] = int(default(state["sim_frame_count"], 0)) + 1
+}
+let time = {"now": _time_now, "clamp_dt": _time_clamp_dt, "fixed_dt": _time_fixed_dt, "next_accumulator": _time_next_accumulator, "alpha": _time_alpha, "create_state": _time_create_state, "set_scale": _time_set_scale, "begin_frame": _time_begin_frame, "did_fixed_step": _time_did_fixed_step}
+
+let _g2d = null
+let _game = null
+def _use_g2d() { return _g2d != null }
+def _use_game() { return !_use_g2d() && _game != null }
+def _window_contract() {
+    return {"window_surface": ["is_open", "close", "width", "height", "backend"], "renderer_facade_2d": ["set_target_fps", "clear", "rect", "text", "present", "delta_time"], "note": "window provides surface/context; renderer facade is replaceable in future phases"}
+}
+def _window_create(config) {
+    if (_g2d == null) { _g2d = import("g2d") }
+    if (_game == null) { _game = import("game") }
+    let cfg = default(config, {})
+    let title = str(default(cfg["title"], "3dengine"))
+    let width = int(default(cfg["width"], 1280))
+    let height = int(default(cfg["height"], 720))
+    let out = {}
+    if (_use_g2d()) {
+        _g2d.createWindow(width, height, title)
+        out["ok"] = true
+        out["backend"] = "g2d"
+        out["surface"] = {"kind": "window_surface", "backend": "g2d"}
+        out["renderer"] = {"kind": "renderer_2d_facade", "backend": "g2d"}
+        out["contract"] = _window_contract()
+        out["set_target_fps"] = lambda (fps) => { _g2d.setTargetFps(int(default(fps, 60))) }
+        out["clear"] = lambda (r, g, b, a) => { _g2d.clear(int(default(r, 0)), int(default(g, 0)), int(default(b, 0)), int(default(a, 255))) }
+        out["rect"] = lambda (x, y, w, h, r, g, b, a) => { _g2d.fillRect(int(default(x, 0)), int(default(y, 0)), int(default(w, 1)), int(default(h, 1)), int(default(r, 255)), int(default(g, 255)), int(default(b, 255)), int(default(a, 255))) }
+        out["text"] = lambda (s, x, y, size, r, g, b) => { _g2d.text(str(default(s, "")), int(default(x, 0)), int(default(y, 0)), int(default(size, 20)), int(default(r, 255)), int(default(g, 255)), int(default(b, 255))) }
+        out["present"] = lambda () => { _g2d.present() }
+        out["is_open"] = lambda () => { return _g2d.isOpen() }
+        out["delta_time"] = lambda () => { return float(_g2d.delta_time()) }
+        out["close"] = lambda () => { _g2d.closeWindow() }
+        out["width"] = lambda () => { return int(_g2d.width()) }
+        out["height"] = lambda () => { return int(_g2d.height()) }
+        return out
+    }
+    if (_use_game()) {
+        _game.window_create(width, height, title)
+        out["ok"] = true
+        out["backend"] = "game"
+        out["surface"] = {"kind": "window_surface", "backend": "game"}
+        out["renderer"] = {"kind": "renderer_2d_facade", "backend": "game"}
+        out["contract"] = _window_contract()
+        out["set_target_fps"] = lambda (fps) => { _game.set_target_fps(int(default(fps, 60))) }
+        out["clear"] = lambda (r, g, b, a) => { _game.clear(int(default(r, 0)), int(default(g, 0)), int(default(b, 0))) }
+        out["rect"] = lambda (x, y, w, h, r, g, b, a) => { _game.draw_rect(int(default(x, 0)), int(default(y, 0)), int(default(w, 1)), int(default(h, 1)), int(default(r, 255)), int(default(g, 255)), int(default(b, 255)), int(default(a, 255))) }
+        out["text"] = lambda (s, x, y, size, r, g, b) => { _game.draw_text(str(default(s, "")), int(default(x, 0)), int(default(y, 0)), int(default(size, 20)), int(default(r, 255)), int(default(g, 255)), int(default(b, 255))) }
+        out["present"] = lambda () => { _game.present() }
+        out["is_open"] = lambda () => { return _game.window_open() }
+        out["delta_time"] = lambda () => { return float(_game.delta_time()) }
+        out["close"] = lambda () => { _game.window_close() }
+        out["width"] = lambda () => { return int(_game.screen_width()) }
+        out["height"] = lambda () => { return int(_game.screen_height()) }
+        return out
+    }
+    out["ok"] = false
+    out["backend"] = "none"
+    out["surface"] = {"kind": "window_surface", "backend": "none"}
+    out["renderer"] = {"kind": "renderer_2d_facade", "backend": "none"}
+    out["contract"] = _window_contract()
+    out["set_target_fps"] = lambda (fps) => { return null }
+    out["clear"] = lambda (r, g, b, a) => { return null }
+    out["rect"] = lambda (x, y, w, h, r, g, b, a) => { return null }
+    out["text"] = lambda (s, x, y, size, r, g, b) => { return null }
+    out["present"] = lambda () => { return null }
+    out["is_open"] = lambda () => { return false }
+    out["delta_time"] = lambda () => { return 0.0166666667 }
+    out["close"] = lambda () => { return null }
+    out["width"] = lambda () => { return width }
+    out["height"] = lambda () => { return height }
+    return out
+}
+let window = {"create": _window_create}
+
+def _app_defaults(config) {
+    let c = default(config, {})
+    return {"title": str(default(c["title"], "3dengine")), "width": int(default(c["width"], 1280)), "height": int(default(c["height"], 720)), "target_fps": int(default(c["target_fps"], 60)), "fixed_hz": float(default(c["fixed_hz"], 60.0)), "max_frame_dt": float(default(c["max_frame_dt"], 0.25)), "max_fixed_steps": int(default(c["max_fixed_steps"], 8)), "time_scale": float(default(c["time_scale"], 1.0)), "clear_color": default(c["clear_color"], {"r": 20, "g": 24, "b": 34, "a": 255})}
+}
+def _app_create_state(config, gfx) {
+    let ts = float(default(config["time_scale"], 1.0))
+    if (ts < 0.0) { ts = 0.0 }
+    return {"running": true, "config": config, "gfx": gfx, "time": {"frame": 0, "sim_frame": 0, "raw_dt": 0.0, "frame_dt": 0.0, "sim_time": 0.0, "fixed_dt": _time_fixed_dt(config["fixed_hz"]), "alpha": 0.0, "time_scale": ts}, "user": {}}
+}
+def _app_stop(state) { state["running"] = false }
+def _app_set_time_scale(state, scale) {
+    let s = float(default(scale, 1.0))
+    if (s < 0.0) { s = 0.0 }
+    state["time"]["time_scale"] = s
+    return s
+}
+def _app_run(config, on_fixed, on_frame) {
+    let cfg = _app_defaults(config)
+    let gfx = _window_create(cfg)
+    if (!gfx["ok"]) {
+        print("3dengine: graphics backend unavailable (need g2d or game module in this Kern build)")
+        return {"ok": false, "reason": "no_backend"}
+    }
+    gfx["set_target_fps"](cfg["target_fps"])
+    let st = _app_create_state(cfg, gfx)
+    let prev = _time_now()
+    let acc = 0.0
+    let fixed = st["time"]["fixed_dt"]
+    while (st["running"] && gfx["is_open"]()) {
+        let now_t = _time_now()
+        let raw_dt = _time_clamp_dt(now_t - prev, cfg["max_frame_dt"])
+        prev = now_t
+        st["time"]["raw_dt"] = raw_dt
+        let frame_dt = raw_dt * float(default(st["time"]["time_scale"], 1.0))
+        acc = _time_next_accumulator(acc, frame_dt, cfg["max_frame_dt"])
+        st["time"]["frame_dt"] = frame_dt
+        let steps = 0
+        while (acc >= fixed && steps < cfg["max_fixed_steps"]) {
+            if (on_fixed != null) { on_fixed(st, fixed) }
+            acc = acc - fixed
+            steps = steps + 1
+            st["time"]["sim_time"] = st["time"]["sim_time"] + fixed
+            st["time"]["sim_frame"] = int(st["time"]["sim_frame"]) + 1
+        }
+        if (steps >= cfg["max_fixed_steps"] && acc >= fixed) { acc = 0.0 }
+        st["time"]["alpha"] = _time_alpha(acc, fixed)
+        let cc = cfg["clear_color"]
+        gfx["clear"](int(default(cc["r"], 0)), int(default(cc["g"], 0)), int(default(cc["b"], 0)), int(default(cc["a"], 255)))
+        if (on_frame != null) { on_frame(st, frame_dt, st["time"]["alpha"]) }
+        gfx["present"]()
+        st["time"]["frame"] = int(st["time"]["frame"]) + 1
+    }
+    gfx["close"]()
+    return {"ok": true, "backend": gfx["backend"], "frames": st["time"]["frame"]}
+}
+let app = {"create_state": _app_create_state, "run": _app_run, "stop": _app_stop, "set_time_scale": _app_set_time_scale}
+
+// ---------- ecs core (phase 2) ----------
+def _ecs_int_or(v, fallback) {
+    if (v == null) { return int(fallback) }
+    return int(v)
+}
+def _ecs_eid(index, generation) { return {"index": _ecs_int_or(index, -1), "generation": _ecs_int_or(generation, 0)} }
+def _ecs_eid_null() { return {"index": -1, "generation": 0} }
+def _ecs_eid_is_null(e) { return _ecs_int_or(e["index"], -1) < 0 }
+def _ecs_eid_equal(a, b) {
+    return _ecs_int_or(a["index"], -1) == _ecs_int_or(b["index"], -2) && _ecs_int_or(a["generation"], -1) == _ecs_int_or(b["generation"], -2)
+}
+def _ecs_idx_key(index) { return str(_ecs_int_or(index, -1)) }
+let _ECS_CFG = {"debug": true, "logging": false}
+def _ecs_as_bool(v) {
+    if (default(v, false)) { return true }
+    return false
+}
+def _ecs_debug_enabled() { return _ecs_as_bool(_ECS_CFG["debug"]) }
+def _ecs_log_enabled() { return _ecs_as_bool(_ECS_CFG["logging"]) }
+def _ecs_log(msg) { if (_ecs_log_enabled()) { print("[3dengine.ecs] " + str(default(msg, ""))) } }
+def _ecs_error(msg) {
+    let m = "3dengine.ecs: " + str(default(msg, "error"))
+    if (_ecs_debug_enabled()) { panic(m) }
+    _ecs_log(m)
+}
+def _ecs_render_locked(world) { return _ecs_as_bool(default(default(world["locks"], {})["render_prep"], false)) }
+def _ecs_registry_write_locked(world) { return _ecs_as_bool(default(default(world["locks"], {})["registry_write"], false)) }
+def _ecs_require_unlocked(world, context) {
+    if (!_ecs_render_locked(world)) { return true }
+    _ecs_error(str(default(context, "ecs")) + " blocked during render_prep lock")
+    return false
+}
+def _ecs_require_registry_write(world, context) {
+    if (!_ecs_registry_write_locked(world)) { return true }
+    _ecs_error(str(default(context, "ecs")) + " blocked during registry_write lock")
+    return false
+}
+
+def _ecs_store_make() { return {"dense_data": [], "dense_entities": [], "sparse": {}, "count": 0} }
+def _ecs_store_dense_index(store, entity) {
+    let key = _ecs_idx_key(entity["index"])
+    if (!has(store["sparse"], key)) { return -1 }
+    let di = _ecs_int_or(store["sparse"][key], -1)
+    if (di < 0 || di >= int(default(store["count"], 0))) { return -1 }
+    let e = store["dense_entities"][di]
+    if (_ecs_int_or(e["index"], -1) != _ecs_int_or(entity["index"], -1)) { return -1 }
+    if (_ecs_int_or(e["generation"], -1) != _ecs_int_or(entity["generation"], -2)) { return -1 }
+    return di
+}
+def _ecs_store_has(store, entity) { return _ecs_store_dense_index(store, entity) >= 0 }
+def _ecs_store_add(store, entity, component) {
+    let di = _ecs_store_dense_index(store, entity)
+    if (di >= 0) { store["dense_data"][di] = component; return di }
+    let n = int(default(store["count"], 0))
+    store["dense_entities"][n] = entity
+    store["dense_data"][n] = component
+    store["sparse"][_ecs_idx_key(entity["index"])] = n
+    store["count"] = n + 1
+    return n
+}
+def _ecs_store_get(store, entity) { let di = _ecs_store_dense_index(store, entity); if (di < 0) { return null }; return store["dense_data"][di] }
+def _ecs_store_remove(store, entity) {
+    let di = _ecs_store_dense_index(store, entity)
+    if (di < 0) { return false }
+    let n = int(default(store["count"], 0))
+    let last = n - 1
+    let remove_key = _ecs_idx_key(entity["index"])
+    if (di != last) {
+        let moved_entity = store["dense_entities"][last]
+        let moved_data = store["dense_data"][last]
+        store["dense_entities"][di] = moved_entity
+        store["dense_data"][di] = moved_data
+        store["sparse"][_ecs_idx_key(moved_entity["index"])] = di
+    }
+    store["sparse"][remove_key] = -1
+    store["count"] = last
+    return true
+}
+
+def _ecs_entity_make_store() { return {"generations": [], "alive": [], "entity_count": 0, "next_index": 1, "free_indices": [], "free_count": 0} }
+def _ecs_entity_is_alive_raw(es, id) {
+    let idx = _ecs_int_or(id["index"], -1)
+    if (idx < 0 || idx >= int(default(es["next_index"], 0))) { return false }
+    let g = int(default(es["generations"][idx], 0))
+    let alive = _ecs_as_bool(default(es["alive"][idx], false))
+    return alive && g == _ecs_int_or(id["generation"], -1)
+}
+def _ecs_require_alive(world, id, context) {
+    if (_ecs_entity_is_alive_raw(world["entities"], id)) { return true }
+    _ecs_error(str(default(context, "ecs")) + " invalid or stale entity id")
+    return false
+}
+def _ecs_entity_take_index(es) {
+    let free_count = int(default(es["free_count"], 0))
+    if (free_count > 0) {
+        es["free_count"] = free_count - 1
+        return int(default(es["free_indices"][free_count - 1], -1))
+    }
+    let idx = int(default(es["next_index"], 0))
+    es["next_index"] = idx + 1
+    if (es["generations"][idx] == null) { es["generations"][idx] = 1 }
+    return idx
+}
+def _ecs_entity_create(es) {
+    let idx = _ecs_entity_take_index(es)
+    es["alive"][idx] = true
+    es["entity_count"] = int(default(es["entity_count"], 0)) + 1
+    return _ecs_eid(idx, int(default(es["generations"][idx], 0)))
+}
+def _ecs_entity_destroy(es, id) {
+    if (!_ecs_entity_is_alive_raw(es, id)) { return false }
+    let idx = _ecs_int_or(id["index"], -1)
+    es["alive"][idx] = false
+    es["generations"][idx] = int(default(es["generations"][idx], 0)) + 1
+    let free_count = int(default(es["free_count"], 0))
+    es["free_indices"][free_count] = idx
+    es["free_count"] = free_count + 1
+    es["entity_count"] = int(default(es["entity_count"], 0)) - 1
+    return true
+}
+
+def _ecs_transform_make(local_position, local_rotation, local_scale) {
+    return {"local_position": default(local_position, vec3["zero"]()), "local_rotation": default(local_rotation, vec3["zero"]()), "local_scale": default(local_scale, vec3["one"]()), "world_matrix": mat4["identity"](), "parent": _ecs_eid_null(), "first_child": _ecs_eid_null(), "next_sibling": _ecs_eid_null(), "dirty": true}
+}
+def _ecs_velocity_make(linear, input_move_speed) {
+    let sp = float(default(input_move_speed, 0.0))
+    if (sp < 0.0) { sp = 0.0 }
+    return {"linear": default(linear, vec3["zero"]()), "input_move_speed": sp}
+}
+def _ecs_vec3_normalize_arr3(x, y, z) {
+    let fx = float(default(x, 0.0))
+    let fy = float(default(y, 0.0))
+    let fz = float(default(z, 0.0))
+    let L = sqrt(fx * fx + fy * fy + fz * fz)
+    if (L <= 0.0000001) { return [0.0, 0.0, 1.0] }
+    let inv = 1.0 / L
+    return [fx * inv, fy * inv, fz * inv]
+}
+def _ecs_mesh_corner_normal_from_pos(px, py, pz) {
+    return _ecs_vec3_normalize_arr3(float(px) * 2.0, float(py) * 2.0, float(pz) * 2.0)
+}
+def _ecs_mesh_make(primitive) {
+    let p = str(default(primitive, "quad"))
+    if (p != "quad" && p != "cube") { p = "quad" }
+    if (p == "cube") {
+        let verts = [[-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0.5, 0.5, -0.5], [-0.5, 0.5, -0.5], [-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [0.5, 0.5, 0.5], [-0.5, 0.5, 0.5]]
+        let norms = []
+        let vi = 0
+        while (vi < len(verts)) {
+            let q = verts[vi]
+            norms = push(norms, _ecs_mesh_corner_normal_from_pos(q[0], q[1], q[2]))
+            vi = vi + 1
+        }
+        return {"primitive_type": "cube", "vertices": verts, "indices": [0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4], "uvs": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]], "normals": norms}
+    }
+    let nz = 1.0
+    let n0 = [0.0, 0.0, nz]
+    let n1 = [0.0, 0.0, nz]
+    let n2 = [0.0, 0.0, nz]
+    let n3 = [0.0, 0.0, nz]
+    return {"primitive_type": "quad", "vertices": [[-0.5, -0.5, 0.0], [0.5, -0.5, 0.0], [0.5, 0.5, 0.0], [-0.5, 0.5, 0.0]], "indices": [0, 1, 2, 2, 3, 0], "uvs": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]], "normals": [n0, n1, n2, n3]}
+}
+def _ecs_mesh_make_quad() { return _ecs_mesh_make("quad") }
+def _ecs_mesh_make_cube() { return _ecs_mesh_make("cube") }
+
+def _ecs_lighting_default() {
+    let ny = 0.0 - 1.0
+    let amb = vec3["make"](0.15, 0.15, 0.18)
+    let ddir = vec3["make"](0.0, ny, 0.0)
+    let dcol = vec3["one"]()
+    return {"ambient": amb, "directional": {"direction": ddir, "color": dcol}}
+}
+def _ecs_lighting_merge(patch) {
+    let p = default(patch, {})
+    let base = _ecs_lighting_default()
+    let amb = default(base["ambient"], vec3["zero"]())
+    if (p["ambient"] != null) { amb = default(p["ambient"], amb) }
+    let d0 = default(base["directional"], {})
+    let dir = default(d0["direction"], vec3["zero"]())
+    let dcol = default(d0["color"], vec3["one"]())
+    let pdir = default(p["directional"], {})
+    if (pdir["direction"] != null) { dir = default(pdir["direction"], dir) }
+    if (pdir["color"] != null) { dcol = default(pdir["color"], dcol) }
+    return {"ambient": amb, "directional": {"direction": dir, "color": dcol}}
+}
+def _ecs_lighting_canonical_for_hash(lit) {
+    let l = default(lit, _ecs_lighting_default())
+    let a = default(l["ambient"], vec3["zero"]())
+    let d = default(l["directional"], {})
+    let dd = default(d["direction"], vec3["zero"]())
+    let dc = default(d["color"], vec3["one"]())
+    let amb_obj = {"x": float(default(a["x"], 0.0)), "y": float(default(a["y"], 0.0)), "z": float(default(a["z"], 0.0))}
+    let dir_obj = {"x": float(default(dd["x"], 0.0)), "y": float(default(dd["y"], 0.0)), "z": float(default(dd["z"], 0.0))}
+    let col_obj = {"x": float(default(dc["x"], 0.0)), "y": float(default(dc["y"], 0.0)), "z": float(default(dc["z"], 0.0))}
+    let dir_wrap = {"direction": dir_obj, "color": col_obj}
+    return {"ambient": amb_obj, "directional": dir_wrap}
+}
+def _ecs_lighting_hash_string(lit) { return sha256(json_stringify(_ecs_lighting_canonical_for_hash(lit))) }
+
+def _ecs_str_trim(s) {
+    let t = str(default(s, ""))
+    let a = 0
+    let b = len(t)
+    while (a < b) {
+        let ca = slice(t, a, a + 1)
+        if (ca != " " && ca != "\t" && ca != "\r") { break }
+        a = a + 1
+    }
+    while (b > a) {
+        let cb = slice(t, b - 1, b)
+        if (cb != " " && cb != "\t" && cb != "\r") { break }
+        b = b - 1
+    }
+    return slice(t, a, b)
+}
+def _ecs_str_split_lines(s) {
+    let t = str(default(s, ""))
+    let out = []
+    let cur = ""
+    let i = 0
+    while (i < len(t)) {
+        let ch = slice(t, i, i + 1)
+        if (ch == "\n") {
+            out = push(out, cur)
+            cur = ""
+        } else {
+            if (ch != "\r") { cur = cur + ch }
+        }
+        i = i + 1
+    }
+    out = push(out, cur)
+    return out
+}
+def _ecs_str_split_ws(line) {
+    let t = _ecs_str_trim(line)
+    let out = []
+    let cur = ""
+    let i = 0
+    while (i < len(t)) {
+        let ch = slice(t, i, i + 1)
+        if (ch == " " || ch == "\t") {
+            if (len(cur) > 0) { out = push(out, cur); cur = "" }
+        } else {
+            cur = cur + ch
+        }
+        i = i + 1
+    }
+    if (len(cur) > 0) { out = push(out, cur) }
+    return out
+}
+def _ecs_obj_parse_index(s) {
+    let t = _ecs_str_trim(str(default(s, "")))
+    if (len(t) == 0) { return 0 }
+    let neg = slice(t, 0, 1) == "-"
+    let body = t
+    if (neg) {
+        body = slice(t, 1, len(t))
+        if (len(body) == 0) { return 0 }
+    }
+    let f = parse_float(body)
+    if (f == null) { return 0 }
+    let v = int(f)
+    if (neg) { v = 0 - v }
+    return v
+}
+def _ecs_obj_resolve_index(idx, buf_len) {
+    let i = int(default(idx, 0))
+    if (i < 0) { i = int(buf_len) + i }
+    return i
+}
+def _ecs_obj_round_coord(x) {
+    let xf = float(x)
+    return float(round(xf * 1000000.0)) / 1000000.0
+}
+def _ecs_obj_corner_indices(tok) {
+    let t = str(default(tok, ""))
+    let v = ""
+    let vt = ""
+    let vn = ""
+    let i = 0
+    while (i < len(t)) {
+        let ch = slice(t, i, i + 1)
+        if (ch == "/") { break }
+        v = v + ch
+        i = i + 1
+    }
+    if (i < len(t) && slice(t, i, i + 1) == "/") {
+        i = i + 1
+        while (i < len(t)) {
+            let ch2 = slice(t, i, i + 1)
+            if (ch2 == "/") { break }
+            vt = vt + ch2
+            i = i + 1
+        }
+    }
+    if (i < len(t) && slice(t, i, i + 1) == "/") {
+        i = i + 1
+        while (i < len(t)) {
+            let ch3 = slice(t, i, i + 1)
+            vn = vn + ch3
+            i = i + 1
+        }
+    }
+    return [v, vt, vn]
+}
+def _ecs_mesh_make_from_obj(obj_text) {
+    let lines = _ecs_str_split_lines(str(default(obj_text, "")))
+    let vs = []
+    vs = push(vs, [0.0, 0.0, 0.0])
+    let vts = []
+    vts = push(vts, [0.0, 0.0])
+    let vns = []
+    vns = push(vns, [0.0, 0.0, 0.0])
+    let face_rows = []
+    let li = 0
+    while (li < len(lines)) {
+        let parts = _ecs_str_split_ws(lines[li])
+        if (len(parts) == 0) { li = li + 1; continue }
+        let tag = str(default(parts[0], ""))
+        if (len(tag) > 0 && slice(tag, 0, 1) == "#") { li = li + 1; continue }
+        if (tag == "vn" && len(parts) >= 4) {
+            let fnx = parse_float(parts[1])
+            let fny = parse_float(parts[2])
+            let fnz = parse_float(parts[3])
+            if (fnx != null && fny != null && fnz != null) {
+                let rx = _ecs_obj_round_coord(float(fnx))
+                let ry = _ecs_obj_round_coord(float(fny))
+                let rz = _ecs_obj_round_coord(float(fnz))
+                let nn = _ecs_vec3_normalize_arr3(rx, ry, rz)
+                vns = push(vns, [_ecs_obj_round_coord(nn[0]), _ecs_obj_round_coord(nn[1]), _ecs_obj_round_coord(nn[2])])
+            }
+        }
+        if (tag == "v" && len(parts) >= 4) {
+            let fx = parse_float(parts[1])
+            let fy = parse_float(parts[2])
+            let fz = parse_float(parts[3])
+            if (fx != null && fy != null && fz != null) {
+                vs = push(vs, [_ecs_obj_round_coord(float(fx)), _ecs_obj_round_coord(float(fy)), _ecs_obj_round_coord(float(fz))])
+            }
+        }
+        if (tag == "vt" && len(parts) >= 3) {
+            let fu = parse_float(parts[1])
+            let fv = parse_float(parts[2])
+            if (fu != null && fv != null) {
+                vts = push(vts, [_ecs_obj_round_coord(float(fu)), _ecs_obj_round_coord(float(fv))])
+            }
+        }
+        if (tag == "f" && len(parts) >= 4) {
+            let prow = []
+            let pj = 0
+            while (pj < len(parts)) {
+                prow = push(prow, parts[pj])
+                pj = pj + 1
+            }
+            face_rows = push(face_rows, prow)
+        }
+        li = li + 1
+    }
+    if (len(face_rows) == 0) { return {"error": "obj: no faces"} }
+    let vertices_out = []
+    let uvs_out = []
+    let normals_out = []
+    let indices_out = []
+    let fi = 0
+    while (fi < len(face_rows)) {
+        let fparts = face_rows[fi]
+        let corners = []
+        let ck = 1
+        while (ck < len(fparts)) {
+            corners = push(corners, fparts[ck])
+            ck = ck + 1
+        }
+        let nc = len(corners)
+        if (nc < 3) { fi = fi + 1; continue }
+        let ti = 0
+        while (ti < nc - 2) {
+            let tri_toks = []
+            tri_toks = push(tri_toks, corners[0])
+            tri_toks = push(tri_toks, corners[ti + 1])
+            tri_toks = push(tri_toks, corners[ti + 2])
+            let ci = 0
+            while (ci < 3) {
+                let trip = _ecs_obj_corner_indices(tri_toks[ci])
+                let vidx = _ecs_obj_parse_index(trip[0])
+                let vtidx = 0
+                if (len(trip[1]) > 0) { vtidx = _ecs_obj_parse_index(trip[1]) }
+                let vnidx = 0
+                if (len(trip[2]) > 0) { vnidx = _ecs_obj_parse_index(trip[2]) }
+                vidx = _ecs_obj_resolve_index(vidx, len(vs))
+                vtidx = _ecs_obj_resolve_index(vtidx, len(vts))
+                vnidx = _ecs_obj_resolve_index(vnidx, len(vns))
+                if (vidx == 0 || vidx >= len(vs)) { return {"error": "obj: bad vertex index"} }
+                if (vtidx < 0 || vtidx >= len(vts)) { return {"error": "obj: bad texcoord index"} }
+                if (vnidx < 0 || vnidx >= len(vns)) { return {"error": "obj: bad normal index"} }
+                let p = vs[vidx]
+                let idx = len(vertices_out)
+                vertices_out = push(vertices_out, [p[0], p[1], p[2]])
+                if (vtidx > 0 && vtidx < len(vts)) {
+                    let uv = vts[vtidx]
+                    uvs_out = push(uvs_out, [uv[0], uv[1]])
+                } else {
+                    uvs_out = push(uvs_out, [0.0, 0.0])
+                }
+                if (vnidx > 0 && vnidx < len(vns)) {
+                    let nn = vns[vnidx]
+                    normals_out = push(normals_out, [nn[0], nn[1], nn[2]])
+                } else {
+                    normals_out = push(normals_out, [0.0, 0.0, 1.0])
+                }
+                indices_out = push(indices_out, idx)
+                ci = ci + 1
+            }
+            ti = ti + 1
+        }
+        fi = fi + 1
+    }
+    if (len(vertices_out) == 0) { return {"error": "obj: empty mesh"} }
+    return {"primitive_type": "indexed", "vertices": vertices_out, "indices": indices_out, "uvs": uvs_out, "normals": normals_out}
+}
+
+def _ecs_texture_make(width, height, data, logical_id) {
+    let w = int(default(width, 0))
+    let h = int(default(height, 0))
+    if (w < 0) { w = 0 }
+    if (h < 0) { h = 0 }
+    return {"width": w, "height": h, "data": data, "logical_id": str(default(logical_id, ""))}
+}
+def _ecs_material_make(color, material_id, texture_ref) {
+    let tr = ""
+    if (texture_ref != null) { tr = str(texture_ref) }
+    return {"color": default(color, vec3["one"]()), "material_id": str(default(material_id, "default")), "texture_id": tr}
+}
+def _ecs_camera_build(position, zoom, projection, mode) {
+    let z = float(default(zoom, 1.0))
+    if (z <= 0.0) { z = 1.0 }
+    let pos = default(position, vec3["zero"]())
+    let view = mat4["translate"](vec3["make"](-float(default(pos["x"], 0.0)), -float(default(pos["y"], 0.0)), -float(default(pos["z"], 0.0))))
+    let proj_name = str(default(projection, "orthographic"))
+    let proj = mat4["ortho"](-640.0 / z, 640.0 / z, -360.0 / z, 360.0 / z, -1000.0, 1000.0)
+    if (proj_name == "perspective") { proj = mat4["perspective"](1.0471975512, 1280.0 / 720.0, 0.1, 1000.0) }
+    return {"position": pos, "zoom": z, "projection": proj_name, "mode": str(default(mode, "2d")), "view_matrix": view, "projection_matrix": proj}
+}
+def _ecs_camera_make(position, zoom, projection) { return _ecs_camera_build(position, zoom, projection, "2d") }
+def _ecs_render_cmd_before(a, b) {
+    let da = float(default(a["depth_value"], 0.0))
+    let db = float(default(b["depth_value"], 0.0))
+    if (da < db) { return true }
+    if (da > db) { return false }
+    let ea = default(a["entity"], _ecs_eid_null())
+    let eb = default(b["entity"], _ecs_eid_null())
+    if (_ecs_int_or(ea["index"], -1) < _ecs_int_or(eb["index"], -1)) { return true }
+    if (_ecs_int_or(ea["index"], -1) > _ecs_int_or(eb["index"], -1)) { return false }
+    return _ecs_int_or(ea["generation"], -1) < _ecs_int_or(eb["generation"], -1)
+}
+def _ecs_render_sort_commands(commands, count) {
+    let n = int(default(count, 0))
+    let i = 1
+    while (i < n) {
+        let key = commands[i]
+        let j = i - 1
+        while (j >= 0 && _ecs_render_cmd_before(key, commands[j])) {
+            commands[j + 1] = commands[j]
+            j = j - 1
+        }
+        commands[j + 1] = key
+        i = i + 1
+    }
+}
+def _ecs_mesh_validate_uvs(mesh) {
+    let m = default(mesh, {})
+    let vs = default(m["vertices"], [])
+    let uvs = default(m["uvs"], [])
+    if (len(uvs) == 0) { return "" }
+    if (len(uvs) != len(vs)) { return "mesh uvs length must match vertices length (or use empty uvs)" }
+    return ""
+}
+def _ecs_mesh_validate_normals(mesh) {
+    let m = default(mesh, {})
+    let vs = default(m["vertices"], [])
+    let ns = default(m["normals"], [])
+    if (len(ns) == 0) { return "" }
+    if (len(ns) != len(vs)) { return "mesh normals length must match vertices length (or use empty normals)" }
+    return ""
+}
+def _ecs_mesh_signature(mesh) {
+    let m = default(mesh, _ecs_mesh_make_quad())
+    let vs = default(m["vertices"], [])
+    let ix = default(m["indices"], [])
+    let v_part = ""
+    let vi = 0
+    while (vi < len(vs)) {
+        let pv = default(vs[vi], [])
+        if (len(pv) >= 3) {
+            v_part = v_part + str(float(pv[0])) + "," + str(float(pv[1])) + "," + str(float(pv[2])) + ";"
+        }
+        vi = vi + 1
+    }
+    let uvs = default(m["uvs"], [])
+    let u_part = ""
+    let ui = 0
+    while (ui < len(uvs)) {
+        let p = default(uvs[ui], [])
+        u_part = u_part + str(default(p[0], 0.0)) + "," + str(default(p[1], 0.0)) + ";"
+        ui = ui + 1
+    }
+    let ns = default(m["normals"], [])
+    let n_part = ""
+    let ni = 0
+    while (ni < len(ns)) {
+        let q = default(ns[ni], [])
+        n_part = n_part + str(default(q[0], 0.0)) + "," + str(default(q[1], 0.0)) + "," + str(default(q[2], 0.0)) + ";"
+        ni = ni + 1
+    }
+    return str(default(m["primitive_type"], "quad")) + "|" + str(len(vs)) + "|" + str(len(ix)) + "|v:" + v_part + "|uv:" + u_part + "|n:" + n_part
+}
+def _ecs_material_signature(material) {
+    let m = default(material, _ecs_material_make(null, "default", null))
+    let c = default(m["color"], vec3["one"]())
+    let cx = 1.0
+    let cy = 1.0
+    let cz = 1.0
+    if (has(c, "x")) { cx = float(c["x"]) }
+    if (has(c, "y")) { cy = float(c["y"]) }
+    if (has(c, "z")) { cz = float(c["z"]) }
+    return str(default(m["material_id"], "default")) + "|" + str(cx) + "|" + str(cy) + "|" + str(cz) + "|tex:" + str(default(m["texture_id"], ""))
+}
+def _ecs_texture_signature(tex) {
+    let t = default(tex, _ecs_texture_make(0, 0, null, ""))
+    let d = t["data"]
+    let dtag = "0"
+    if (d != null) { dtag = "1" }
+    return str(int(default(t["width"], 0))) + "|" + str(int(default(t["height"], 0))) + "|" + dtag + "|" + str(default(t["logical_id"], ""))
+}
+def _ecs_registry_register_mesh(world, mesh) {
+    let regs = world["registries"]
+    let m = default(mesh, _ecs_mesh_make_quad())
+    if (has(m, "error") && len(str(default(m["error"], ""))) > 0) {
+        _ecs_error("registry_register_mesh: " + str(m["error"]))
+        return ""
+    }
+    let uv_err = _ecs_mesh_validate_uvs(m)
+    if (len(uv_err) > 0) { _ecs_error("registry_register_mesh: " + uv_err); return "" }
+    let n_err = _ecs_mesh_validate_normals(m)
+    if (len(n_err) > 0) { _ecs_error("registry_register_mesh: " + n_err); return "" }
+    let sig = _ecs_mesh_signature(m)
+    if (has(regs["mesh_sig_to_id"], sig)) { return regs["mesh_sig_to_id"][sig] }
+    if (!_ecs_require_registry_write(world, "registry_register_mesh")) { return "" }
+    let hid = "mesh." + str(int(default(regs["next_mesh_id"], 1)))
+    regs["next_mesh_id"] = int(default(regs["next_mesh_id"], 1)) + 1
+    if (has(regs["mesh_by_id"], hid)) { _ecs_error("registry mesh id collision (append-only violated)"); return "" }
+    regs["mesh_by_id"][hid] = m
+    regs["mesh_sig_to_id"][sig] = hid
+    return hid
+}
+def _ecs_registry_register_material(world, material) {
+    let regs = world["registries"]
+    let m = default(material, _ecs_material_make(null, "default", null))
+    let tid = str(default(m["texture_id"], ""))
+    if (len(tid) > 0) {
+        let tr = default(world["texture_registry"], {})
+        let by = default(tr["texture_by_id"], {})
+        if (!has(by, tid)) { _ecs_error("registry_register_material: unknown texture_id (register texture first)"); return "" }
+    }
+    let sig = _ecs_material_signature(m)
+    if (has(regs["material_sig_to_id"], sig)) { return regs["material_sig_to_id"][sig] }
+    if (!_ecs_require_registry_write(world, "registry_register_material")) { return "" }
+    let hid = "mat." + str(int(default(regs["next_material_id"], 1)))
+    regs["next_material_id"] = int(default(regs["next_material_id"], 1)) + 1
+    if (has(regs["material_by_id"], hid)) { _ecs_error("registry material id collision (append-only violated)"); return "" }
+    regs["material_by_id"][hid] = m
+    regs["material_sig_to_id"][sig] = hid
+    return hid
+}
+def _ecs_registry_get_mesh(world, mesh_id) {
+    let regs = world["registries"]
+    let id = str(default(mesh_id, ""))
+    if (!has(regs["mesh_by_id"], id)) { return null }
+    return regs["mesh_by_id"][id]
+}
+def _ecs_registry_get_material(world, material_id) {
+    let regs = world["registries"]
+    let id = str(default(material_id, ""))
+    if (!has(regs["material_by_id"], id)) { return null }
+    return regs["material_by_id"][id]
+}
+def _ecs_registry_register_texture(world, texture) {
+    let tr = default(world["texture_registry"], {})
+    let by = default(tr["texture_by_id"], {})
+    let sigmap = default(tr["texture_sig_to_id"], {})
+    let t = default(texture, _ecs_texture_make(0, 0, null, ""))
+    let sig = _ecs_texture_signature(t)
+    if (has(sigmap, sig)) { return sigmap[sig] }
+    if (!_ecs_require_registry_write(world, "registry_register_texture")) { return "" }
+    let hid = "tex." + str(int(default(tr["next_texture_id"], 1)))
+    tr["next_texture_id"] = int(default(tr["next_texture_id"], 1)) + 1
+    if (has(by, hid)) { _ecs_error("registry texture id collision (append-only violated)"); return "" }
+    by[hid] = t
+    sigmap[sig] = hid
+    tr["texture_by_id"] = by
+    tr["texture_sig_to_id"] = sigmap
+    world["texture_registry"] = tr
+    return hid
+}
+def _ecs_registry_get_texture(world, texture_id) {
+    let tr = default(world["texture_registry"], {})
+    let id = str(default(texture_id, ""))
+    if (!has(default(tr["texture_by_id"], {}), id)) { return null }
+    return tr["texture_by_id"][id]
+}
+
+def _ecs_world_create() {
+    let world = {}
+    world["entities"] = _ecs_entity_make_store()
+    world["components"] = {"transform": _ecs_store_make(), "velocity": _ecs_store_make(), "mesh": _ecs_store_make(), "material": _ecs_store_make()}
+    world["registries"] = {"mesh_by_id": {}, "material_by_id": {}, "mesh_sig_to_id": {}, "material_sig_to_id": {}, "next_mesh_id": 1, "next_material_id": 1}
+    world["texture_registry"] = {"texture_by_id": {}, "texture_sig_to_id": {}, "next_texture_id": 1}
+    world["input"] = {"held_keys": {}, "pressed_keys": {}, "released_keys": {}}
+    world["locks"] = {"render_prep": false, "registry_write": false}
+    world["render"] = {"commands": [], "count": 0, "camera": {"position": vec3["zero"](), "zoom": 1.0, "projection": "orthographic", "mode": "2d", "view_matrix": mat4["identity"](), "projection_matrix": mat4["ortho"](-640.0, 640.0, -360.0, 360.0, -1000.0, 1000.0)}, "lighting": _ecs_lighting_default(), "stats": {"command_count": 0, "draw_calls": 0, "batched_draw_calls": 0, "unique_materials": 0, "rendered_entities": 0, "mesh_registry_size": 0, "material_registry_size": 0, "texture_registry_size": 0, "lighting_hash": "", "batch_sizes": []}}
+    world["systems"] = {"pipeline": ["input", "simulation", "transform_propagation", "rendering_prep"], "stage_order": ["PRE_INPUT", "INPUT", "SIMULATION", "POST_SIMULATION", "TRANSFORM", "RENDER_PREP"], "stage": {"input": "INPUT", "simulation": "SIMULATION", "transform_propagation": "TRANSFORM", "rendering_prep": "RENDER_PREP"}, "stage_policy": {"PRE_INPUT": {"allow_structural_mutation": false, "allowed_writes": ["input"]}, "INPUT": {"allow_structural_mutation": false, "allowed_writes": ["input", "velocity"]}, "SIMULATION": {"allow_structural_mutation": false, "allowed_writes": ["velocity", "transform"]}, "POST_SIMULATION": {"allow_structural_mutation": false, "allowed_writes": ["velocity", "transform"]}, "TRANSFORM": {"allow_structural_mutation": false, "allowed_writes": ["transform"]}, "RENDER_PREP": {"allow_structural_mutation": false, "allowed_writes": []}}, "current_stage": "", "current_system": "", "custom": {}, "custom_meta": {}, "custom_order": [], "deps": {}, "resolved": [], "dirty": true, "auto_policy_preset": "balanced", "auto_policy": {"name": "balanced", "min_systems_for_parallel": 2, "min_parallel_ratio": 0.34, "allow_render_prep_parallel": false}, "parallel_runtime_stats": {"enabled": false, "mode": "serial", "policy_preset": "balanced", "stages_executed": 0, "batches_executed": 0, "parallel_batches_executed": 0, "systems_executed": 0, "stage_parallel_ratio": 0.0, "parallel_speedup_estimate": 1.0, "auto_serial_stages": 0, "auto_parallel_stages": 0, "policy_decisions": []}}
+    return world
+}
+def _ecs_world_is_alive(world, id) { return _ecs_entity_is_alive_raw(world["entities"], id) }
+def _ecs_scheduler_contains(arr, value) {
+    let i = 0
+    let n = len(default(arr, []))
+    let v = str(default(value, ""))
+    while (i < n) {
+        if (str(default(arr[i], "")) == v) { return true }
+        i = i + 1
+    }
+    return false
+}
+def _ecs_stage_runtime_meta(world) {
+    let sys = default(world["systems"], {})
+    return {"stage": str(default(sys["current_stage"], "")), "system": str(default(sys["current_system"], ""))}
+}
+def _ecs_stage_allows_structural(world) {
+    let meta = _ecs_stage_runtime_meta(world)
+    if (len(meta["stage"]) == 0) { return true }
+    let sys = world["systems"]
+    let pol = default(sys["stage_policy"][meta["stage"]], {"allow_structural_mutation": false, "allowed_writes": []})
+    let base_allow = _ecs_as_bool(default(pol["allow_structural_mutation"], false))
+    let is_builtin = _ecs_scheduler_contains(default(sys["pipeline"], []), meta["system"])
+    if (is_builtin) { return base_allow }
+    let cmeta = default(sys["custom_meta"][meta["system"]], {})
+    if (_ecs_as_bool(default(cmeta["allow_structural_mutation"], false))) { return true }
+    return base_allow
+}
+def _ecs_stage_allows_write(world, key) {
+    let meta = _ecs_stage_runtime_meta(world)
+    if (len(meta["stage"]) == 0) { return true }
+    let sys = world["systems"]
+    let pol = default(sys["stage_policy"][meta["stage"]], {"allow_structural_mutation": false, "allowed_writes": []})
+    let allow = default(pol["allowed_writes"], [])
+    let is_builtin = _ecs_scheduler_contains(default(sys["pipeline"], []), meta["system"])
+    if (!is_builtin) {
+        let cmeta = default(sys["custom_meta"][meta["system"]], {})
+        if (cmeta["write_mask"] != null) { allow = default(cmeta["write_mask"], []) }
+    }
+    return _ecs_scheduler_contains(allow, key)
+}
+def _ecs_require_structural_allowed(world, context) {
+    if (_ecs_stage_allows_structural(world)) { return true }
+    _ecs_error(str(default(context, "ecs")) + " structural mutation blocked in stage/system")
+    return false
+}
+def _ecs_require_write_allowed(world, key, context) {
+    if (_ecs_stage_allows_write(world, key)) { return true }
+    _ecs_error(str(default(context, "ecs")) + " write to '" + str(default(key, "")) + "' blocked in stage/system")
+    return false
+}
+def _ecs_world_create_entity(world) {
+    if (!_ecs_require_structural_allowed(world, "world_create_entity")) { return _ecs_eid_null() }
+    let e = _ecs_entity_create(world["entities"])
+    _ecs_log("entity created index=" + str(e["index"]) + " gen=" + str(e["generation"]))
+    return e
+}
+def _ecs_world_destroy_entity(world, id) {
+    if (!_ecs_require_structural_allowed(world, "world_destroy_entity")) { return false }
+    if (!_ecs_require_unlocked(world, "world_destroy_entity")) { return false }
+    if (!_ecs_require_alive(world, id, "world_destroy_entity")) { return false }
+    let ts = world["components"]["transform"]
+    let t = _ecs_store_get(ts, id)
+    if (t != null) {
+        // Detach this entity from its parent sibling list.
+        let parent_id = t["parent"]
+        if (!_ecs_eid_is_null(parent_id)) {
+            let parent_t = _ecs_store_get(ts, parent_id)
+            if (parent_t != null) {
+                let first = parent_t["first_child"]
+                if (_ecs_eid_equal(first, id)) { parent_t["first_child"] = t["next_sibling"] }
+                else {
+                    let cur = first
+                    while (!_ecs_eid_is_null(cur)) {
+                        let cur_t = _ecs_store_get(ts, cur)
+                        if (cur_t == null) { cur = _ecs_eid_null() }
+                        else {
+                            let nx = cur_t["next_sibling"]
+                            if (_ecs_eid_equal(nx, id)) { cur_t["next_sibling"] = t["next_sibling"]; cur = _ecs_eid_null() }
+                            else { cur = nx }
+                        }
+                    }
+                }
+            }
+        }
+        let child = t["first_child"]
+        while (!_ecs_eid_is_null(child)) {
+            let ct = _ecs_store_get(ts, child)
+            let nx = _ecs_eid_null()
+            if (ct != null) { nx = ct["next_sibling"] }
+            if (ct != null) {
+                ct["parent"] = _ecs_eid_null()
+                ct["next_sibling"] = _ecs_eid_null()
+                ct["dirty"] = true
+            }
+            child = nx
+        }
+        t["first_child"] = _ecs_eid_null()
+        t["parent"] = _ecs_eid_null()
+        t["next_sibling"] = _ecs_eid_null()
+    }
+    _ecs_store_remove(world["components"]["transform"], id)
+    _ecs_store_remove(world["components"]["velocity"], id)
+    _ecs_store_remove(world["components"]["mesh"], id)
+    _ecs_store_remove(world["components"]["material"], id)
+    let ok = _ecs_entity_destroy(world["entities"], id)
+    if (ok) { _ecs_log("entity destroyed index=" + str(id["index"])) }
+    return ok
+}
+def _ecs_world_add_transform(world, id, component) { if (!_ecs_require_structural_allowed(world, "world_add_transform")) { return false }; if (!_ecs_require_write_allowed(world, "transform", "world_add_transform")) { return false }; if (!_ecs_require_unlocked(world, "world_add_transform")) { return false }; if (!_ecs_require_alive(world, id, "world_add_transform")) { return false }; _ecs_store_add(world["components"]["transform"], id, default(component, _ecs_transform_make(null, null, null))); return true }
+def _ecs_world_add_velocity(world, id, component) { if (!_ecs_require_structural_allowed(world, "world_add_velocity")) { return false }; if (!_ecs_require_write_allowed(world, "velocity", "world_add_velocity")) { return false }; if (!_ecs_require_unlocked(world, "world_add_velocity")) { return false }; if (!_ecs_require_alive(world, id, "world_add_velocity")) { return false }; let v = default(component, _ecs_velocity_make(null, 0.0)); _ecs_store_add(world["components"]["velocity"], id, v); return true }
+def _ecs_world_add_mesh(world, id, component) { if (!_ecs_require_structural_allowed(world, "world_add_mesh")) { return false }; if (!_ecs_require_write_allowed(world, "mesh", "world_add_mesh")) { return false }; if (!_ecs_require_unlocked(world, "world_add_mesh")) { return false }; if (!_ecs_require_alive(world, id, "world_add_mesh")) { return false }; let hid = _ecs_registry_register_mesh(world, default(component, _ecs_mesh_make_quad())); if (str(default(hid, "")) == "") { return false }; _ecs_store_add(world["components"]["mesh"], id, {"mesh_id": hid}); return true }
+def _ecs_world_add_material(world, id, component) { if (!_ecs_require_structural_allowed(world, "world_add_material")) { return false }; if (!_ecs_require_write_allowed(world, "material", "world_add_material")) { return false }; if (!_ecs_require_unlocked(world, "world_add_material")) { return false }; if (!_ecs_require_alive(world, id, "world_add_material")) { return false }; let hid = _ecs_registry_register_material(world, default(component, _ecs_material_make(null, "default", null))); if (str(default(hid, "")) == "") { return false }; _ecs_store_add(world["components"]["material"], id, {"material_id": hid}); return true }
+def _ecs_world_add_mesh_handle(world, id, mesh_id) { if (!_ecs_require_structural_allowed(world, "world_add_mesh_handle")) { return false }; if (!_ecs_require_write_allowed(world, "mesh", "world_add_mesh_handle")) { return false }; if (!_ecs_require_unlocked(world, "world_add_mesh_handle")) { return false }; if (!_ecs_require_alive(world, id, "world_add_mesh_handle")) { return false }; if (_ecs_registry_get_mesh(world, mesh_id) == null) { _ecs_error("world_add_mesh_handle unknown mesh_id"); return false }; _ecs_store_add(world["components"]["mesh"], id, {"mesh_id": str(mesh_id)}); return true }
+def _ecs_world_add_material_handle(world, id, material_id) { if (!_ecs_require_structural_allowed(world, "world_add_material_handle")) { return false }; if (!_ecs_require_write_allowed(world, "material", "world_add_material_handle")) { return false }; if (!_ecs_require_unlocked(world, "world_add_material_handle")) { return false }; if (!_ecs_require_alive(world, id, "world_add_material_handle")) { return false }; if (_ecs_registry_get_material(world, material_id) == null) { _ecs_error("world_add_material_handle unknown material_id"); return false }; _ecs_store_add(world["components"]["material"], id, {"material_id": str(material_id)}); return true }
+def _ecs_world_get_transform(world, id) { if (!_ecs_require_alive(world, id, "world_get_transform")) { return null }; return _ecs_store_get(world["components"]["transform"], id) }
+def _ecs_world_get_velocity(world, id) { if (!_ecs_require_alive(world, id, "world_get_velocity")) { return null }; return _ecs_store_get(world["components"]["velocity"], id) }
+def _ecs_world_get_mesh(world, id) { if (!_ecs_require_alive(world, id, "world_get_mesh")) { return null }; return _ecs_store_get(world["components"]["mesh"], id) }
+def _ecs_world_get_material(world, id) { if (!_ecs_require_alive(world, id, "world_get_material")) { return null }; return _ecs_store_get(world["components"]["material"], id) }
+def _ecs_world_resolve_mesh(world, mesh_id) { return _ecs_registry_get_mesh(world, mesh_id) }
+def _ecs_world_resolve_material(world, material_id) { return _ecs_registry_get_material(world, material_id) }
+def _ecs_world_has_transform(world, id) { if (!_ecs_require_alive(world, id, "world_has_transform")) { return false }; return _ecs_store_has(world["components"]["transform"], id) }
+def _ecs_world_has_velocity(world, id) { if (!_ecs_require_alive(world, id, "world_has_velocity")) { return false }; return _ecs_store_has(world["components"]["velocity"], id) }
+def _ecs_world_has_mesh(world, id) { if (!_ecs_require_alive(world, id, "world_has_mesh")) { return false }; return _ecs_store_has(world["components"]["mesh"], id) }
+def _ecs_world_has_material(world, id) { if (!_ecs_require_alive(world, id, "world_has_material")) { return false }; return _ecs_store_has(world["components"]["material"], id) }
+def _ecs_world_remove_transform(world, id) { if (!_ecs_require_structural_allowed(world, "world_remove_transform")) { return false }; if (!_ecs_require_write_allowed(world, "transform", "world_remove_transform")) { return false }; if (!_ecs_require_unlocked(world, "world_remove_transform")) { return false }; if (!_ecs_require_alive(world, id, "world_remove_transform")) { return false }; return _ecs_store_remove(world["components"]["transform"], id) }
+def _ecs_world_remove_velocity(world, id) { if (!_ecs_require_structural_allowed(world, "world_remove_velocity")) { return false }; if (!_ecs_require_write_allowed(world, "velocity", "world_remove_velocity")) { return false }; if (!_ecs_require_unlocked(world, "world_remove_velocity")) { return false }; if (!_ecs_require_alive(world, id, "world_remove_velocity")) { return false }; return _ecs_store_remove(world["components"]["velocity"], id) }
+def _ecs_world_remove_mesh(world, id) { if (!_ecs_require_structural_allowed(world, "world_remove_mesh")) { return false }; if (!_ecs_require_write_allowed(world, "mesh", "world_remove_mesh")) { return false }; if (!_ecs_require_unlocked(world, "world_remove_mesh")) { return false }; if (!_ecs_require_alive(world, id, "world_remove_mesh")) { return false }; return _ecs_store_remove(world["components"]["mesh"], id) }
+def _ecs_world_remove_material(world, id) { if (!_ecs_require_structural_allowed(world, "world_remove_material")) { return false }; if (!_ecs_require_write_allowed(world, "material", "world_remove_material")) { return false }; if (!_ecs_require_unlocked(world, "world_remove_material")) { return false }; if (!_ecs_require_alive(world, id, "world_remove_material")) { return false }; return _ecs_store_remove(world["components"]["material"], id) }
+def _ecs_component_store(world, name) {
+    let n = str(default(name, ""))
+    if (n == "transform") { return world["components"]["transform"] }
+    if (n == "velocity") { return world["components"]["velocity"] }
+    if (n == "mesh") { return world["components"]["mesh"] }
+    if (n == "material") { return world["components"]["material"] }
+    return null
+}
+def _ecs_world_query(world, component_names) {
+    let names = default(component_names, [])
+    let name_count = len(names)
+    if (name_count <= 0) { return {"entities": [], "components": {}, "count": 0, "signature": []} }
+    let i = 0
+    let stores = []
+    let comp_out = {}
+    while (i < name_count) {
+        let n = str(default(names[i], ""))
+        let st = _ecs_component_store(world, n)
+        if (st == null) { return {"entities": [], "components": {}, "count": 0, "signature": names} }
+        stores[i] = st
+        comp_out[n] = []
+        i = i + 1
+    }
+    let anchor = stores[0]
+    let entities = []
+    let count = 0
+    i = 0
+    while (i < int(default(anchor["count"], 0))) {
+        let e = anchor["dense_entities"][i]
+        let ok = true
+        let vals = {}
+        let j = 0
+        while (j < name_count) {
+            let n = str(default(names[j], ""))
+            let st = stores[j]
+            let di = _ecs_store_dense_index(st, e)
+            if (di < 0) { ok = false; j = name_count }
+            else { vals[n] = st["dense_data"][di]; j = j + 1 }
+        }
+        if (ok) {
+            entities[count] = e
+            j = 0
+            while (j < name_count) {
+                let n = str(default(names[j], ""))
+                comp_out[n] = push(default(comp_out[n], []), vals[n])
+                j = j + 1
+            }
+            count = count + 1
+        }
+        i = i + 1
+    }
+    return {"entities": entities, "components": comp_out, "count": count, "signature": names}
+}
+def _ecs_world_query_transform(world) { let s = world["components"]["transform"]; return {"entities": s["dense_entities"], "components": s["dense_data"], "count": int(default(s["count"], 0))} }
+def _ecs_world_query_transform_velocity(world) {
+    let ts = world["components"]["transform"]
+    let vs = world["components"]["velocity"]
+    let out_t = []
+    let out_v = []
+    let out_e = []
+    let count = 0
+    let i = 0
+    while (i < int(default(vs["count"], 0))) {
+        let e = vs["dense_entities"][i]
+        let di = _ecs_store_dense_index(ts, e)
+        if (di >= 0) { out_e[count] = e; out_t[count] = ts["dense_data"][di]; out_v[count] = vs["dense_data"][i]; count = count + 1 }
+        i = i + 1
+    }
+    return {"entities": out_e, "transform": out_t, "velocity": out_v, "count": count}
+}
+def _ecs_world_query_renderables(world) {
+    let ts = world["components"]["transform"]
+    let ms = world["components"]["mesh"]
+    let mats = world["components"]["material"]
+    let out_t = []
+    let out_mesh_id = []
+    let out_material_id = []
+    let out_e = []
+    let count = 0
+    let i = 0
+    while (i < int(default(ms["count"], 0))) {
+        let e = ms["dense_entities"][i]
+        let tdi = _ecs_store_dense_index(ts, e)
+        let mdi = _ecs_store_dense_index(mats, e)
+        if (tdi >= 0 && mdi >= 0) {
+            out_e[count] = e
+            out_t[count] = ts["dense_data"][tdi]
+            out_mesh_id[count] = str(default(default(ms["dense_data"][i], {})["mesh_id"], ""))
+            out_material_id[count] = str(default(default(mats["dense_data"][mdi], {})["material_id"], ""))
+            count = count + 1
+        }
+        i = i + 1
+    }
+    return {"entities": out_e, "transform": out_t, "mesh_id": out_mesh_id, "material_id": out_material_id, "count": count}
+}
+
+def _ecs_world_mark_dirty(world, id) {
+    let t = _ecs_world_get_transform(world, id)
+    if (t == null) { return false }
+    if (_ecs_as_bool(default(t["dirty"], false))) { return true }
+    t["dirty"] = true
+    let child = t["first_child"]
+    while (!_ecs_eid_is_null(child)) {
+        _ecs_world_mark_dirty(world, child)
+        let ct = _ecs_world_get_transform(world, child)
+        if (ct == null) { child = _ecs_eid_null() } else { child = ct["next_sibling"] }
+    }
+    return true
+}
+
+def _ecs_world_detach_from_parent(world, child_id) {
+    let child_t = _ecs_world_get_transform(world, child_id)
+    if (child_t == null) { return false }
+    let parent_id = child_t["parent"]
+    if (_ecs_eid_is_null(parent_id)) { return true }
+    let parent_t = _ecs_world_get_transform(world, parent_id)
+    if (parent_t == null) { child_t["parent"] = _ecs_eid_null(); return true }
+    let first = parent_t["first_child"]
+    if (_ecs_int_or(first["index"], -1) == _ecs_int_or(child_id["index"], -2) && _ecs_int_or(first["generation"], -1) == _ecs_int_or(child_id["generation"], -2)) {
+        parent_t["first_child"] = child_t["next_sibling"]
+        child_t["next_sibling"] = _ecs_eid_null()
+        child_t["parent"] = _ecs_eid_null()
+        return true
+    }
+    let cur = first
+    while (!_ecs_eid_is_null(cur)) {
+        let cur_t = _ecs_world_get_transform(world, cur)
+        if (cur_t == null) { return false }
+        let nx = cur_t["next_sibling"]
+        if (_ecs_int_or(nx["index"], -1) == _ecs_int_or(child_id["index"], -2) && _ecs_int_or(nx["generation"], -1) == _ecs_int_or(child_id["generation"], -2)) {
+            cur_t["next_sibling"] = child_t["next_sibling"]
+            child_t["next_sibling"] = _ecs_eid_null()
+            child_t["parent"] = _ecs_eid_null()
+            return true
+        }
+        cur = nx
+    }
+    return true
+}
+
+def _ecs_world_set_parent(world, child_id, parent_id_or_null) {
+    if (!_ecs_require_structural_allowed(world, "world_set_parent")) { return false }
+    if (!_ecs_require_write_allowed(world, "transform", "world_set_parent")) { return false }
+    if (!_ecs_require_unlocked(world, "world_set_parent")) { return false }
+    if (!_ecs_require_alive(world, child_id, "world_set_parent(child)")) { return false }
+    let child_t = _ecs_world_get_transform(world, child_id)
+    if (child_t == null) { return false }
+    let parent_id = default(parent_id_or_null, _ecs_eid_null())
+    if (!_ecs_eid_is_null(parent_id) && !_ecs_require_alive(world, parent_id, "world_set_parent(parent)")) { return false }
+    if (!_ecs_eid_is_null(parent_id) && _ecs_world_get_transform(world, parent_id) == null) { _ecs_error("world_set_parent requires parent transform"); return false }
+    if (!_ecs_eid_is_null(parent_id) && _ecs_eid_equal(parent_id, child_id)) { _ecs_error("world_set_parent self-cycle rejected"); return false }
+    if (!_ecs_eid_is_null(parent_id)) {
+        let cur = parent_id
+        let guard = 0
+        while (!_ecs_eid_is_null(cur) && guard < 100000) {
+            if (_ecs_eid_equal(cur, child_id)) { _ecs_error("world_set_parent cycle detected"); return false }
+            let ct = _ecs_world_get_transform(world, cur)
+            if (ct == null) { cur = _ecs_eid_null() } else { cur = ct["parent"] }
+            guard = guard + 1
+        }
+    }
+    _ecs_world_detach_from_parent(world, child_id)
+    if (_ecs_eid_is_null(parent_id)) { child_t["parent"] = _ecs_eid_null(); _ecs_world_mark_dirty(world, child_id); return true }
+    let parent_t = _ecs_world_get_transform(world, parent_id)
+    child_t["parent"] = parent_id
+    child_t["next_sibling"] = parent_t["first_child"]
+    parent_t["first_child"] = child_id
+    _ecs_world_mark_dirty(world, child_id)
+    return true
+}
+
+def _ecs_compose_local_matrix(transform) { return mat4["mul"](mat4["translate"](transform["local_position"]), mat4["scale"](transform["local_scale"])) }
+def _ecs_world_update_node_recursive(world, entity, parent_world, parent_dirty) {
+    let t = _ecs_world_get_transform(world, entity)
+    if (t == null) { return }
+    let dirty = parent_dirty || _ecs_as_bool(default(t["dirty"], false))
+    if (dirty) {
+        let local = _ecs_compose_local_matrix(t)
+        if (parent_world == null) { t["world_matrix"] = local } else { t["world_matrix"] = mat4["mul"](parent_world, local) }
+        t["dirty"] = false
+    }
+    let child = t["first_child"]
+    while (!_ecs_eid_is_null(child)) {
+        _ecs_world_update_node_recursive(world, child, t["world_matrix"], dirty)
+        let ct = _ecs_world_get_transform(world, child)
+        if (ct == null) { child = _ecs_eid_null() } else { child = ct["next_sibling"] }
+    }
+}
+
+def _ecs_input_keys_array_to_map(arr) {
+    let m = {}
+    let i = 0
+    let n = len(default(arr, []))
+    while (i < n) {
+        let k = str(default(arr[i], ""))
+        if (len(k) > 0) { m[k] = 1 }
+        i = i + 1
+    }
+    return m
+}
+def _ecs_world_input_get(world) { return default(world["input"], {"held_keys": {}, "pressed_keys": {}, "released_keys": {}}) }
+def _ecs_world_input_feed(world, held_keys, pressed_keys, released_keys) {
+    if (!_ecs_require_write_allowed(world, "input", "world_input_feed")) { return false }
+    let inp = _ecs_world_input_get(world)
+    inp["held_keys"] = _ecs_input_keys_array_to_map(held_keys)
+    inp["pressed_keys"] = _ecs_input_keys_array_to_map(pressed_keys)
+    inp["released_keys"] = _ecs_input_keys_array_to_map(released_keys)
+    world["input"] = inp
+    return true
+}
+def _ecs_input_key_held(world, key) { return has(_ecs_world_input_get(world)["held_keys"], str(default(key, ""))) }
+def _ecs_input_key_pressed(world, key) { return has(_ecs_world_input_get(world)["pressed_keys"], str(default(key, ""))) }
+def _ecs_input_key_released(world, key) { return has(_ecs_world_input_get(world)["released_keys"], str(default(key, ""))) }
+
+def _ecs_system_input(world, fixed_dt) {
+    let q = _ecs_world_query_transform_velocity(world)
+    let i = 0
+    while (i < int(default(q["count"], 0))) {
+        let vel = q["velocity"][i]
+        let sp = float(default(vel["input_move_speed"], 0.0))
+        if (sp > 0.0) {
+            let dx = 0.0
+            let dy = 0.0
+            if (_ecs_input_key_held(world, "W")) { dy = dy + 1.0 }
+            if (_ecs_input_key_held(world, "S")) { dy = dy - 1.0 }
+            if (_ecs_input_key_held(world, "D")) { dx = dx + 1.0 }
+            if (_ecs_input_key_held(world, "A")) { dx = dx - 1.0 }
+            vel["linear"] = vec3["make"](dx * sp, dy * sp, 0.0)
+        }
+        i = i + 1
+    }
+    return null
+}
+def _ecs_system_simulation(world, fixed_dt) {
+    let q = _ecs_world_query_transform_velocity(world)
+    let i = 0
+    while (i < int(default(q["count"], 0))) {
+        let tr = q["transform"][i]
+        let vel = q["velocity"][i]
+        tr["local_position"] = vec3["add"](tr["local_position"], vec3["scale"](vel["linear"], fixed_dt))
+        tr["dirty"] = true
+        i = i + 1
+    }
+}
+def _ecs_system_transform_propagation(world, fixed_dt) {
+    let q = _ecs_world_query_transform(world)
+    let i = 0
+    while (i < int(default(q["count"], 0))) {
+        let e = q["entities"][i]
+        let t = q["components"][i]
+        if (_ecs_eid_is_null(t["parent"])) { _ecs_world_update_node_recursive(world, e, null, false) }
+        i = i + 1
+    }
+}
+def _ecs_world_set_camera(world, camera) {
+    if (!_ecs_require_write_allowed(world, "render", "world_set_camera")) { return false }
+    let c = default(camera, {})
+    let z = float(default(c["zoom"], 1.0))
+    if (z <= 0.0) { z = 1.0 }
+    let pos = default(c["position"], vec3["zero"]())
+    let proj_name = str(default(c["projection"], "orthographic"))
+    let view = mat4["translate"](vec3["make"](-float(default(pos["x"], 0.0)), -float(default(pos["y"], 0.0)), -float(default(pos["z"], 0.0))))
+    let proj = mat4["ortho"](-640.0 / z, 640.0 / z, -360.0 / z, 360.0 / z, -1000.0, 1000.0)
+    if (proj_name == "perspective") { proj = mat4["perspective"](1.0471975512, 1280.0 / 720.0, 0.1, 1000.0) }
+    world["render"]["camera"] = {"position": pos, "zoom": z, "projection": proj_name, "mode": str(default(c["mode"], "2d")), "view_matrix": view, "projection_matrix": proj}
+    return true
+}
+def _ecs_world_get_camera(world) { return default(world["render"]["camera"], {"position": vec3["zero"](), "zoom": 1.0, "projection": "orthographic", "mode": "2d", "view_matrix": mat4["identity"](), "projection_matrix": mat4["ortho"](-640.0, 640.0, -360.0, 360.0, -1000.0, 1000.0)}) }
+def _ecs_world_get_lighting(world) {
+    let r = default(world["render"], {})
+    let cur = default(r["lighting"], null)
+    if (cur == null) { return _ecs_lighting_default() }
+    return _ecs_lighting_merge(cur)
+}
+def _ecs_world_set_lighting(world, patch) {
+    if (!_ecs_require_write_allowed(world, "render", "world_set_lighting")) { return false }
+    world["render"]["lighting"] = _ecs_lighting_merge(patch)
+    return true
+}
+def _ecs_system_render_prep(world, fixed_dt) {
+    world["locks"]["render_prep"] = true
+    world["locks"]["registry_write"] = true
+    let rq = world["render"]["commands"]
+    let q = _ecs_world_query_renderables(world)
+    let cam = _ecs_world_get_camera(world)
+    let cam_pos = default(cam["position"], vec3["zero"]())
+    let cam_mode = str(default(cam["mode"], "2d"))
+    let zoom = float(default(cam["zoom"], 1.0))
+    if (zoom <= 0.0) { zoom = 1.0 }
+    let i = 0
+    while (i < int(default(q["count"], 0))) {
+        let tr = q["transform"][i]
+        let mesh_id = q["mesh_id"][i]
+        let material_id = q["material_id"][i]
+        let eid = q["entities"][i]
+        if (_ecs_debug_enabled()) {
+            if (tr == null || _ecs_registry_get_mesh(world, mesh_id) == null || _ecs_registry_get_material(world, material_id) == null) { _ecs_error("render_prep invalid renderable tuple") }
+        }
+        let wx = 0.0
+        let wy = 0.0
+        let wz = float(default(tr["world_matrix"][11], 0.0))
+        if (cam_mode == "3d") {
+            let wp = vec3["make"](float(default(tr["world_matrix"][3], 0.0)), float(default(tr["world_matrix"][7], 0.0)), wz)
+            let vp = mat4["transform_point"](default(cam["view_matrix"], mat4["identity"]()), wp)
+            let cp = mat4["transform_point"](default(cam["projection_matrix"], mat4["identity"]()), vp)
+            wx = (float(default(cp["x"], 0.0)) + 1.0) * 640.0
+            wy = (1.0 - float(default(cp["y"], 0.0))) * 360.0
+        } else {
+            wx = (float(default(tr["world_matrix"][3], 0.0)) - float(default(cam_pos["x"], 0.0))) * zoom
+            wy = (float(default(tr["world_matrix"][7], 0.0)) - float(default(cam_pos["y"], 0.0))) * zoom
+        }
+        let mat_ent = _ecs_registry_get_material(world, material_id)
+        let tex_resolved = ""
+        if (mat_ent != null) { tex_resolved = str(default(mat_ent["texture_id"], "")) }
+        rq[i] = {"entity": eid, "depth_value": wz, "transform": default(tr["world_matrix"], mat4["identity"]()), "mesh_id": str(default(mesh_id, "")), "material_id": str(default(material_id, "")), "texture_id": tex_resolved, "screen": {"x": int(wx), "y": int(wy)}}
+        i = i + 1
+    }
+    _ecs_render_sort_commands(rq, int(default(q["count"], 0)))
+    world["render"]["count"] = int(default(q["count"], 0))
+    world["render"]["stats"]["command_count"] = int(default(q["count"], 0))
+    world["render"]["stats"]["draw_calls"] = 0
+    world["render"]["stats"]["batched_draw_calls"] = 0
+    world["render"]["stats"]["unique_materials"] = 0
+    world["render"]["stats"]["rendered_entities"] = int(default(q["count"], 0))
+    world["render"]["stats"]["mesh_registry_size"] = len(keys(world["registries"]["mesh_by_id"]))
+    world["render"]["stats"]["material_registry_size"] = len(keys(world["registries"]["material_by_id"]))
+    world["render"]["stats"]["texture_registry_size"] = len(keys(default(world["texture_registry"]["texture_by_id"], {})))
+    world["render"]["stats"]["lighting_hash"] = _ecs_lighting_hash_string(_ecs_world_get_lighting(world))
+    world["render"]["stats"]["batch_sizes"] = []
+    world["locks"]["render_prep"] = false
+    world["locks"]["registry_write"] = false
+}
+def _ecs_world_run_render_prep(world) { _ecs_system_render_prep(world, 0.0) }
+def _ecs_world_render(world, gfx) {
+    if (gfx == null) { return 0 }
+    world["locks"]["registry_write"] = true
+    let n = int(default(world["render"]["count"], 0))
+    let rq = world["render"]["commands"]
+    let unique = {}
+    let batch_calls = 0
+    let batch_sizes = []
+    let batch_size = 0
+    let draws = 0
+    let last_batch = ""
+    let i = 0
+    while (i < n) {
+        let c = rq[i]
+        let mesh = _ecs_registry_get_mesh(world, c["mesh_id"])
+        let mat = _ecs_registry_get_material(world, c["material_id"])
+        if (mesh == null || mat == null) { i = i + 1; continue }
+        let mat_id = str(default(c["material_id"], "default"))
+        let tex_id = str(default(c["texture_id"], ""))
+        let batch_key = mat_id + "|" + tex_id
+        if (!has(unique, mat_id)) { unique[mat_id] = 1 }
+        if (i == 0 || batch_key != last_batch) {
+            if (batch_size > 0) { batch_sizes = push(batch_sizes, batch_size) }
+            batch_calls = batch_calls + 1
+            last_batch = batch_key
+            batch_size = 0
+        }
+        let sc = default(c["screen"], {})
+        let t = default(c["transform"], mat4["identity"]())
+        let sx = abs(float(default(t[0], 1.0)))
+        let sy = abs(float(default(t[5], 1.0)))
+        let prim = str(default(mesh["primitive_type"], "quad"))
+        let base_w = prim == "cube" ? 48 : prim == "indexed" ? 42 : 40
+        let base_h = base_w
+        let zoom = float(default(default(world["render"]["camera"], {})["zoom"], 1.0))
+        let w = int(float(base_w) * max(1.0, sx) * zoom)
+        let h = int(float(base_h) * max(1.0, sy) * zoom)
+        let color = default(mat["color"], vec3["one"]())
+        let r = int(float(default(color["x"], 1.0)) * 255.0)
+        let g = int(float(default(color["y"], 1.0)) * 255.0)
+        let b = int(float(default(color["z"], 1.0)) * 255.0)
+        gfx["rect"](int(default(sc["x"], 0)), int(default(sc["y"], 0)), w, h, r, g, b, 255)
+        batch_size = batch_size + 1
+        draws = draws + 1
+        i = i + 1
+    }
+    if (batch_size > 0) { batch_sizes = push(batch_sizes, batch_size) }
+    world["render"]["stats"]["draw_calls"] = draws
+    world["render"]["stats"]["batched_draw_calls"] = batch_calls
+    world["render"]["stats"]["unique_materials"] = len(keys(unique))
+    world["render"]["stats"]["mesh_registry_size"] = len(keys(world["registries"]["mesh_by_id"]))
+    world["render"]["stats"]["material_registry_size"] = len(keys(world["registries"]["material_by_id"]))
+    world["render"]["stats"]["texture_registry_size"] = len(keys(default(world["texture_registry"]["texture_by_id"], {})))
+    world["render"]["stats"]["lighting_hash"] = _ecs_lighting_hash_string(_ecs_world_get_lighting(world))
+    world["render"]["stats"]["batch_sizes"] = batch_sizes
+    world["locks"]["registry_write"] = false
+    return draws
+}
+def _ecs_world_render_stats(world) { return default(world["render"]["stats"], {"command_count": 0, "draw_calls": 0, "batched_draw_calls": 0, "unique_materials": 0, "rendered_entities": 0, "mesh_registry_size": 0, "material_registry_size": 0, "texture_registry_size": 0, "lighting_hash": "", "batch_sizes": []}) }
+def _ecs_system_builtin_fn(name) {
+    let n = str(default(name, ""))
+    if (n == "input") { return _ecs_system_input }
+    if (n == "simulation") { return _ecs_system_simulation }
+    if (n == "transform_propagation") { return _ecs_system_transform_propagation }
+    if (n == "rendering_prep") { return _ecs_system_render_prep }
+    return null
+}
+def _ecs_scheduler_stage_index(world, stage_name) {
+    let stages = default(world["systems"]["stage_order"], [])
+    let s = str(default(stage_name, ""))
+    let i = 0
+    while (i < len(stages)) { if (str(default(stages[i], "")) == s) { return i }; i = i + 1 }
+    return -1
+}
+def _ecs_world_stage_order(world) { return default(default(world["systems"], {})["stage_order"], []) }
+def _ecs_scheduler_system_stage(world, system_name) {
+    let n = str(default(system_name, ""))
+    if (has(default(world["systems"], {})["stage"], n)) { return str(default(world["systems"]["stage"][n], "")) }
+    return ""
+}
+def _ecs_scheduler_valid_stage(world, stage_name) { return _ecs_scheduler_stage_index(world, stage_name) >= 0 }
+def _ecs_world_register_system(world, stage, name, system_fn, after_names, options) {
+    let sys = world["systems"]
+    let st = str(default(stage, "POST_SIMULATION"))
+    let n = str(default(name, ""))
+    if (len(n) == 0 || system_fn == null) { return false }
+    if (!_ecs_scheduler_valid_stage(world, st)) { return false }
+    if (_ecs_system_builtin_fn(n) != null) { return false }
+    sys["custom"][n] = system_fn
+    sys["stage"][n] = st
+    let opt = default(options, {})
+    sys["custom_meta"][n] = {"write_mask": default(opt["write_mask"], null), "allow_structural_mutation": _ecs_as_bool(default(opt["allow_structural_mutation"], false))}
+    if (!has(sys["custom_order"], n)) { sys["custom_order"] = push(default(sys["custom_order"], []), n) }
+    sys["deps"][n] = default(after_names, [])
+    sys["dirty"] = true
+    return true
+}
+def _ecs_world_unregister_system(world, name) {
+    let sys = world["systems"]
+    let n = str(default(name, ""))
+    if (len(n) == 0) { return false }
+    sys["custom"][n] = null
+    sys["stage"][n] = ""
+    sys["custom_meta"][n] = {}
+    sys["deps"][n] = []
+    sys["dirty"] = true
+    return true
+}
+def _ecs_world_set_stage_policy(world, stage, policy) {
+    let st = str(default(stage, ""))
+    if (!_ecs_scheduler_valid_stage(world, st)) { return false }
+    let p = default(policy, {})
+    world["systems"]["stage_policy"][st] = {"allow_structural_mutation": _ecs_as_bool(default(p["allow_structural_mutation"], false)), "allowed_writes": default(p["allowed_writes"], [])}
+    world["systems"]["dirty"] = true
+    return true
+}
+def _ecs_world_register_system_spec(world, spec) {
+    let s = default(spec, {})
+    let name = str(default(s["name"], ""))
+    let stage = str(default(s["stage"], "POST_SIMULATION"))
+    let after = default(s["after"], [])
+    let run_fn = s["run"]
+    if (len(name) == 0 || run_fn == null) { return false }
+    let query_sig = default(s["query"], [])
+    let wrapped = lambda (w, dt) => {
+        let q = null
+        if (len(default(query_sig, [])) > 0) { q = _ecs_world_query(w, query_sig) }
+        return run_fn(w, dt, q)
+    }
+    let opts = {}
+    opts["write_mask"] = default(s["write"], null)
+    opts["allow_structural_mutation"] = _ecs_as_bool(default(s["allow_structural_mutation"], false))
+    return _ecs_world_register_system(world, stage, name, wrapped, after, opts)
+}
+def _ecs_world_resolve_system_order(world) {
+    let sys = world["systems"]
+    let names = []
+    let pipeline = default(sys["pipeline"], [])
+    let i = 0
+    while (i < len(pipeline)) { names = push(names, str(default(pipeline[i], ""))); i = i + 1 }
+    i = 0
+    let custom_order = default(sys["custom_order"], [])
+    while (i < len(custom_order)) {
+        let n = str(default(custom_order[i], ""))
+        if (len(n) > 0 && sys["custom"][n] != null) { names = push(names, n) }
+        i = i + 1
+    }
+    let name_set = {}
+    i = 0
+    while (i < len(names)) { name_set[names[i]] = 1; i = i + 1 }
+    let resolved = []
+    let done = {}
+    let progress = true
+    while (len(resolved) < len(names)) {
+        if (!progress) {
+            if (_ecs_debug_enabled()) { _ecs_error("system scheduler dependency cycle or stage boundary violation detected") }
+            i = 0
+            while (i < len(names)) { if (!has(done, names[i])) { resolved = push(resolved, names[i]); done[names[i]] = 1 }; i = i + 1 }
+            continue
+        }
+        progress = false
+        i = 0
+        while (i < len(names)) {
+            let n = names[i]
+            if (has(done, n)) { i = i + 1; continue }
+            let deps = default(sys["deps"][n], [])
+            let ok = true
+            let j = 0
+            while (j < len(deps)) {
+                let d = str(default(deps[j], ""))
+                if (has(name_set, d)) {
+                    let s_dep = _ecs_scheduler_system_stage(world, d)
+                    let s_cur = _ecs_scheduler_system_stage(world, n)
+                    if (_ecs_scheduler_stage_index(world, s_dep) > _ecs_scheduler_stage_index(world, s_cur)) { ok = false; j = len(deps) }
+                    else {
+                        if (!has(done, d)) { ok = false; j = len(deps) }
+                        else { j = j + 1 }
+                    }
+                } else { j = j + 1 }
+            }
+            if (ok) { resolved = push(resolved, n); done[n] = 1; progress = true }
+            i = i + 1
+        }
+    }
+    sys["resolved"] = resolved
+    sys["dirty"] = false
+    return resolved
+}
+def _ecs_world_system_order(world) {
+    let sys = world["systems"]
+    let d = sys["dirty"]
+    if (d == null || _ecs_as_bool(d)) { return _ecs_world_resolve_system_order(world) }
+    return default(sys["resolved"], [])
+}
+def _ecs_world_system_effective_policy(world, system_name) {
+    let n = str(default(system_name, ""))
+    let stage = _ecs_scheduler_system_stage(world, n)
+    let stage_policy = default(default(world["systems"]["stage_policy"], {})[stage], {"allow_structural_mutation": false, "allowed_writes": []})
+    let writes = default(stage_policy["allowed_writes"], [])
+    let structural = _ecs_as_bool(default(stage_policy["allow_structural_mutation"], false))
+    if (_ecs_system_builtin_fn(n) == null) {
+        let meta = default(default(world["systems"]["custom_meta"], {})[n], {})
+        if (meta["write_mask"] != null) { writes = default(meta["write_mask"], []) }
+        if (_ecs_as_bool(default(meta["allow_structural_mutation"], false))) { structural = true }
+    }
+    return {"stage": stage, "writes": writes, "allow_structural_mutation": structural}
+}
+def _ecs_world_system_graph(world) {
+    let order = _ecs_world_system_order(world)
+    let sys = world["systems"]
+    let graph = {}
+    graph["stages"] = default(sys["stage_order"], [])
+    graph["execution_order"] = order
+    graph["edges"] = []
+    graph["systems"] = {}
+    let i = 0
+    while (i < len(order)) {
+        let n = str(default(order[i], ""))
+        let deps = default(sys["deps"][n], [])
+        let eff = _ecs_world_system_effective_policy(world, n)
+        graph["systems"][n] = {"name": n, "stage": eff["stage"], "after": deps, "writes": eff["writes"], "allow_structural_mutation": eff["allow_structural_mutation"], "builtin": _ecs_system_builtin_fn(n) != null}
+        let j = 0
+        while (j < len(deps)) {
+            let d = str(default(deps[j], ""))
+            if (len(d) > 0) { graph["edges"] = push(default(graph["edges"], []), {"from": d, "to": n}) }
+            j = j + 1
+        }
+        i = i + 1
+    }
+    return graph
+}
+def _ecs_list_has_string(arr, value) {
+    let a = default(arr, [])
+    let v = str(default(value, ""))
+    let i = 0
+    while (i < len(a)) {
+        if (str(default(a[i], "")) == v) { return true }
+        i = i + 1
+    }
+    return false
+}
+def _ecs_list_overlap(a, b) {
+    let aa = default(a, [])
+    let bb = default(b, [])
+    let i = 0
+    while (i < len(aa)) {
+        if (_ecs_list_has_string(bb, aa[i])) { return true }
+        i = i + 1
+    }
+    return false
+}
+def _ecs_list_intersection(a, b) {
+    let aa = default(a, [])
+    let bb = default(b, [])
+    let out = []
+    let i = 0
+    while (i < len(aa)) {
+        let v = str(default(aa[i], ""))
+        if (_ecs_list_has_string(bb, v) && !_ecs_list_has_string(out, v)) { out = push(out, v) }
+        i = i + 1
+    }
+    return out
+}
+def _ecs_rank_map_from_list(items) {
+    let out = {}
+    let arr = default(items, [])
+    let i = 0
+    while (i < len(arr)) { out[str(default(arr[i], ""))] = i; i = i + 1 }
+    return out
+}
+def _ecs_sort_strings_by_rank(values, rank_map) {
+    let arr = default(values, [])
+    let out = []
+    let i = 0
+    while (i < len(arr)) { out = push(out, str(default(arr[i], ""))); i = i + 1 }
+    i = 1
+    while (i < len(out)) {
+        let key = out[i]
+        let key_rank = int(default(default(rank_map, {})[key], 999999))
+        let j = i - 1
+        while (j >= 0 && int(default(default(rank_map, {})[str(default(out[j], ""))], 999999)) > key_rank) {
+            out[j + 1] = out[j]
+            j = j - 1
+        }
+        out[j + 1] = key
+        i = i + 1
+    }
+    return out
+}
+def _ecs_edge_type_rank(edge_type) {
+    let t = str(default(edge_type, ""))
+    if (t == "dependency") { return 0 }
+    if (t == "write_conflict") { return 1 }
+    return 9
+}
+def _ecs_sorted_edges_by_rank(edges, system_rank, stage_rank) {
+    let out = []
+    let src = default(edges, [])
+    let i = 0
+    while (i < len(src)) { out = push(out, default(src[i], {})); i = i + 1 }
+    i = 1
+    while (i < len(out)) {
+        let key = out[i]
+        let kt = _ecs_edge_type_rank(default(key["type"], ""))
+        let kf = int(default(default(system_rank, {})[str(default(key["from"], ""))], 999999))
+        let kto = int(default(default(system_rank, {})[str(default(key["to"], ""))], 999999))
+        let ks = int(default(default(stage_rank, {})[str(default(key["stage"], ""))], 999999))
+        let j = i - 1
+        while (j >= 0) {
+            let cur = default(out[j], {})
+            let ct = _ecs_edge_type_rank(default(cur["type"], ""))
+            let cf = int(default(default(system_rank, {})[str(default(cur["from"], ""))], 999999))
+            let cto = int(default(default(system_rank, {})[str(default(cur["to"], ""))], 999999))
+            let cs = int(default(default(stage_rank, {})[str(default(cur["stage"], ""))], 999999))
+            let move = false
+            if (ct > kt) { move = true }
+            else {
+                if (ct == kt && cf > kf) { move = true }
+                else {
+                    if (ct == kt && cf == kf && cto > kto) { move = true }
+                    else {
+                        if (ct == kt && cf == kf && cto == kto && cs > ks) { move = true }
+                    }
+                }
+            }
+            if (!move) { j = -1 } else {
+                out[j + 1] = out[j]
+                j = j - 1
+            }
+        }
+        out[j + 1] = key
+        i = i + 1
+    }
+    return out
+}
+def _ecs_dep_contains(dep_arr, name) { return _ecs_list_has_string(default(dep_arr, []), str(default(name, ""))) }
+def _ecs_world_scheduler_parallel_plan(world) {
+    let order = _ecs_world_system_order(world)
+    let stages = _ecs_world_stage_order(world)
+    let sys = world["systems"]
+    let plan = {"stages": [], "flat_batches": [], "notes": ["dry_run_only", "no_threads_started", "conflict_rule:dependency_or_write_overlap"], "systems": {}}
+    let si = 0
+    while (si < len(stages)) {
+        let stage_name = str(default(stages[si], ""))
+        let stage_systems = []
+        let oi = 0
+        while (oi < len(order)) {
+            let n = str(default(order[oi], ""))
+            if (_ecs_scheduler_system_stage(world, n) == stage_name) { stage_systems = push(stage_systems, n) }
+            oi = oi + 1
+        }
+        let batches = []
+        let conflicts = []
+        let pi = 0
+        while (pi < len(stage_systems)) {
+            let n = str(default(stage_systems[pi], ""))
+            let eff = _ecs_world_system_effective_policy(world, n)
+            plan["systems"][n] = {"stage": stage_name, "writes": default(eff["writes"], []), "allow_structural_mutation": _ecs_as_bool(default(eff["allow_structural_mutation"], false))}
+            let placed = false
+            let bi = 0
+            while (bi < len(batches) && !placed) {
+                let batch = default(batches[bi], [])
+                let conflict = false
+                let bj = 0
+                while (bj < len(batch)) {
+                    let m = str(default(batch[bj], ""))
+                    let em = _ecs_world_system_effective_policy(world, m)
+                    let dep_nm = _ecs_dep_contains(default(sys["deps"][n], []), m) || _ecs_dep_contains(default(sys["deps"][m], []), n)
+                    if (dep_nm || _ecs_list_overlap(default(eff["writes"], []), default(em["writes"], []))) {
+                        conflict = true
+                        conflicts = push(conflicts, {"a": n, "b": m, "reason": dep_nm ? "dependency" : "write_overlap"})
+                        bj = len(batch)
+                    } else { bj = bj + 1 }
+                }
+                if (!conflict) {
+                    batches[bi] = push(batch, n)
+                    placed = true
+                }
+                bi = bi + 1
+            }
+            if (!placed) { batches = push(batches, [n]) }
+            pi = pi + 1
+        }
+        let splan = {"stage": stage_name, "systems": stage_systems, "batches": batches, "conflicts": conflicts}
+        plan["stages"] = push(default(plan["stages"], []), splan)
+        let fb = 0
+        while (fb < len(batches)) {
+            plan["flat_batches"] = push(default(plan["flat_batches"], []), {"stage": stage_name, "batch_index": fb, "systems": default(batches[fb], [])})
+            fb = fb + 1
+        }
+        si = si + 1
+    }
+    return plan
+}
+def _ecs_world_scheduler_conflict_graph(world) {
+    let order = _ecs_world_system_order(world)
+    let stages = _ecs_world_stage_order(world)
+    let sys = world["systems"]
+    let graph = {"nodes": {}, "edges": [], "stage_batches": [], "notes": ["deterministic", "dependency_edges_global", "write_conflict_edges_stage_local"]}
+    let nameset = {}
+    let i = 0
+    while (i < len(order)) { nameset[str(default(order[i], ""))] = 1; i = i + 1 }
+
+    i = 0
+    while (i < len(order)) {
+        let n = str(default(order[i], ""))
+        let eff = _ecs_world_system_effective_policy(world, n)
+        graph["nodes"][n] = {"stage": eff["stage"], "writes": default(eff["writes"], []), "structural": _ecs_as_bool(default(eff["allow_structural_mutation"], false)), "builtin": _ecs_system_builtin_fn(n) != null}
+        i = i + 1
+    }
+
+    i = 0
+    while (i < len(order)) {
+        let to = str(default(order[i], ""))
+        let deps = default(sys["deps"][to], [])
+        let j = 0
+        while (j < len(deps)) {
+            let src_name = str(default(deps[j], ""))
+            if (has(nameset, src_name)) {
+                graph["edges"] = push(default(graph["edges"], []), {"from": src_name, "to": to, "type": "dependency", "reason": "dependency: " + src_name + " -> " + to})
+            }
+            j = j + 1
+        }
+        i = i + 1
+    }
+
+    let si = 0
+    while (si < len(stages)) {
+        let stage_name = str(default(stages[si], ""))
+        let stage_systems = []
+        i = 0
+        while (i < len(order)) {
+            let n = str(default(order[i], ""))
+            if (_ecs_scheduler_system_stage(world, n) == stage_name) { stage_systems = push(stage_systems, n) }
+            i = i + 1
+        }
+        let batches = []
+        i = 0
+        while (i < len(stage_systems)) {
+            let a = str(default(stage_systems[i], ""))
+            let ea = _ecs_world_system_effective_policy(world, a)
+            let placed = false
+            let bi = 0
+            while (bi < len(batches) && !placed) {
+                let batch = default(batches[bi], [])
+                let conflict = false
+                let bj = 0
+                while (bj < len(batch)) {
+                    let b = str(default(batch[bj], ""))
+                    let eb = _ecs_world_system_effective_policy(world, b)
+                    let dep_ab = _ecs_dep_contains(default(sys["deps"][a], []), b)
+                    let dep_ba = _ecs_dep_contains(default(sys["deps"][b], []), a)
+                    let overlap = _ecs_list_intersection(default(ea["writes"], []), default(eb["writes"], []))
+                    if (dep_ab || dep_ba || len(overlap) > 0) {
+                        conflict = true
+                        let reason = dep_ab || dep_ba ? "dependency" : "write_overlap: " + json_stringify(overlap)
+                        graph["edges"] = push(default(graph["edges"], []), {"from": b, "to": a, "type": "write_conflict", "stage": stage_name, "reason": reason})
+                        bj = len(batch)
+                    } else { bj = bj + 1 }
+                }
+                if (!conflict) { batches[bi] = push(batch, a); placed = true }
+                bi = bi + 1
+            }
+            if (!placed) { batches = push(batches, [a]) }
+            i = i + 1
+        }
+        graph["stage_batches"] = push(default(graph["stage_batches"], []), {"stage": stage_name, "batches": batches})
+        si = si + 1
+    }
+    return graph
+}
+def _ecs_world_scheduler_conflict_graph_normalized(world) {
+    let g = _ecs_world_scheduler_conflict_graph(world)
+    let n = {"nodes": {}, "edges": [], "stage_batches": [], "notes": default(g["notes"], [])}
+
+    let system_order = _ecs_world_system_order(world)
+    let system_rank = _ecs_rank_map_from_list(system_order)
+    let stage_order = _ecs_world_stage_order(world)
+    let stage_rank = _ecs_rank_map_from_list(stage_order)
+    let write_rank = _ecs_rank_map_from_list(["input", "velocity", "transform", "mesh", "material", "registry", "render"])
+
+    let names = _ecs_sort_strings_by_rank(keys(default(g["nodes"], {})), system_rank)
+    let i = 0
+    while (i < len(names)) {
+        let name = str(default(names[i], ""))
+        let node = default(default(g["nodes"], {})[name], {})
+        n["nodes"][name] = {"stage": str(default(node["stage"], "")), "writes": _ecs_sort_strings_by_rank(default(node["writes"], []), write_rank), "structural": _ecs_as_bool(default(node["structural"], false)), "builtin": _ecs_as_bool(default(node["builtin"], false))}
+        i = i + 1
+    }
+
+    n["edges"] = default(g["edges"], [])
+
+    let sb = default(g["stage_batches"], [])
+    i = 0
+    while (i < len(stage_order)) {
+        let stage_name = str(default(stage_order[i], ""))
+        let batches = []
+        let sbi = 0
+        while (sbi < len(sb)) {
+            let s = default(sb[sbi], {})
+            if (str(default(s["stage"], "")) == stage_name) { batches = default(s["batches"], []); sbi = len(sb) } else { sbi = sbi + 1 }
+        }
+        let nb = []
+        let bi = 0
+        while (bi < len(batches)) {
+            nb = push(nb, _ecs_sort_strings_by_rank(default(batches[bi], []), system_rank))
+            bi = bi + 1
+        }
+        n["stage_batches"] = push(default(n["stage_batches"], []), {"stage": stage_name, "batches": nb})
+        i = i + 1
+    }
+    return n
+}
+def _ecs_world_scheduler_conflict_graph_hash(world) {
+    let normalized = _ecs_world_scheduler_conflict_graph_normalized(world)
+    let payload = json_stringify(normalized)
+    let stage_hashes = {}
+    let batch_hashes = {}
+    let stages = _ecs_world_stage_order(world)
+    let nodes = default(normalized["nodes"], {})
+    let edges = default(normalized["edges"], [])
+    let batches = default(normalized["stage_batches"], [])
+    let si = 0
+    while (si < len(stages)) {
+        let stage_name = str(default(stages[si], ""))
+        let stage_nodes = {}
+        let node_names = _ecs_sort_strings_by_rank(keys(nodes), _ecs_rank_map_from_list(_ecs_world_system_order(world)))
+        let ni = 0
+        while (ni < len(node_names)) {
+            let n = str(default(node_names[ni], ""))
+            let node = default(nodes[n], {})
+            if (str(default(node["stage"], "")) == stage_name) { stage_nodes[n] = node }
+            ni = ni + 1
+        }
+        let stage_edges = []
+        let ei = 0
+        while (ei < len(edges)) {
+            let e = default(edges[ei], {})
+            let src = str(default(e["from"], ""))
+            let to = str(default(e["to"], ""))
+            let src_stage = str(default(default(nodes[src], {})["stage"], ""))
+            let to_stage = str(default(default(nodes[to], {})["stage"], ""))
+            if (str(default(e["stage"], "")) == stage_name || (src_stage == stage_name && to_stage == stage_name)) { stage_edges = push(stage_edges, e) }
+            ei = ei + 1
+        }
+        let stage_batches = []
+        let bi = 0
+        while (bi < len(batches)) {
+            let b = default(batches[bi], {})
+            if (str(default(b["stage"], "")) == stage_name) {
+                stage_batches = default(b["batches"], [])
+                bi = len(batches)
+            } else { bi = bi + 1 }
+        }
+        let stage_payload = {"stage": stage_name, "nodes": stage_nodes, "edges": stage_edges, "batches": stage_batches}
+        stage_hashes[stage_name] = sha256(json_stringify(stage_payload))
+
+        let stage_batch_hashes = []
+        bi = 0
+        while (bi < len(stage_batches)) {
+            let systems = default(stage_batches[bi], [])
+            let batch_nodes = {}
+            ni = 0
+            while (ni < len(systems)) {
+                let sn = str(default(systems[ni], ""))
+                if (has(stage_nodes, sn)) { batch_nodes[sn] = stage_nodes[sn] }
+                ni = ni + 1
+            }
+            let batch_edges = []
+            ei = 0
+            while (ei < len(stage_edges)) {
+                let e = default(stage_edges[ei], {})
+                let src = str(default(e["from"], ""))
+                let to = str(default(e["to"], ""))
+                if (_ecs_list_has_string(systems, src) && _ecs_list_has_string(systems, to)) { batch_edges = push(batch_edges, e) }
+                ei = ei + 1
+            }
+            let batch_payload = {"stage": stage_name, "batch_id": bi, "systems": systems, "nodes": batch_nodes, "edges": batch_edges}
+            stage_batch_hashes = push(stage_batch_hashes, {"batch_id": bi, "hash": sha256(json_stringify(batch_payload))})
+            bi = bi + 1
+        }
+        batch_hashes[stage_name] = stage_batch_hashes
+        si = si + 1
+    }
+    return {"hash": sha256(payload), "stage_hashes": stage_hashes, "batch_hashes": batch_hashes, "normalized": normalized}
+}
+def _ecs_world_debug_print_conflict_graph(world) {
+    let g = _ecs_world_scheduler_conflict_graph(world)
+    print("ecs.conflict_graph: " + json_stringify(g))
+    return g
+}
+def _ecs_world_debug_print_graph(world) {
+    let g = _ecs_world_system_graph(world)
+    print("ecs.system_graph: " + json_stringify(g))
+    return g
+}
+def _ecs_world_run_fixed_pipeline(world, fixed_dt) {
+    let order = _ecs_world_system_order(world)
+    world["systems"]["current_stage"] = ""
+    world["systems"]["current_system"] = ""
+    let i = 0
+    while (i < len(order)) {
+        let n = str(default(order[i], ""))
+        world["systems"]["current_system"] = n
+        world["systems"]["current_stage"] = _ecs_scheduler_system_stage(world, n)
+        let system_fn = _ecs_system_builtin_fn(n)
+        if (system_fn == null) { system_fn = world["systems"]["custom"][n] }
+        if (system_fn != null) { system_fn(world, fixed_dt) }
+        i = i + 1
+    }
+    world["systems"]["current_stage"] = ""
+    world["systems"]["current_system"] = ""
+}
+def _ecs_world_run_fixed_pipeline_parallel(world, fixed_dt) {
+    let plan = _ecs_world_scheduler_parallel_plan(world)
+    let stages = default(plan["stages"], [])
+    let sysstats = world["systems"]["parallel_runtime_stats"]
+    sysstats["enabled"] = true
+    sysstats["mode"] = "parallel"
+    sysstats["policy_preset"] = "manual"
+    sysstats["stages_executed"] = 0
+    sysstats["batches_executed"] = 0
+    sysstats["parallel_batches_executed"] = 0
+    sysstats["systems_executed"] = 0
+    sysstats["stage_parallel_ratio"] = 0.0
+    sysstats["parallel_speedup_estimate"] = 1.0
+    sysstats["auto_serial_stages"] = 0
+    sysstats["auto_parallel_stages"] = 0
+    sysstats["policy_decisions"] = []
+    let planned_parallel_systems = 0
+    let si = 0
+    world["systems"]["current_stage"] = ""
+    world["systems"]["current_system"] = ""
+    while (si < len(stages)) {
+        let s = default(stages[si], {})
+        let stage_name = str(default(s["stage"], ""))
+        let batches = default(s["batches"], [])
+        if (len(batches) > 0) { sysstats["stages_executed"] = int(default(sysstats["stages_executed"], 0)) + 1 }
+        let bi = 0
+        while (bi < len(batches)) {
+            let batch = default(batches[bi], [])
+            world["systems"]["current_stage"] = stage_name
+            sysstats["batches_executed"] = int(default(sysstats["batches_executed"], 0)) + 1
+            if (len(batch) > 1) {
+                sysstats["parallel_batches_executed"] = int(default(sysstats["parallel_batches_executed"], 0)) + 1
+                planned_parallel_systems = planned_parallel_systems + len(batch)
+            }
+            let bj = 0
+            while (bj < len(batch)) {
+                let n = str(default(batch[bj], ""))
+                world["systems"]["current_system"] = n
+                let system_fn = _ecs_system_builtin_fn(n)
+                if (system_fn == null) { system_fn = world["systems"]["custom"][n] }
+                if (system_fn != null) {
+                    system_fn(world, fixed_dt)
+                    sysstats["systems_executed"] = int(default(sysstats["systems_executed"], 0)) + 1
+                }
+                bj = bj + 1
+            }
+            bi = bi + 1
+        }
+        si = si + 1
+    }
+    let total_batches = int(default(sysstats["batches_executed"], 0))
+    if (total_batches > 0) { sysstats["stage_parallel_ratio"] = float(default(sysstats["parallel_batches_executed"], 0)) / float(total_batches) }
+    let systems_executed = int(default(sysstats["systems_executed"], 0))
+    if (systems_executed > 0) {
+        let serial_units = float(systems_executed)
+        let parallel_units = serial_units - float(default(planned_parallel_systems, 0)) + float(default(sysstats["parallel_batches_executed"], 0))
+        if (parallel_units > 0.0) { sysstats["parallel_speedup_estimate"] = serial_units / parallel_units }
+    }
+    world["systems"]["current_stage"] = ""
+    world["systems"]["current_system"] = ""
+}
+def _ecs_scheduler_policy_from_name(name) {
+    let n = str(default(name, "balanced"))
+    if (n == "safe") { return {"name": "safe", "min_systems_for_parallel": 6, "min_parallel_ratio": 0.80, "allow_render_prep_parallel": false} }
+    if (n == "aggressive") { return {"name": "aggressive", "min_systems_for_parallel": 1, "min_parallel_ratio": 0.0, "allow_render_prep_parallel": true} }
+    return {"name": "balanced", "min_systems_for_parallel": 2, "min_parallel_ratio": 0.34, "allow_render_prep_parallel": false}
+}
+def _ecs_world_set_scheduler_policy(world, preset_name) {
+    let pol = _ecs_scheduler_policy_from_name(preset_name)
+    world["systems"]["auto_policy"] = pol
+    world["systems"]["auto_policy_preset"] = str(default(pol["name"], "balanced"))
+    return pol
+}
+def _ecs_world_get_scheduler_policy(world) { return default(default(world["systems"], {})["auto_policy"], _ecs_scheduler_policy_from_name(default(default(world["systems"], {})["auto_policy_preset"], "balanced"))) }
+def _ecs_world_run_fixed_pipeline_auto(world, fixed_dt, policy) {
+    let plan = _ecs_world_scheduler_parallel_plan(world)
+    let stages = default(plan["stages"], [])
+    let pol = null
+    let preset = "custom"
+    if (policy == null) {
+        pol = _ecs_world_get_scheduler_policy(world)
+        preset = str(default(pol["name"], "balanced"))
+    } else {
+        let p_name = str(default(policy, ""))
+        if (p_name == "safe" || p_name == "balanced" || p_name == "aggressive") {
+            pol = _ecs_scheduler_policy_from_name(p_name)
+            preset = p_name
+        } else { pol = default(policy, {}) }
+    }
+    let min_systems = int(default(pol["min_systems_for_parallel"], 2))
+    if (min_systems < 1) { min_systems = 1 }
+    let min_ratio = float(default(pol["min_parallel_ratio"], 0.34))
+    if (min_ratio < 0.0) { min_ratio = 0.0 }
+    if (min_ratio > 1.0) { min_ratio = 1.0 }
+    let allow_render = _ecs_as_bool(default(pol["allow_render_prep_parallel"], false))
+
+    let sysstats = world["systems"]["parallel_runtime_stats"]
+    sysstats["enabled"] = true
+    sysstats["mode"] = "auto"
+    sysstats["policy_preset"] = preset
+    sysstats["stages_executed"] = 0
+    sysstats["batches_executed"] = 0
+    sysstats["parallel_batches_executed"] = 0
+    sysstats["systems_executed"] = 0
+    sysstats["stage_parallel_ratio"] = 0.0
+    sysstats["parallel_speedup_estimate"] = 1.0
+    sysstats["auto_serial_stages"] = 0
+    sysstats["auto_parallel_stages"] = 0
+    sysstats["policy_decisions"] = []
+
+    let serial_units = 0.0
+    let parallel_units = 0.0
+    let si = 0
+    world["systems"]["current_stage"] = ""
+    world["systems"]["current_system"] = ""
+    while (si < len(stages)) {
+        let s = default(stages[si], {})
+        let stage_name = str(default(s["stage"], ""))
+        let systems = default(s["systems"], [])
+        let batches = default(s["batches"], [])
+        let par_batches = 0
+        let bi = 0
+        while (bi < len(batches)) { if (len(default(batches[bi], [])) > 1) { par_batches = par_batches + 1 }; bi = bi + 1 }
+        let stage_ratio = 0.0
+        if (len(batches) > 0) { stage_ratio = float(par_batches) / float(len(batches)) }
+
+        let choose_parallel = true
+        let reason = "parallel"
+        if (len(systems) < min_systems) { choose_parallel = false; reason = "serial:min_systems" }
+        if (choose_parallel && stage_ratio < min_ratio) { choose_parallel = false; reason = "serial:min_parallel_ratio" }
+        if (choose_parallel && stage_name == "RENDER_PREP" && !allow_render) { choose_parallel = false; reason = "serial:render_prep_policy" }
+        if (choose_parallel && len(batches) == 0) { choose_parallel = false; reason = "serial:no_batches" }
+        if (len(systems) == 0) { choose_parallel = false; reason = "serial:no_systems" }
+        sysstats["policy_decisions"] = push(default(sysstats["policy_decisions"], []), {"stage": stage_name, "mode": choose_parallel ? "parallel" : "serial", "reason": reason, "systems": len(systems), "batches": len(batches), "parallel_ratio": stage_ratio, "policy_preset": preset})
+
+        if (len(systems) > 0) {
+            sysstats["stages_executed"] = int(default(sysstats["stages_executed"], 0)) + 1
+            if (choose_parallel) { sysstats["auto_parallel_stages"] = int(default(sysstats["auto_parallel_stages"], 0)) + 1 }
+            else { sysstats["auto_serial_stages"] = int(default(sysstats["auto_serial_stages"], 0)) + 1 }
+        }
+
+        if (choose_parallel) {
+            bi = 0
+            while (bi < len(batches)) {
+                let batch = default(batches[bi], [])
+                world["systems"]["current_stage"] = stage_name
+                sysstats["batches_executed"] = int(default(sysstats["batches_executed"], 0)) + 1
+                serial_units = serial_units + float(len(batch))
+                if (len(batch) > 1) {
+                    sysstats["parallel_batches_executed"] = int(default(sysstats["parallel_batches_executed"], 0)) + 1
+                    parallel_units = parallel_units + 1.0
+                } else { parallel_units = parallel_units + float(len(batch)) }
+                let bj = 0
+                while (bj < len(batch)) {
+                    let n = str(default(batch[bj], ""))
+                    world["systems"]["current_system"] = n
+                    let system_fn = _ecs_system_builtin_fn(n)
+                    if (system_fn == null) { system_fn = world["systems"]["custom"][n] }
+                    if (system_fn != null) {
+                        system_fn(world, fixed_dt)
+                        sysstats["systems_executed"] = int(default(sysstats["systems_executed"], 0)) + 1
+                    }
+                    bj = bj + 1
+                }
+                bi = bi + 1
+            }
+        } else {
+            world["systems"]["current_stage"] = stage_name
+            sysstats["batches_executed"] = int(default(sysstats["batches_executed"], 0)) + 1
+            serial_units = serial_units + float(len(systems))
+            parallel_units = parallel_units + float(len(systems))
+            let xi = 0
+            while (xi < len(systems)) {
+                let n = str(default(systems[xi], ""))
+                world["systems"]["current_system"] = n
+                let system_fn = _ecs_system_builtin_fn(n)
+                if (system_fn == null) { system_fn = world["systems"]["custom"][n] }
+                if (system_fn != null) {
+                    system_fn(world, fixed_dt)
+                    sysstats["systems_executed"] = int(default(sysstats["systems_executed"], 0)) + 1
+                }
+                xi = xi + 1
+            }
+        }
+        si = si + 1
+    }
+    let stages_executed = int(default(sysstats["stages_executed"], 0))
+    if (stages_executed > 0) { sysstats["stage_parallel_ratio"] = float(default(sysstats["auto_parallel_stages"], 0)) / float(stages_executed) }
+    if (parallel_units > 0.0) { sysstats["parallel_speedup_estimate"] = serial_units / parallel_units }
+    world["systems"]["current_stage"] = ""
+    world["systems"]["current_system"] = ""
+}
+def _ecs_world_parallel_runtime_stats(world) { return default(default(world["systems"], {})["parallel_runtime_stats"], {"enabled": false, "mode": "serial", "policy_preset": "balanced", "stages_executed": 0, "batches_executed": 0, "parallel_batches_executed": 0, "systems_executed": 0, "stage_parallel_ratio": 0.0, "parallel_speedup_estimate": 1.0, "auto_serial_stages": 0, "auto_parallel_stages": 0, "policy_decisions": []}) }
+def _ecs_world_entity_count(world) { return int(default(world["entities"]["entity_count"], 0)) }
+def _ecs_world_transform_count(world) { return int(default(world["components"]["transform"]["count"], 0)) }
+def _ecs_world_velocity_count(world) { return int(default(world["components"]["velocity"]["count"], 0)) }
+def _ecs_world_mesh_count(world) { return int(default(world["components"]["mesh"]["count"], 0)) }
+def _ecs_world_material_count(world) { return int(default(world["components"]["material"]["count"], 0)) }
+def _ecs_world_mesh_registry_size(world) { return len(keys(world["registries"]["mesh_by_id"])) }
+def _ecs_world_material_registry_size(world) { return len(keys(world["registries"]["material_by_id"])) }
+def _ecs_world_texture_registry_size(world) { return len(keys(default(world["texture_registry"]["texture_by_id"], {}))) }
+def _ecs_world_set_registry_write_lock(world, enabled) { if (!_ecs_require_write_allowed(world, "registry", "world_set_registry_write_lock")) { return false }; world["locks"]["registry_write"] = _ecs_as_bool(default(enabled, false)); return world["locks"]["registry_write"] }
+def _ecs_world_register_mesh(world, mesh) {
+    if (!_ecs_require_structural_allowed(world, "world_register_mesh")) { return "" }
+    if (!_ecs_require_write_allowed(world, "registry", "world_register_mesh")) { return "" }
+    let hid = _ecs_registry_register_mesh(world, mesh)
+    if (str(default(hid, "")) == "") { return "" }
+    return hid
+}
+def _ecs_world_register_material(world, material) {
+    if (!_ecs_require_structural_allowed(world, "world_register_material")) { return "" }
+    if (!_ecs_require_write_allowed(world, "registry", "world_register_material")) { return "" }
+    let hid = _ecs_registry_register_material(world, material)
+    if (str(default(hid, "")) == "") { return "" }
+    return hid
+}
+def _ecs_world_register_texture(world, texture) {
+    if (!_ecs_require_structural_allowed(world, "world_register_texture")) { return "" }
+    if (!_ecs_require_write_allowed(world, "registry", "world_register_texture")) { return "" }
+    let hid = _ecs_registry_register_texture(world, texture)
+    if (str(default(hid, "")) == "") { return "" }
+    return hid
+}
+def _ecs_set_debug(enabled) { _ECS_CFG["debug"] = _ecs_as_bool(default(enabled, false)); return _ECS_CFG["debug"] }
+def _ecs_set_logging(enabled) { _ECS_CFG["logging"] = _ecs_as_bool(default(enabled, false)); return _ECS_CFG["logging"] }
+def _ecs_config() { return _ECS_CFG }
+
+def _ecs_spec() {
+    return {"ecs_model": "hybrid_strict_data_core", "entity_id": "index_generation", "storage": "soa_dense_sparse", "pipeline": ["input", "simulation", "transform_propagation", "rendering_prep"], "scheduler": "registered_systems_dependency_order", "transform_hierarchy": "parent_first_child_next_sibling_dirty_propagation", "input": "world_input held_keys pressed_keys released_keys", "registry_ids": "append_only_no_reuse"}
+}
+
+let ecs = {"spec": _ecs_spec, "config": _ecs_config, "set_debug": _ecs_set_debug, "set_logging": _ecs_set_logging, "entity_null": _ecs_eid_null, "transform_make": _ecs_transform_make, "velocity_make": _ecs_velocity_make, "mesh_make": _ecs_mesh_make, "mesh_make_quad": _ecs_mesh_make_quad, "mesh_make_cube": _ecs_mesh_make_cube, "mesh_make_from_obj": _ecs_mesh_make_from_obj, "material_make": _ecs_material_make, "texture_make": _ecs_texture_make, "camera_make": _ecs_camera_build, "world_create": _ecs_world_create, "world_create_entity": _ecs_world_create_entity, "world_destroy_entity": _ecs_world_destroy_entity, "world_is_alive": _ecs_world_is_alive, "world_entity_count": _ecs_world_entity_count, "world_transform_count": _ecs_world_transform_count, "world_velocity_count": _ecs_world_velocity_count, "world_mesh_count": _ecs_world_mesh_count, "world_material_count": _ecs_world_material_count, "world_mesh_registry_size": _ecs_world_mesh_registry_size, "world_material_registry_size": _ecs_world_material_registry_size, "world_texture_registry_size": _ecs_world_texture_registry_size, "world_set_registry_write_lock": _ecs_world_set_registry_write_lock, "world_register_mesh": _ecs_world_register_mesh, "world_register_material": _ecs_world_register_material, "world_register_texture": _ecs_world_register_texture, "world_input_get": _ecs_world_input_get, "world_input_feed": _ecs_world_input_feed, "input_key_held": _ecs_input_key_held, "input_key_pressed": _ecs_input_key_pressed, "input_key_released": _ecs_input_key_released, "world_add_transform": _ecs_world_add_transform, "world_add_velocity": _ecs_world_add_velocity, "world_add_mesh": _ecs_world_add_mesh, "world_add_material": _ecs_world_add_material, "world_add_mesh_handle": _ecs_world_add_mesh_handle, "world_add_material_handle": _ecs_world_add_material_handle, "world_get_transform": _ecs_world_get_transform, "world_get_velocity": _ecs_world_get_velocity, "world_get_mesh": _ecs_world_get_mesh, "world_get_material": _ecs_world_get_material, "world_resolve_mesh": _ecs_world_resolve_mesh, "world_resolve_material": _ecs_world_resolve_material, "world_has_transform": _ecs_world_has_transform, "world_has_velocity": _ecs_world_has_velocity, "world_has_mesh": _ecs_world_has_mesh, "world_has_material": _ecs_world_has_material, "world_remove_transform": _ecs_world_remove_transform, "world_remove_velocity": _ecs_world_remove_velocity, "world_remove_mesh": _ecs_world_remove_mesh, "world_remove_material": _ecs_world_remove_material, "world_query": _ecs_world_query, "world_query_transform": _ecs_world_query_transform, "world_query_transform_velocity": _ecs_world_query_transform_velocity, "world_query_renderables": _ecs_world_query_renderables, "world_set_parent": _ecs_world_set_parent, "world_mark_dirty": _ecs_world_mark_dirty, "world_stage_order": _ecs_world_stage_order, "world_set_stage_policy": _ecs_world_set_stage_policy, "world_register_system": _ecs_world_register_system, "world_register_system_spec": _ecs_world_register_system_spec, "world_unregister_system": _ecs_world_unregister_system, "world_system_order": _ecs_world_system_order, "world_system_graph": _ecs_world_system_graph, "world_scheduler_parallel_plan": _ecs_world_scheduler_parallel_plan, "world_scheduler_conflict_graph": _ecs_world_scheduler_conflict_graph, "world_scheduler_conflict_graph_normalized": _ecs_world_scheduler_conflict_graph_normalized, "world_scheduler_conflict_graph_hash": _ecs_world_scheduler_conflict_graph_hash, "world_debug_print_graph": _ecs_world_debug_print_graph, "world_debug_print_conflict_graph": _ecs_world_debug_print_conflict_graph, "world_set_scheduler_policy": _ecs_world_set_scheduler_policy, "world_get_scheduler_policy": _ecs_world_get_scheduler_policy, "world_run_fixed_pipeline": _ecs_world_run_fixed_pipeline, "world_run_fixed_pipeline_parallel": _ecs_world_run_fixed_pipeline_parallel, "world_run_fixed_pipeline_auto": _ecs_world_run_fixed_pipeline_auto, "world_parallel_runtime_stats": _ecs_world_parallel_runtime_stats, "world_set_camera": _ecs_world_set_camera, "world_get_camera": _ecs_world_get_camera, "world_get_lighting": _ecs_world_get_lighting, "world_set_lighting": _ecs_world_set_lighting, "world_run_render_prep": _ecs_world_run_render_prep, "world_render": _ecs_world_render, "world_render_stats": _ecs_world_render_stats}
+
+def conventions() { return CONVENTIONS }
+def version() { return VERSION }

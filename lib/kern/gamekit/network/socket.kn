@@ -1,0 +1,35 @@
+// gamekit networking wrappers
+
+net = import("net")
+
+def http_get_text(url) {
+    if (net == null || !has(net, "http_get")) {
+        return {"ok": false, "error": "net.http_get unavailable"}
+    }
+    try {
+        let body = net.http_get(url)
+        return {"ok": true, "status": 200, "body": body}
+    } catch (e) {
+        return {"ok": false, "status": -1, "error": error_message(e)}
+    }
+}
+
+def url_encode_text(s) {
+    if (net == null || !has(net, "url_encode")) { return str(s) }
+    return net.url_encode(str(s))
+}
+
+def url_decode_text(s) {
+    if (net == null || !has(net, "url_decode")) { return str(s) }
+    return net.url_decode(str(s))
+}
+
+def connect(ip, port) {
+    // compatibility API for future socket implementation.
+    let out = {}
+    out["ok"] = true
+    out["mode"] = "http"
+    out["endpoint"] = str(ip) + ":" + str(port)
+    out["note"] = "Use http_get_text for request/response networking in current runtime"
+    return out
+}

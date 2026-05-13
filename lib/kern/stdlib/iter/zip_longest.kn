@@ -1,0 +1,28 @@
+// Zip arrays to shortest or pad with fill to longest.
+// import("lib/kern/stdlib/iter/zip_longest.kn")
+
+def zip_shortest(a, b) {
+    let n = len(a)
+    if (len(b) < n) { n = len(b) }
+    let out = array()
+    let i = 0
+    while (i < n) {
+        push(out, array(a[i], b[i]))
+        i = i + 1
+    }
+    return out
+}
+
+def zip_longest(a, b, fill) {
+    let n = len(a)
+    if (len(b) > n) { n = len(b) }
+    let out = array()
+    let i = 0
+    while (i < n) {
+        let x = i < len(a) ? a[i] : fill
+        let y = i < len(b) ? b[i] : fill
+        push(out, array(x, y))
+        i = i + 1
+    }
+    return out
+}

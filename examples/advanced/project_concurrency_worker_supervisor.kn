@@ -1,0 +1,10 @@
+concurrency = import("concurrency")
+
+print("supervisor pid:", concurrency.getpid())
+print("available cores:", concurrency.cpu_count())
+
+h = concurrency.spawn(["cmd", "/c", "ping 127.0.0.1 -n 2 >nul"])
+st = concurrency.wait_process(h, 10000)
+
+print("worker exited:", st.exited)
+print("worker code:", st.code)

@@ -1,0 +1,58 @@
+// File processing: read, process, write
+
+print("=== File Processing Demo ===")
+
+// Create a test file
+let test_file = "test_data.txt"
+let content = "Line 1: Hello, Kern!\nLine 2: This is a test.\nLine 3: File processing demo.\n"
+
+// Write to file
+let fd = file_open_write(test_file)
+file_write_string(fd, content)
+file_close(fd)
+print("Created test file:", test_file)
+
+// Read and process file line by line
+let read_fd = file_open_read(test_file)
+let line_num = 1
+let total_chars = 0
+let word_count = 0
+
+// Read all content
+let all_content = file_read_string(read_fd)
+file_close(read_fd)
+
+print("File content:")
+print(all_content)
+
+// Count lines, words, characters
+for i in range(0, len(all_content)) {
+    let c = char_at(all_content, i)
+    total_chars = total_chars + 1
+    if (c == "\n") {
+        line_num = line_num + 1
+    }
+}
+
+print("Total lines:", line_num)
+print("Total characters:", total_chars)
+
+// Append to file
+let append_fd = file_open_append(test_file)
+file_write_string(append_fd, "Line 4: Appended line.\n")
+file_close(append_fd)
+print("Appended to file")
+
+// Read updated content
+let final_fd = file_open_read(test_file)
+let final_content = file_read_string(final_fd)
+file_close(final_fd)
+
+print("Final content:")
+print(final_content)
+
+// Cleanup
+file_delete(test_file)
+print("Deleted test file")
+
+print("=== File processing demo complete ===")

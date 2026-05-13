@@ -1,0 +1,67 @@
+// 3dengine Ursina-style example - Rotating Cube
+// Minimal boilerplate, immediate-mode 3D
+
+// Import Ursina-style API
+let e = import("3dengine")
+let u = e["ursina"]
+
+// Create app (automatically creates world, camera, lighting)
+let app = u["App"]()
+
+// Create entities with immediate-mode syntax
+let cube = u["Entity"](app, {"model": "cube", "color": [1.0, 0.2, 0.2], "position": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0]})
+
+let ground = u["Entity"](app, {"model": "plane", "color": [0.3, 0.5, 0.3], "position": [0.0, -1.0, 0.0], "scale": [10.0, 1.0, 10.0]})
+
+// Another cube that will rotate differently
+let cube2 = u["Entity"](app, {"model": "cube", "color": [0.2, 0.2, 1.0], "position": [2.0, 0.5, -2.0], "scale": [0.5, 0.5, 0.5]})
+
+print("Created 3 entities")
+print("  Cube (red) at origin")
+print("  Ground (green) below")
+print("  Small cube (blue) offset")
+
+// Define update function (auto-registered by engine)
+// In full implementation, this would be called every frame
+def update(dt) {
+    // Rotate the main cube
+    let currentRot = u["entity_get_rotation"](cube)
+    if (currentRot != null && len(currentRot) >= 3) {
+        u["entity_set_rotation"](cube, [
+            currentRot[0],
+            currentRot[1] + 50.0 * dt,
+            currentRot[2]
+        ])
+    }
+    
+    // Make small cube bob up and down
+    let pos = u["entity_get_position"](cube2)
+    if (pos != null && len(pos) >= 3) {
+        let time = float(time())
+        let newY = 0.5 + sin(time * 2.0) * 0.3
+        u["entity_set_position"](cube2, [pos[0], newY, pos[2]])
+    }
+    
+    // Check for input
+    if (u["input"]["is_key_down"]("w")) {
+        print("W key is down!")
+    }
+}
+
+// In full implementation, the engine would automatically:
+// 1. Register update() as a system in SIMULATION stage
+// 2. Call it every frame with dt
+// 3. Handle the render loop internally
+
+// Start the app (would run the main loop)
+// u["run"](app)  // or app.run()
+
+print("")
+print("=== Ursina-Style Cube Example ===")
+print("This demonstrates minimal-boilerplate 3D with 3dengine")
+print("In full implementation, this would run a rotating cube scene")
+print("")
+print("Entities created:")
+print("  cube: " + str(cube))
+print("  ground: " + str(ground))
+print("  cube2: " + str(cube2))

@@ -1,0 +1,11 @@
+// Must fail at runtime: max call depth exceeded. The CLI raises the default above VM::maxCallDepth_
+// (see main.cpp); this test calls set_max_call_depth(1024) so the limit is deterministic.
+// Tail-call frame reuse is disabled when a depth limit is set, so `return 1 + rec(n-1)` cannot bypass it.
+set_max_call_depth(1024)
+def rec(n) {
+    if (n <= 0) {
+        return 0
+    }
+    return 1 + rec(n - 1)
+}
+rec(1100)

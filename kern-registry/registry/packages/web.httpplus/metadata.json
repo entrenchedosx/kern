@@ -1,0 +1,14 @@
+{
+  "name": "web.httpplus",
+  "description": "Resilient HTTP helpers with retries, timeouts, and JSON parsing.",
+  "trusted": false,
+  "latest": "1.0.1",
+  "versions": {
+    "1.0.0": {
+      "manifest": "versions/1.0.0.json"
+    },
+    "1.0.1": {
+      "manifest": "versions/1.0.1.json"
+    }
+  }
+}

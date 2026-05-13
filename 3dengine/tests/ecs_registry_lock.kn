@@ -1,0 +1,14 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let w = ecs["world_create"]()
+ecs["world_set_registry_write_lock"](w, true)
+let bad = ecs["world_register_mesh"](w, ecs["mesh_make"]("cube"))
+if (str(bad) != "") { panic("ecs_registry_lock: register should fail while registry_write locked") }
+ecs["world_set_registry_write_lock"](w, false)
+let ok = ecs["world_register_mesh"](w, ecs["mesh_make"]("cube"))
+if (str(default(ok, "")) == "") { panic("ecs_registry_lock: register should succeed after unlock") }
+
+print("ecs_registry_lock: ok")

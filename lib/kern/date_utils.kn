@@ -1,0 +1,28 @@
+// kern date/time helpers — import("lib/kern/date_utils.kn")
+// format_ts, elapsed_sec, elapsed_str, now_iso (uses time, time_format)
+
+def now_iso() {
+    return time_format("%Y-%m-%d %H:%M:%S", time())
+}
+
+def format_ts(ts, fmt) {
+    return time_format(fmt, ts)
+}
+
+def elapsed_sec(t0) {
+    return time() - t0
+}
+
+def elapsed_str(t0) {
+    let s = elapsed_sec(t0)
+    if (s < 60) { return str(s) + "s" }
+    if (s < 3600) { return str(int(s / 60)) + "m " + str(int(s % 60)) + "s" }
+    let h = int(s / 3600)
+    let m = int((s % 3600) / 60)
+    let sec = int(s % 60)
+    return str(h) + "h " + str(m) + "m " + str(sec) + "s"
+}
+
+def timestamp() {
+    return time()
+}

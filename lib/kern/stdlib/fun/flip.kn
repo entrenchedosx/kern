@@ -1,0 +1,6 @@
+// flip(f) returns a function that swaps first two arguments.
+// import("lib/kern/stdlib/fun/flip.kn")
+
+def flip(f) {
+    return lambda (a, b) => f(b, a)
+}

@@ -1,0 +1,34 @@
+// safe device abstraction layer (host-independent, capability-gated).
+
+caps = import("lib/kern/runtime/modern/capabilities.kn")
+
+def list(policy, kind) {
+    caps.require(policy, "devices.list")
+    let k = lower(str(kind))
+    if (k == "audio") {
+        let d = {}
+        d["id"] = "audio.default"
+        d["name"] = "Default Audio Device"
+        d["kind"] = "audio"
+        return [d]
+    }
+    if (k == "display") {
+        let d = {}
+        d["id"] = "display.main"
+        d["name"] = "Primary Display"
+        d["kind"] = "display"
+        return [d]
+    }
+    if (k == "input") {
+        let a = {}
+        a["id"] = "input.keyboard"
+        a["name"] = "Keyboard"
+        a["kind"] = "input"
+        let b = {}
+        b["id"] = "input.mouse"
+        b["name"] = "Mouse"
+        b["kind"] = "input"
+        return [a, b]
+    }
+    return []
+}

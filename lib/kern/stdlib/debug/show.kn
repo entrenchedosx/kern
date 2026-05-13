@@ -1,0 +1,30 @@
+// Shallow human-readable rendering for debugging.
+// import("lib/kern/stdlib/debug/show.kn")
+
+def show_val(x) {
+    let t = type(x)
+    if (t == "array") {
+        let s = "["
+        let i = 0
+        while (i < len(x)) {
+            if (i > 0) { s = s + ", " }
+            s = s + show_val(x[i])
+            i = i + 1
+        }
+        return s + "]"
+    }
+    if (t == "map") {
+        let ks = keys(x)
+        sort(ks)
+        let s = "{"
+        let i = 0
+        while (i < len(ks)) {
+            if (i > 0) { s = s + ", " }
+            let k = ks[i]
+            s = s + str(k) + ": " + show_val(x[k])
+            i = i + 1
+        }
+        return s + "}"
+    }
+    return str(x)
+}

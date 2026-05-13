@@ -1,0 +1,15 @@
+{
+  "format": "secure_vault_v1",
+  "created_at": 1775405952,
+  "updated_at": 1775405952,
+  "master_key_hash": "bd0516bb6fd7a9aa0bfead17c622e8d792ad13cfa3f27e3c803771a244a40f91",
+  "entries": [
+    {
+      "name": "github",
+      "created_at": 1775405952,
+      "username": "alice@example.com",
+      "password_sig": "1db5aaa01bad45b4c5e20fc043cf45cb1049e43ca9c6df0e251afdd2bb9e48bd",
+      "password_cipher": "CgkDKwAKTAkVAQpyHwoSCA8="
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+# Kern Project Rules
+
+## Project Overview
+* This project is the C++ backend and virtual machine for **Kern** (or Kerncode), a newly released and experimental programming language. 
+* **DO NOT** hallucinate Kern syntax based on older languages. Rely strictly on the documentation and source files within this repository.
+
+## C++ Architectural Rules
+* **Encapsulation:** Pay strict attention to access modifiers. (e.g., Value factory methods must be correctly exposed, not left private).
+* Do not rewrite entire files unless requested. Provide targeted C++ fixes.
+
+## Navigation
+* The core virtual machine logic is generally located in files like `vm.cpp`.
+* Value structures and factories are located in files like `value.hpp`.

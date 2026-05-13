@@ -1,0 +1,34 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+let vec3 = import("src/math/vec3.kn")
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let w = ecs["world_create"]()
+let e = ecs["world_create_entity"](w)
+ecs["world_add_transform"](w, e, ecs["transform_make"](vec3["zero"](), null, null))
+ecs["world_add_velocity"](w, e, ecs["velocity_make"](vec3["make"](5, 0, 0)))
+w["spec_seen_count"] = 0
+w["spec_ran"] = false
+
+let sys_run = lambda (world, dt, q) => {
+    world["spec_ran"] = true
+    let qq = default(q, {"count": 0})
+    world["spec_seen_count"] = int(default(qq["count"], 0))
+}
+
+let spec = {}
+spec["name"] = "spec.system"
+spec["stage"] = "POST_SIMULATION"
+spec["after"] = ["simulation"]
+spec["query"] = ["transform", "velocity"]
+spec["write"] = ["transform"]
+spec["run"] = sys_run
+
+if (!ecs["world_register_system_spec"](w, spec)) { panic("ecs_system_spec: register spec failed") }
+ecs["world_run_fixed_pipeline"](w, 1.0 / 60.0)
+
+if (!default(w["spec_ran"], false)) { panic("ecs_system_spec: run callback not executed") }
+if (int(default(w["spec_seen_count"], 0)) != 1) { panic("ecs_system_spec: expected one row in auto-query") }
+
+print("ecs_system_spec: ok")

@@ -1,0 +1,23 @@
+// Angle wrapping (degrees and radians) without float `%` (VM `%` is integer-only).
+// import("lib/kern/stdlib/math/angles.kn")
+
+def deg_norm360(d) {
+    let x = float(d)
+    while (x >= 360.0) { x = x - 360.0 }
+    while (x < 0) { x = x + 360.0 }
+    return x
+}
+
+def deg_norm180(d) {
+    let x = deg_norm360(d)
+    if (x > 180.0) { x = x - 360.0 }
+    return x
+}
+
+def rad_norm_tau(r) {
+    let two_pi = 2.0 * PI
+    let x = float(r)
+    while (x >= two_pi) { x = x - two_pi }
+    while (x < 0) { x = x + two_pi }
+    return x
+}

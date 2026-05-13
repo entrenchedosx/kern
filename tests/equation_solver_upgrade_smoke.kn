@@ -1,0 +1,20 @@
+// Extended smoke for equation_solver upgrades — kern tests/equation_solver_upgrade_smoke.kn
+import("lib/kern/testing.kn")
+
+let ES = import("lib/kern/math/equation_solver.kn")
+let solve = ES["solve_linear_equation"]
+let solveQ = ES["solve_quadratic_equation"]
+let fmt = ES["format_solution"]
+
+assert_eq(solve("3x + = 5")["ok"], false, "syntax trailing +")
+assert_eq(solve("2(x+3)=10")["ok"], true, "2(x+3)=10")
+assert_eq(abs(solve("2(x+3)=10")["x"] - 2.0) < 0.0001, true, "2(x+3)=10 value")
+assert_eq(solve("(2*x+3)/2=5")["ok"], true, "fraction")
+assert_eq(solve("5*x-2*x+4=2*x+3")["ok"], true, "many terms")
+assert_eq(abs(solve("5*x-2*x+4=2*x+3")["x"] + 1.0) < 0.0001, true, "many terms value")
+
+let q = solveQ("x^2+5*x+6=0")
+assert_eq(q["ok"], true, "quad ok")
+assert_eq(q["kind"], "two", "quad two roots")
+
+print("equation_solver_upgrade_smoke: ok")

@@ -1,0 +1,5 @@
+let cfgm = import("sys.config")
+let result = cfgm["load"]({ "API_URL": "https://dev.api" }, "", "APP_", ["API_URL"])
+if (!result["ok"]) { panic("config load failed: " + result["error"]) }
+let cfg = result["value"]
+print("API_URL=" + str(cfgm["get"](cfg, "API_URL", "missing")))

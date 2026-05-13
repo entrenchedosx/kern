@@ -1,0 +1,34 @@
+// minimal kernel-style Kern program.
+// compiles with: kernc --target kernel examples/oskit_minimal_kernel.kn -o dist/kernel.bin --freestanding
+
+screen = import("lib/kern/oskit/drivers/screen.kn")
+kernel = import("lib/kern/oskit/kernel/core.kn")
+threads = import("lib/kern/oskit/scheduler/threading.kn")
+ints = import("lib/kern/oskit/interrupts/idt.kn")
+paging = import("lib/kern/oskit/memory/paging.kn")
+fs = import("lib/kern/oskit/filesystem/vfs.kn")
+
+def worker_a() {
+    screen.print("thread A tick")
+}
+
+def worker_b() {
+    screen.print("thread B tick")
+}
+
+kernel.boot_banner()
+screen.print("Hello from Kern kernel")
+screen.print("Initializing paging + IDT + scheduler")
+
+paging.map_page(4096, 4096, 3)
+ints.install_defaults(kernel)
+threads.create(worker_a, 1)
+threads.create(worker_b, 2)
+threads.run_round_robin(2)
+
+fs.mkdir("/etc")
+fs.write("/etc/kernel.conf", "name=kern-os")
+screen.print("vfs file: " + fs.read("/etc/kernel.conf"))
+
+
+

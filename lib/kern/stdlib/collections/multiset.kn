@@ -1,0 +1,39 @@
+// Multiset (bag) counts — string keys via str() for non-string elements.
+// import("lib/kern/stdlib/collections/multiset.kn")
+
+def mset_new() {
+    return {}
+}
+
+def mset_add(m, x) {
+    let k = str(x)
+    if (has(m, k)) { m[k] = m[k] + 1 }
+    else { m[k] = 1 }
+}
+
+def mset_remove(m, x) {
+    let k = str(x)
+    if (!has(m, k)) { return false }
+    if (m[k] <= 1) {
+        // delete key — Kern may lack delete; zero out
+        m[k] = 0
+    }
+    else { m[k] = m[k] - 1 }
+    return true
+}
+
+def mset_count(m, x) {
+    let k = str(x)
+    if (!has(m, k)) { return 0 }
+    return m[k]
+}
+
+def mset_total(m) {
+    let t = 0
+    for k in keys(m) { t = t + m[k] }
+    return t
+}
+
+def mset_unique(m) {
+    return len(keys(m))
+}

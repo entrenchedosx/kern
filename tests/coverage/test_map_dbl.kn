@@ -1,0 +1,6 @@
+def dbl(x) {
+    return x * 2
+}
+let out = map([5, 6], dbl)
+print(len(out))
+print(out[0])

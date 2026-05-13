@@ -1,0 +1,31 @@
+// Parse an argv token array: flags ( -x ), long flags ( --name ), and positional args.
+// import("lib/kern/stdlib/sys/argv_parse.kn")
+
+def argv_parse(tokens) {
+    let flags = {}
+    let positionals = array()
+    let i = 0
+    while (i < len(tokens)) {
+        let t = tokens[i]
+        if (starts_with(t, "--")) {
+            let name = slice(t, 2, len(t))
+            if (len(name) == 0) { i = i + 1; continue }
+            flags[name] = true
+        }
+        else {
+            if (starts_with(t, "-") and len(t) > 1) {
+                let j = 1
+                while (j < len(t)) {
+                    let c = slice(t, j, j + 1)
+                    flags[c] = true
+                    j = j + 1
+                }
+            }
+            else {
+                push(positionals, t)
+            }
+        }
+        i = i + 1
+    }
+    return { "flags": flags, "args": positionals }
+}

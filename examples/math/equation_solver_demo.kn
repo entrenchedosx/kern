@@ -1,0 +1,100 @@
+// Interactive equation solver (variable x). Run from repo root:
+//   kern examples/math/equation_solver_demo.kn
+// One-shot (equation is the 3rd CLI arg after the script path):
+//   kern examples/math/equation_solver_demo.kn "2*x+3=11"
+
+let ES = import("lib/kern/math/equation_solver.kn")
+let solveLin = ES["solve_linear_equation"]
+let solveLinSteps = ES["solve_linear_equation_with_steps"]
+let solveQuad = ES["solve_quadratic_equation"]
+let fmt = ES["format_solution"]
+let fmtV = ES["format_solution_verbose"]
+
+let mode = "linear"
+let steps_on = false
+
+def _needs_quadratic(eq) {
+    let e = lower(eq)
+    let i = 0
+    while (i < len(e)) {
+        if (e[i] == "^") { return true }
+        i = i + 1
+    }
+    return false
+}
+
+def run_solve(eq) {
+    let use_q = _needs_quadratic(eq) or mode == "quad"
+    if (use_q) {
+        let r = solveQuad(eq)
+        if (steps_on) {
+            print(fmtV(r))
+        }
+        else {
+            print(fmt(r))
+        }
+    }
+    else {
+        if (steps_on) {
+            let r = solveLinSteps(eq)
+            print(fmtV(r))
+        }
+        else {
+            print(fmt(solveLin(eq)))
+        }
+    }
+}
+
+// cli_args: [executable, script.kn, ...extras]
+let args = cli_args()
+if (len(args) > 2) {
+    run_solve(args[2])
+}
+else {
+    print("Kern equation solver - variable x (linear & quadratic)")
+    print("Commands: help | clear | steps on | steps off | mode linear | mode quad | quit")
+    while (true) {
+        let line = readline("eq> ")
+        if (line == null) { break }
+        line = trim(line)
+        if (len(line) == 0) { continue }
+        let low = lower(line)
+        if (low == "quit" or low == "exit") { break }
+        if (low == "help") {
+            print("Examples (linear):  2x+3=7   2(x+3)=10   (2*x+3)/2=5   5*x-2*x+4=2*x+3")
+            print("Examples (quad):    mode quad  then  x^2+5*x+6=0")
+            print("Special:            x+2=x+2 (infinite)   x+2=x+3 (no solution)")
+            print("Systems (2x+y=...): not supported - use x only for this demo.")
+            continue
+        }
+        if (low == "clear") {
+            let k = 0
+            while (k < 40) {
+                print("")
+                k = k + 1
+            }
+            continue
+        }
+        if (low == "steps on") {
+            steps_on = true
+            print("Step-by-step output: ON")
+            continue
+        }
+        if (low == "steps off") {
+            steps_on = false
+            print("Step-by-step output: OFF")
+            continue
+        }
+        if (low == "mode linear") {
+            mode = "linear"
+            print("Mode: linear (degree 1 in x)")
+            continue
+        }
+        if (low == "mode quad") {
+            mode = "quad"
+            print("Mode: quadratic (x^2, x, constants)")
+            continue
+        }
+        run_solve(line)
+    }
+}

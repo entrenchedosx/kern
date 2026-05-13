@@ -1,0 +1,57 @@
+// browserkit dom/query.kn
+
+def _matches(node, selector) {
+    if (node == null || node["type"] != "element") { return false }
+    let s = str(selector)
+    if (len(s) == 0) { return false }
+    if (starts_with(s, "#")) {
+        let id = slice(s, 1, len(s))
+        return has(node["attrs"], "id") && node["attrs"]["id"] == id
+    }
+    if (starts_with(s, ".")) {
+        let klass = slice(s, 1, len(s))
+        if (!has(node["attrs"], "class")) { return false }
+        let all = split(node["attrs"]["class"], " ")
+        let i = 0
+        while (i < len(all)) {
+            if (all[i] == klass) { return true }
+            i = i + 1
+        }
+        return false
+    }
+    return lower(node["tag"]) == lower(s)
+}
+
+def _dfs(node, selector, out) {
+    if (_matches(node, selector)) { push(out, node) }
+    let i = 0
+    while (i < len(node["children"])) {
+        _dfs(node["children"][i], selector, out)
+        i = i + 1
+    }
+}
+
+def query_all(root, selector) {
+    let out = []
+    if (root == null) { return out }
+    _dfs(root, selector, out)
+    return out
+}
+
+def query_one(root, selector) {
+    let arr = query_all(root, selector)
+    if (len(arr) == 0) { return null }
+    return arr[0]
+}
+
+def set_text(node, value) {
+    if (node == null) { return false }
+    node["text"] = str(value)
+    return true
+}
+
+def set_attr(node, key, value) {
+    if (node == null) { return false }
+    node["attrs"][key] = str(value)
+    return true
+}

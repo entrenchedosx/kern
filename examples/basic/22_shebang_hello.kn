@@ -1,0 +1,3 @@
+#!/usr/bin/env kern
+// On Linux/macOS: chmod +x 22_shebang_hello.kn  then  ./22_shebang_hello.kn
+print("Shebang-friendly Kern script")

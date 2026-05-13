@@ -1,0 +1,19 @@
+// small control helpers — import("lib/kern/flow.kn")
+// identity, tap, repeat_times
+
+def identity(x) {
+    return x
+}
+
+def tap(x, f) {
+    f(x)
+    return x
+}
+
+def repeat_times(n, f) {
+    let i = 0
+    while (i < n) {
+        f()
+        i = i + 1
+    }
+}

@@ -1,0 +1,30 @@
+// ROT13 for ASCII letters only; other characters unchanged.
+// import("lib/kern/stdlib/encoding/rot13.kn")
+
+def rot13_char(c) {
+    if (len(c) != 1) { return c }
+    let oa = ord("a")
+    let oz = ord("z")
+    let oA = ord("A")
+    let oZ = ord("Z")
+    let code = int(ord(c))
+    if (code >= oa and code <= oz) {
+        let o = int(int(code - oa + 13) % 26)
+        return chr(oa + o)
+    }
+    if (code >= oA and code <= oZ) {
+        let o = int(int(code - oA + 13) % 26)
+        return chr(oA + o)
+    }
+    return c
+}
+
+def rot13(s) {
+    let out = ""
+    let i = 0
+    while (i < len(s)) {
+        out = out + rot13_char(slice(s, i, i + 1))
+        i = i + 1
+    }
+    return out
+}

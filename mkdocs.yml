@@ -1,0 +1,56 @@
+# Browsable docs: pip install mkdocs && mkdocs serve
+# Published separately from CI by maintainers (optional GitHub Pages).
+
+site_name: Kern
+site_description: Kern language & toolchain documentation
+# Public site URL (GitHub Pages, etc.). Used by tools/generate_sitemap.py after `mkdocs build`.
+site_url: https://entrenchedosx.github.io/kern/
+repo_url: https://github.com/entrenchedosx/kern
+edit_uri: edit/main/docs/
+
+theme:
+  name: readthedocs
+  highlightjs: true
+  # Fixes invalid `id ="rtd-search-form"` from stock theme when rebuilding `site/`.
+  custom_dir: docs/overrides
+
+nav:
+  - Home: index.md
+  - Getting started: GETTING_STARTED.md
+  - Testing: TESTING.md
+  - Troubleshooting: TROUBLESHOOTING.md
+  - Language syntax: LANGUAGE_SYNTAX.md
+  - Standard library (std.v1): STDLIB_STD_V1.md
+  - Builtin reference: BUILTIN_REFERENCE.md
+  - Error codes: ERROR_CODES.md
+  - Trust model: TRUST_MODEL.md
+  - Networking & multiplayer: NETWORKING_MULTIPLAYER.md
+  - Adoption roadmap: ADOPTION_ROADMAP.md
+  - Internals:
+      - Overview: INTERNALS.md
+      - Repository architecture: INTERNALS_ARCHITECTURE.md
+      - Compiler and bytecode: INTERNALS_COMPILER_AND_BYTECODE.md
+      - Standalone EXE compile: STANDALONE_COMPILE_ARCHITECTURE.md
+      - Virtual machine: INTERNALS_VM.md
+      - Modules and security: INTERNALS_MODULES_AND_SECURITY.md
+  - More:
+      - Feature plan (20): FEATURE_PLAN_20.md
+      - Production vision: PRODUCTION_VISION.md
+      - Language roadmap: LANGUAGE_ROADMAP.md
+      - Memory model: MEMORY_MODEL.md
+      - Strict types: STRICT_TYPES.md
+      - Kern scan: KERN_SCAN.md
+      - Implementation summary: IMPLEMENTATION_SUMMARY.md
+      - Release checklist: RELEASE_CHECKLIST.md
+      - Stress tests plan: STRESS_TESTS_PLAN.md
+      - Nested kern tree removed: NESTED_KERN_TREE_REMOVED.md
+
+# Docs link to repo-root files (README, src/, RELEASE.md); those live outside docs_dir.
+validation:
+  links:
+    not_found: ignore
+    unrecognized_links: ignore
+
+markdown_extensions:
+  - toc:
+      permalink: true

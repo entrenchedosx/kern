@@ -1,0 +1,34 @@
+// gamekit physics helpers
+
+math3 = import("lib/kern/gamekit/math/vector.kn")
+
+def aabb(x, y, w, h) {
+    return {"x": x, "y": y, "w": w, "h": h}
+}
+
+def circle(x, y, r) {
+    return {"x": x, "y": y, "r": r}
+}
+
+def aabb_intersects(a, b) {
+    return a.x < (b.x + b.w) && (a.x + a.w) > b.x && a.y < (b.y + b.h) && (a.y + a.h) > b.y
+}
+
+def circle_intersects(a, b) {
+    let dx = a.x - b.x
+    let dy = a.y - b.y
+    let rr = a.r + b.r
+    return (dx * dx + dy * dy) <= rr * rr
+}
+
+def point_in_aabb(px, py, box) {
+    return px >= box.x && px <= (box.x + box.w) && py >= box.y && py <= (box.y + box.h)
+}
+
+def integrate_velocity(position, velocity, dt) {
+    return math3.vec2(position.x + velocity.x * dt, position.y + velocity.y * dt)
+}
+
+def apply_gravity(velocity, gravity, dt) {
+    return math3.vec2(velocity.x, velocity.y + gravity * dt)
+}

@@ -1,0 +1,7 @@
+start = now_ms()
+for i in range(0, 2000) {
+  m = import("math")
+}
+end = now_ms()
+print("import-cache-ms=" + (end - start))
+

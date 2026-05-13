@@ -1,0 +1,19 @@
+// Shallow dict merge with optional conflict resolution.
+// import("lib/kern/stdlib/data/dict_merge.kn")
+
+def dict_merge(base, extra) {
+    let out = {}
+    for k in keys(base) { out[k] = base[k] }
+    for k in keys(extra) { out[k] = extra[k] }
+    return out
+}
+
+def dict_merge_with(base, extra, resolve) {
+    let out = {}
+    for k in keys(base) { out[k] = base[k] }
+    for k in keys(extra) {
+        if (has(out, k)) { out[k] = resolve(k, out[k], extra[k]) }
+        else { out[k] = extra[k] }
+    }
+    return out
+}

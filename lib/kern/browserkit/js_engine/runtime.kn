@@ -1,0 +1,124 @@
+// browserkit js_engine/runtime.kn
+// jS-like runtime hooks: events, timers, DOM manipulation bridge.
+
+domq = import("lib/kern/browserkit/dom/query.kn")
+
+def create_context(dom_root) {
+    let ctx = {}
+    ctx["dom"] = dom_root
+    ctx["now_ms"] = 0
+    ctx["timers"] = []
+    ctx["next_timer_id"] = 1
+    ctx["events"] = {}
+    return ctx
+}
+
+def _mk_timer(id, due_ms, interval_ms, repeat_flag, callback) {
+    let t = {}
+    t["id"] = id
+    t["due_ms"] = due_ms
+    t["interval_ms"] = interval_ms
+    t["repeat"] = repeat_flag
+    t["fn"] = callback
+    t["cancelled"] = false
+    return t
+}
+
+def set_timeout(ctx, callback, delay_ms) {
+    let id = ctx["next_timer_id"]
+    ctx["next_timer_id"] = id + 1
+    let t = _mk_timer(id, ctx["now_ms"] + int(delay_ms), 0, false, callback)
+    push(ctx["timers"], t)
+    return id
+}
+
+def set_interval(ctx, callback, interval_ms) {
+    let id = ctx["next_timer_id"]
+    ctx["next_timer_id"] = id + 1
+    let t = _mk_timer(id, ctx["now_ms"] + int(interval_ms), int(interval_ms), true, callback)
+    push(ctx["timers"], t)
+    return id
+}
+
+def clear_timer(ctx, timer_id) {
+    let i = 0
+    while (i < len(ctx["timers"])) {
+        if (ctx["timers"][i]["id"] == timer_id) {
+            ctx["timers"][i]["cancelled"] = true
+            return true
+        }
+        i = i + 1
+    }
+    return false
+}
+
+def tick(ctx, dt_ms) {
+    ctx["now_ms"] = ctx["now_ms"] + int(dt_ms)
+    let i = 0
+    while (i < len(ctx["timers"])) {
+        let t = ctx["timers"][i]
+        if (!t["cancelled"] && ctx["now_ms"] >= t["due_ms"]) {
+            t["fn"]()
+            if (t["repeat"]) { t["due_ms"] = ctx["now_ms"] + t["interval_ms"] }
+            else { t["cancelled"] = true }
+            ctx["timers"][i] = t
+        }
+        i = i + 1
+    }
+}
+
+def on(ctx, event_name, handler) {
+    if (!has(ctx["events"], event_name)) { ctx["events"][event_name] = [] }
+    push(ctx["events"][event_name], handler)
+}
+
+def emit(ctx, event_name, event_obj) {
+    if (!has(ctx["events"], event_name)) { return 0 }
+    let handlers = ctx["events"][event_name]
+    let i = 0
+    while (i < len(handlers)) {
+        handlers[i](event_obj)
+        i = i + 1
+    }
+    return len(handlers)
+}
+
+def dom_set_text(ctx, selector, value) {
+    let node = domq.query_one(ctx["dom"], selector)
+    if (node == null) { return false }
+    let ok = domq.set_text(node, value)
+    if (ok) { return true }
+    return false
+}
+
+def dom_set_attr(ctx, selector, key, value) {
+    let node = domq.query_one(ctx["dom"], selector)
+    if (node == null) { return false }
+    let ok = domq.set_attr(node, key, value)
+    if (ok) { return true }
+    return false
+}
+
+def run_script_lines(ctx, lines) {
+    // tiny script format:
+    // log hello
+    // setText #title Welcome
+    let i = 0
+    while (i < len(lines)) {
+        let line = trim(lines[i])
+        if (line == "") { i = i + 1; continue }
+        if (starts_with(line, "log ")) {
+            print(slice(line, 4, len(line)))
+        } else {
+            if (starts_with(line, "setText ")) {
+                let p = split(line, " ")
+                if (len(p) >= 3) {
+                    let selector = p[1]
+                    let txt = join(slice(p, 2), " ")
+                    dom_set_text(ctx, selector, txt)
+                }
+            }
+        }
+        i = i + 1
+    }
+}

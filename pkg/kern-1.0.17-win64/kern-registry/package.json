@@ -1,0 +1,22 @@
+{
+  "name": "kern-registry",
+  "version": "1.0.17",
+  "private": true,
+  "description": "Production-grade package registry toolkit for Kern",
+  "type": "module",
+  "bin": {
+    "kern-pkg": "./cli/entry.js"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "scripts": {
+    "lint": "node ./cli/entry.js --help",
+    "test": "node --test ./cli/tests/*.test.js",
+    "server": "node ./server/index.js"
+  },
+  "dependencies": {
+    "semver": "^7.6.3",
+    "tar": "^7.4.3"
+  }
+}

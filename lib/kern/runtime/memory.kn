@@ -1,0 +1,63 @@
+// runtime/memory.kn
+// hosted + freestanding-friendly memory helpers.
+
+let _alloc_table = {}
+let _next_id = 1
+
+def alloc_bytes(size) {
+    let n = int(size)
+    if (n < 0) { n = 0 }
+    let id = _next_id
+    _next_id = _next_id + 1
+    _alloc_table[id] = { "size": n, "tag": "raw" }
+    return id
+}
+
+def free_bytes(ptr_id) {
+    if (has(_alloc_table, ptr_id)) {
+        _alloc_table[ptr_id] = null
+        return true
+    }
+    return false
+}
+
+def realloc_bytes(ptr_id, new_size) {
+    if (!has(_alloc_table, ptr_id)) { return alloc_bytes(new_size) }
+    if (_alloc_table[ptr_id] == null) { return alloc_bytes(new_size) }
+    _alloc_table[ptr_id]["size"] = int(new_size)
+    return ptr_id
+}
+
+def fill(ptr_id, byte_value) {
+    if (!has(_alloc_table, ptr_id)) { return false }
+    if (_alloc_table[ptr_id] == null) { return false }
+    _alloc_table[ptr_id]["fill"] = int(byte_value)
+    return true
+}
+
+def copy_region(dst_id, src_id, count) {
+    if (!has(_alloc_table, dst_id)) { return false }
+    if (!has(_alloc_table, src_id)) { return false }
+    if (_alloc_table[dst_id] == null) { return false }
+    if (_alloc_table[src_id] == null) { return false }
+    let dst = _alloc_table[dst_id]
+    dst["copied_from"] = src_id
+    dst["copied_bytes"] = int(count)
+    return true
+}
+
+def stats() {
+    let used = 0
+    let blocks = 0
+    let ks = keys(_alloc_table)
+    let i = 0
+    while (i < len(ks)) {
+        let k = ks[i]
+        if (_alloc_table[k] != null) {
+            used = used + int(_alloc_table[k]["size"])
+            blocks = blocks + 1
+        }
+        i = i + 1
+    }
+    return { "blocks": blocks, "bytes": used }
+}

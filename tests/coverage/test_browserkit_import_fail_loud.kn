@@ -1,0 +1,10 @@
+ok = false
+try {
+  import("lib/kern/browserkit/does_not_exist.kn")
+} catch (e) {
+  msg = error_message(e)
+  if (regex_match(msg, "IMP-RESOLVE")) { ok = true }
+}
+
+assert_eq(ok, true)
+print("test_browserkit_import_fail_loud: pass")

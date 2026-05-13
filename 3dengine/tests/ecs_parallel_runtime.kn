@@ -1,0 +1,40 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+let vec3 = import("src/math/vec3.kn")
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+def run_world(use_parallel) {
+    let w = ecs["world_create"]()
+    let e = ecs["world_create_entity"](w)
+    ecs["world_add_transform"](w, e, ecs["transform_make"](vec3["zero"](), null, null))
+    ecs["world_add_velocity"](w, e, ecs["velocity_make"](vec3["make"](2, 0, 0)))
+
+    let pass = lambda (world, dt) => { return null }
+    if (!ecs["world_register_system"](w, "POST_SIMULATION", "p.a", pass, [], {"write_mask": ["registry"]})) { panic("ecs_parallel_runtime: register p.a failed") }
+    if (!ecs["world_register_system"](w, "POST_SIMULATION", "p.b", pass, [], {"write_mask": ["render"]})) { panic("ecs_parallel_runtime: register p.b failed") }
+    if (!ecs["world_register_system"](w, "POST_SIMULATION", "p.c", pass, ["p.a"], {"write_mask": ["registry"]})) { panic("ecs_parallel_runtime: register p.c failed") }
+
+    let i = 0
+    while (i < 120) {
+        if (default(use_parallel, false)) { ecs["world_run_fixed_pipeline_parallel"](w, 1.0 / 60.0) }
+        else { ecs["world_run_fixed_pipeline"](w, 1.0 / 60.0) }
+        i = i + 1
+    }
+    let t = ecs["world_get_transform"](w, e)
+    let x = float(default(default(t, {})["local_position"]["x"], 0.0))
+    let stats = ecs["world_parallel_runtime_stats"](w)
+    return {"x": x, "stats": stats}
+}
+
+let serial = run_world(false)
+let parallel = run_world(true)
+
+if (float(default(serial["x"], 0.0)) != float(default(parallel["x"], 0.0))) { panic("ecs_parallel_runtime: serial and parallel results diverged") }
+
+let ps = default(parallel["stats"], {})
+if (!default(ps["enabled"], false)) { panic("ecs_parallel_runtime: parallel stats should indicate enabled run") }
+if (int(default(ps["parallel_batches_executed"], 0)) <= 0) { panic("ecs_parallel_runtime: expected at least one parallel-capable batch execution") }
+if (float(default(ps["parallel_speedup_estimate"], 0.0)) < 1.0) { panic("ecs_parallel_runtime: expected speedup estimate >= 1.0") }
+
+print("ecs_parallel_runtime: ok")

@@ -1,0 +1,32 @@
+runtime_mod = import("lib/kern/runtime/modern/module.kn")
+commands = import("lib/kern/runtime/modern/commands.kn")
+
+let state = {}
+state["after"] = 0
+state["attempts"] = 0
+
+@event("on_command", priority=100, retries=1, stop_on_error=true)
+def failing_listener(ctx, payload) {
+    state["attempts"] = int(state["attempts"]) + 1
+    throw Error("listener failed", "LISTENER-FAIL")
+}
+
+@event("on_command", priority=1)
+def after_listener(ctx, payload) {
+    state["after"] = int(state["after"]) + 1
+    return null
+}
+
+@command("cmd_stop_err")
+def cmd_stop_err(ctx, args) {
+    return "ok"
+}
+
+let rt = runtime_mod.create_runtime({})
+let named = {}
+let res = commands.run_command(rt["commands"], rt["events"], rt["ctx"], "cmd_stop_err", named)
+assert_eq(res["ok"], true)
+assert_eq(res["value"], "ok")
+assert_eq(state["attempts"], 2)
+assert_eq(state["after"], 0)
+print("ok")

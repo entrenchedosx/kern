@@ -1,0 +1,2 @@
+# Bash entrypoints must use LF (Unix CI / WSL / Git Bash).
+tests/run_stable.sh text eol=lf

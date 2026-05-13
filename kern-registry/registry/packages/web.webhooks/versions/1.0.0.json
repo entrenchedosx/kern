@@ -1,0 +1,15 @@
+{
+  "name": "web.webhooks",
+  "version": "1.0.0",
+  "main": "src/index.kn",
+  "dependencies": {
+    "web.httpplus": "^1.0.0",
+    "sec.crypto": "^1.0.0",
+    "sys.log": "^1.0.0"
+  },
+  "trusted": false,
+  "dist": {
+    "tarball": "../../../dist/web.webhooks/web.webhooks-1.0.0.tgz",
+    "shasum": "sha256-e606b4b418cf771328863d4748b5de92e1e35c40bc7cd5606dad8d79dfe8b2ab"
+  }
+}

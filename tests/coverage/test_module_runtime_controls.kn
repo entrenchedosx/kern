@@ -1,0 +1,8 @@
+m = import("runtime_controls")
+assert_eq(has(m, "set_step_limit"), true)
+assert_eq(has(m, "set_max_call_depth"), true)
+assert_eq(has(m, "runtime_info"), true)
+m.set_step_limit(12345)
+info = m.runtime_info()
+assert_eq(info.step_limit, 12345)
+print("OK: test_module_runtime_controls")

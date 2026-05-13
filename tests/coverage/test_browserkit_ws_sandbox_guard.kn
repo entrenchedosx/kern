@@ -1,0 +1,12 @@
+ws = import("lib/kern/browserkit/network/ws.kn")
+
+ok = false
+try {
+  ws.connect("ws://example.com/socket")
+} catch (e) {
+  msg = error_message(e)
+  if (regex_match(msg, "BROWSERKIT-SANDBOX-DENY")) { ok = true }
+}
+
+assert_eq(ok, true)
+print("test_browserkit_ws_sandbox_guard: pass")

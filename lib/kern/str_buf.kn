@@ -1,0 +1,38 @@
+// kern string buffer (builder) — import("lib/kern/str_buf.kn")
+// buf_new, buf_add, buf_add_line, buf_build (array of parts, then join)
+
+def buf_new() {
+    return array()
+}
+
+def buf_add(b, s) {
+    push(b, str(s))
+    return b
+}
+
+def buf_add_line(b, s) {
+    push(b, str(s) + "\n")
+    return b
+}
+
+def buf_build(b, sep) {
+    if (len(sep) == 0) { sep = "" }
+    return join(b, sep)
+}
+
+def buf_clear(b) {
+    while (len(b) > 0) {
+        remove_at(b, len(b) - 1)
+    }
+    return b
+}
+
+def buf_len(b) {
+    let n = 0
+    let i = 0
+    while (i < len(b)) {
+        n = n + len(b[i])
+        i = i + 1
+    }
+    return n
+}

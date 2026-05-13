@@ -1,0 +1,31 @@
+let u = import("src/index.kn")
+let ecs = u["ecs"]
+
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let face = "\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"
+let obj_v_eps = "v 0.1000000001 0 0" + face
+let obj_v_canon = "v 0.1 0 0" + face
+let mv1 = ecs["mesh_make_from_obj"](obj_v_eps)
+let mv2 = ecs["mesh_make_from_obj"](obj_v_canon)
+if (has(mv1, "error") || has(mv2, "error")) { panic("ecs_mesh_obj_rounding: v eps parse") }
+if (json_stringify(default(mv1["vertices"], [])) != json_stringify(default(mv2["vertices"], []))) {
+    panic("ecs_mesh_obj_rounding: vertex epsilon should round equal")
+}
+
+let obj_uv_eps = "v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0.2000000002 0\nvt 1 0\nvt 0 1\nf 1/1 2/2 3/3\n"
+let obj_uv_canon = "v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0.2 0\nvt 1 0\nvt 0 1\nf 1/1 2/2 3/3\n"
+let mu1 = ecs["mesh_make_from_obj"](obj_uv_eps)
+let mu2 = ecs["mesh_make_from_obj"](obj_uv_canon)
+if (has(mu1, "error") || has(mu2, "error")) { panic("ecs_mesh_obj_rounding: vt eps parse") }
+if (json_stringify(default(mu1["uvs"], [])) != json_stringify(default(mu2["uvs"], []))) {
+    panic("ecs_mesh_obj_rounding: uv epsilon should round equal")
+}
+
+let w = ecs["world_create"]()
+let id_a = ecs["world_register_mesh"](w, mv1)
+let id_b = ecs["world_register_mesh"](w, mv2)
+if (id_a != id_b) { panic("ecs_mesh_obj_rounding: registry dedupe after v rounding") }
+
+print("ecs_mesh_obj_rounding: ok")

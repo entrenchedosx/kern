@@ -1,0 +1,14 @@
+// Simple assertion helpers.
+// import("lib/kern/stdlib/debug/assert_extra.kn")
+
+def assert_true(x, msg) {
+    if (!x) { throw msg }
+}
+
+def assert_eq(a, b, msg) {
+    if (a != b) { throw msg + ": " + str(a) + " != " + str(b) }
+}
+
+def assert_near(a, b, eps, msg) {
+    if (abs(a - b) > eps) { throw msg }
+}

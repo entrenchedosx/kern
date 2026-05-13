@@ -1,0 +1,6 @@
+// lexer behavior coverage
+let a = 123
+let b = 4.5
+let s = "abc"
+print(a + int(b))
+print(s)

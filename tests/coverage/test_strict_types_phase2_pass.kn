@@ -1,0 +1,6 @@
+// Phase 2 strict-types: must pass `kern --check --strict-types` and run under kern test.
+let a: float = sqrt(1.0)
+let b: int = len("hi")
+let c: string = str(42)
+print(b)
+print(c)

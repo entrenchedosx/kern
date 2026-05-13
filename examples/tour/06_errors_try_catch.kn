@@ -1,0 +1,11 @@
+// try / catch / throw — Error() and error_message() are VM builtins
+try {
+    throw Error("demo", "expected failure")
+} catch (e) {
+    print("caught Error:", error_message(e))
+}
+try {
+    throw "plain string"
+} catch (e2) {
+    print("caught string:", error_message(e2))
+}

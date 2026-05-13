@@ -1,0 +1,14 @@
+// Lightweight validators for common shapes.
+// import("lib/kern/stdlib/util/validate.kn")
+
+def is_non_empty_string(x) {
+    return type(x) == "string" and len(x) > 0
+}
+
+def is_positive_int(x) {
+    return (type(x) == "int" or type(x) == "float") and int(x) > 0
+}
+
+def is_array_of_len(arr, n) {
+    return type(arr) == "array" and len(arr) == n
+}

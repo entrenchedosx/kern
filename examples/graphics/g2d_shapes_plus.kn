@@ -1,0 +1,26 @@
+let g = import("g2d")
+def update() {}
+
+def draw() {
+    g.clear(16, 20, 34, 255)
+    g.drawEllipse(180, 160, 90, 50, 255, 255, 255, 255)
+    g.fillEllipse(180, 160, 86, 46, 90, 160, 255, 180)
+
+    g.drawTriangle(360, 120, 520, 180, 300, 280, 255, 255, 255, 255)
+    g.fillTriangle(362, 124, 514, 178, 304, 274, 255, 120, 120, 210)
+
+    g.drawTextCentered("g2d new features", 450, 340, 28, 255, 245, 180, 255)
+    g.drawTextCentered("Mouse wheel: " + g.mouseWheel(), 450, 390, 20, 180, 255, 220, 255)
+}
+
+if (g == null) {
+    print("g2d unavailable in this build")
+} else {
+    g.createWindow(900, 620, "Kern g2d - Shapes Plus")
+    g.setTargetFps(60)
+    g.run(update, draw)
+}
+
+
+
+

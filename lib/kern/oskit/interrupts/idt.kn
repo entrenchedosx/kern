@@ -1,0 +1,30 @@
+// oskit interrupts/idt.kn
+
+let _handlers = {}
+
+def _div0_handler(frame) {
+    let k = import("lib/kern/oskit/kernel/core.kn")
+    k.panic("divide by zero")
+}
+
+def _page_fault_handler(frame) {
+    k.panic("page fault")
+}
+
+def register(vector, handler) {
+    _handlers[str(int(vector))] = handler
+    return true
+}
+
+def trigger(vector, frame) {
+    let k = str(int(vector))
+    if (!has(_handlers, k) || _handlers[k] == null) { return false }
+    _handlers[k](frame)
+    return true
+}
+
+def install_defaults(kernel) {
+    register(0, _div0_handler)
+    register(14, _page_fault_handler)
+    return true
+}

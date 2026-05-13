@@ -1,0 +1,31 @@
+// All permutations of a small array (max length 8).
+// import("lib/kern/stdlib/alg/permute.kn")
+
+def _perm_swap(a, i, j) {
+    let t = a[i]
+    a[i] = a[j]
+    a[j] = t
+}
+
+def _permute_rec(a, k, out) {
+    let n = len(a)
+    if (k == n) {
+        push(out, copy(a))
+        return
+    }
+    let i = k
+    while (i < n) {
+        _perm_swap(a, k, i)
+        _permute_rec(a, k + 1, out)
+        _perm_swap(a, k, i)
+        i = i + 1
+    }
+}
+
+def permute_all(arr) {
+    if (len(arr) > 8) { throw "permute_all: max input length is 8" }
+    let out = array()
+    let a = copy(arr)
+    _permute_rec(a, 0, out)
+    return out
+}

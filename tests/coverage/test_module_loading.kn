@@ -1,0 +1,5 @@
+// module loading coverage
+let m = import("math")
+print(m != null)
+let missing = import("__does_not_exist__")
+print(missing == null)

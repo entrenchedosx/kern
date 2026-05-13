@@ -1,0 +1,11 @@
+// adversarial surface: odd tokens, empty / edge constructs — must compile-check (no crash)
+let _x = 1
+let x = "quote \" nested \t and \\ backslash"
+let y = """triple
+line"""
+// empty blocks and minimal expressions
+if (false) { }
+def f() { return null }
+// stress binary chain (lexer/parser; should not stack overflow)
+let z = 1 + 2 + 3 + 4 + 5
+print(_x + len(y))

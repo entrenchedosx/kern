@@ -1,0 +1,25 @@
+// minimal SSR-style templates: {{key}} replaced with html_escape(value). import("lib/kern/html_template.kn")
+
+def render(template, vars) {
+    let chunks = split(template, "{{")
+    let out = chunks[0]
+    let i = 1
+    while (i < len(chunks)) {
+        let c = chunks[i]
+        let parts = split(c, "}}")
+        if (len(parts) < 2) {
+            out = out + "{{" + c
+            i = i + 1
+            continue
+        }
+        let key = trim(parts[0])
+        let rest = join(slice(parts, 1, len(parts)), "}}")
+        let val = ""
+        if (has(vars, key)) {
+            val = str(vars[key])
+        }
+        out = out + html_escape(val) + rest
+        i = i + 1
+    }
+    return out
+}

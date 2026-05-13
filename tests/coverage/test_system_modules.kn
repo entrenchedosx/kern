@@ -1,0 +1,56 @@
+let process = import("kern::process")
+let input = import("kern::input")
+let vision = import("kern::vision")
+let render = import("kern::render")
+
+let keyHit = 0
+let mouseHit = 0
+
+def onKey(ev) {
+    keyHit = keyHit + 1
+}
+
+def onMouse(ev) {
+    mouseHit = mouseHit + 1
+}
+
+if (process == null || input == null || vision == null || render == null) {
+    print("skip-system-modules")
+} else {
+
+let rows = process.list()
+assert_eq(type(rows), "array")
+
+if len(rows) > 0 {
+    let p0 = rows[0]
+    let h = process.open(p0.pid)
+    if h >= 0 {
+        let meta = process.metadata(h)
+        assert_eq(type(meta), "dictionary")
+        process.close(h)
+    }
+}
+
+input.onKey(77, onKey)
+input.onMouse("move", onMouse)
+env_set("KERN_ALLOW_INPUT_SIM", "1")
+input.simulateKey(77)
+input.simulateMouse(33, 44)
+let drained = input.poll()
+assert_eq(type(drained), "int")
+
+render.createWindow(64, 64, "test", false)
+render.clear("#000000")
+render.drawRect(8, 8, 16, 16, "#112233")
+render.present()
+
+let cap = vision.capture()
+assert_eq(cap.width, 64)
+assert_eq(cap.height, 64)
+let px = vision.getPixel(10, 10)
+assert_eq(type(px), "int")
+let hit = vision.findColor("#112233")
+assert_eq(type(hit), "dictionary")
+
+print("OK: test_system_modules")
+}

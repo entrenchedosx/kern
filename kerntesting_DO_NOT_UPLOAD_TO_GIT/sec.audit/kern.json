@@ -1,0 +1,11 @@
+{
+  "name": "sec.audit",
+  "version": "1.0.1",
+  "main": "src/index.kn",
+  "description": "Security audit event helpers with signatures and append-only logs.",
+  "dependencies": {
+    "sec.crypto": "^1.0.0",
+    "sec.perm": "^1.0.0",
+    "sys.log": "^1.0.0"
+  }
+}

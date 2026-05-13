@@ -1,0 +1,73 @@
+// browserkit ui/events.kn
+// mouse/keyboard events with bubbling over parent pointers.
+
+def _mk_event(kind, target, data) {
+    let e = {}
+    e["kind"] = kind
+    e["target"] = target
+    e["data"] = data
+    e["stopped"] = false
+    return e
+}
+
+def stop_propagation(e) {
+    e["stopped"] = true
+}
+
+def on(node, kind, handler) {
+    if (!has(node, "listeners") || node["listeners"] == null) { node["listeners"] = {} }
+    if (!has(node["listeners"], kind)) { node["listeners"][kind] = [] }
+    push(node["listeners"][kind], handler)
+}
+
+def set_parent_links(node, parent) {
+    node["parent"] = parent
+    let i = 0
+    while (i < len(node["children"])) {
+        set_parent_links(node["children"][i], node)
+        i = i + 1
+    }
+}
+
+def dispatch(target, kind, data) {
+    let e = _mk_event(kind, target, data)
+    let cur = target
+    while (cur != null && !e["stopped"]) {
+        if (has(cur, "listeners") && cur["listeners"] != null && has(cur["listeners"], kind)) {
+            let handlers = cur["listeners"][kind]
+            let i = 0
+            while (i < len(handlers)) {
+                handlers[i](e)
+                i = i + 1
+            }
+        }
+        cur = has(cur, "parent") ? cur["parent"] : null
+    }
+    return e
+}
+
+def mouse_click(target, x, y) {
+    let d = {}
+    d["x"] = x
+    d["y"] = y
+    return dispatch(target, "click", d)
+}
+
+def mouse_move(target, x, y) {
+    let d = {}
+    d["x"] = x
+    d["y"] = y
+    return dispatch(target, "move", d)
+}
+
+def mouse_scroll(target, delta) {
+    let d = {}
+    d["delta"] = delta
+    return dispatch(target, "scroll", d)
+}
+
+def key_down(target, key) {
+    let d = {}
+    d["key"] = key
+    return dispatch(target, "keydown", d)
+}

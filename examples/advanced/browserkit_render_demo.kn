@@ -1,0 +1,83 @@
+// live BrowserKit viewer:
+// loads a real web page into BrowserKit
+// renders DOM in the window
+// shows graphics/runtime info overlay
+
+g = import("g2d")
+tabs = import("lib/kern/browserkit/ui/window_tabs.kn")
+paint = import("lib/kern/browserkit/render/paint2d.kn")
+domq = import("lib/kern/browserkit/dom/query.kn")
+
+def _count_nodes(node) {
+    if (node == null) { return 0 }
+    let n = 1
+    let i = 0
+    while (i < len(node["children"])) {
+        n = n + _count_nodes(node["children"][i])
+        i = i + 1
+    }
+    return n
+}
+
+def _text_or_dash(v) {
+    if (v == null || trim(str(v)) == "") { return "-" }
+    return str(v)
+}
+
+if (g == null) {
+    print("g2d unavailable")
+} else {
+    let url_main = "http://example.com"
+    let url_alt = "http://example.org"
+    let win = tabs.create(1200, 760)
+    tabs.tab_open(win, url_main)
+
+    g.createWindow(1200, 760, "BrowserKit Live Page Viewer")
+    g.setTargetFps(60)
+
+    while (g.isOpen()) {
+        if (g.isKeyPressed("R")) {
+            tabs.reload(win)
+        }
+        if (g.isKeyPressed("N")) {
+            let t0 = tabs.active_tab(win)
+            if (t0 != null && t0["url"] == url_main) { tabs.navigate(win, url_alt) }
+            else { tabs.navigate(win, url_main) }
+        }
+
+        let t = tabs.active_tab(win)
+        g.clear(12, 18, 34, 255)
+
+        if (t != null && t["dom"] != null) {
+            paint.render_document(t["dom"])
+        }
+
+        // info overlay panel
+        g.fillRect(10, 10, 1180, 104, 8, 12, 24, 220)
+        g.drawRect(10, 10, 1180, 104, 90, 120, 180, 255)
+        g.drawText("BrowserKit Live Viewer", 22, 22, null, 240, 245, 255, 255)
+
+        let st = "-"
+        let cur = "-"
+        let nodes = 0
+        let h1txt = "-"
+        if (t != null) {
+            st = _text_or_dash(t["status"])
+            cur = _text_or_dash(t["url"])
+            if (t["dom"] != null) {
+                nodes = _count_nodes(t["dom"])
+                let h1 = domq.query_one(t["dom"], "h1")
+                if (h1 != null) { h1txt = _text_or_dash(h1["text"]) }
+            }
+        }
+
+        g.drawText("Status: " + st + " | URL: " + cur, 22, 46, null, 190, 220, 255, 255)
+        g.drawText("FPS: " + g.fps() + " | Nodes: " + nodes + " | H1: " + h1txt, 22, 68, null, 220, 230, 245, 255)
+        g.drawText("[R] reload | [N] switch example.com/org", 22, 90, null, 170, 190, 220, 255)
+
+        g.present()
+    }
+}
+
+
+

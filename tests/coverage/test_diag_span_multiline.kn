@@ -1,0 +1,4 @@
+let a = "first line content"
+let b = "second line content"
+let e = json_parse("{\"message\":\"diagnostic multiline range\",\"code\":\"IMPORT-NOT-FOUND\",\"line\":3,\"column\":5,\"lineEnd\":4,\"columnEnd\":2}")
+throw e

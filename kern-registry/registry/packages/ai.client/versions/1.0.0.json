@@ -1,0 +1,15 @@
+{
+  "name": "ai.client",
+  "version": "1.0.0",
+  "main": "src/index.kn",
+  "dependencies": {
+    "web.httpplus": "^1.0.0",
+    "sys.config": "^1.0.0",
+    "sys.log": "^1.0.0"
+  },
+  "trusted": false,
+  "dist": {
+    "tarball": "../../../dist/ai.client/ai.client-1.0.0.tgz",
+    "shasum": "sha256-37ac9cae15acc9ce3834900ea1a167d06001876225bdce18bb6c4123e8c7d74c"
+  }
+}

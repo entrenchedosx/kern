@@ -1,0 +1,7 @@
+let u = import("3dengine")
+let app = u["app"]
+let draw_frame = lambda (s, dt, alpha) => {
+    s["gfx"]["rect"](180, 140, 320, 180, 95, 180, 255, 255)
+    s["gfx"]["text"]("Phase 1 Core Foundation", 200, 240, 24, 255, 255, 255)
+}
+app.run({"title": "3dengine: first render", "width": 960, "height": 540, "target_fps": 60, "fixed_hz": 60.0}, null, draw_frame)

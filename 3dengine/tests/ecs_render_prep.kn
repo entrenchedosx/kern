@@ -1,0 +1,25 @@
+let u = import("src/index.kn")
+let ecs = u["ecs"]
+def v3(x, y, z) { return {"x": float(default(x, 0.0)), "y": float(default(y, 0.0)), "z": float(default(z, 0.0))} }
+
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let w = ecs["world_create"]()
+let e = ecs["world_create_entity"](w)
+ecs["world_add_transform"](w, e, ecs["transform_make"](v3(10, 20, 0), null, null))
+ecs["world_add_mesh"](w, e, ecs["mesh_make_quad"]())
+ecs["world_add_material"](w, e, ecs["material_make"](v3(0.2, 0.4, 0.6), "m.test", null))
+
+ecs["world_run_render_prep"](w)
+let stats = ecs["world_render_stats"](w)
+if (int(default(stats["command_count"], 0)) != 1) { panic("ecs_render_prep: command_count mismatch") }
+if (int(default(stats["draw_calls"], 0)) != 0) { panic("ecs_render_prep: draw_calls before render should be 0") }
+if (int(default(stats["batched_draw_calls"], 0)) != 0) { panic("ecs_render_prep: batched_draw_calls before render should be 0") }
+if (int(default(stats["unique_materials"], 0)) != 0) { panic("ecs_render_prep: unique_materials before render should be 0") }
+if (int(default(stats["rendered_entities"], 0)) != 1) { panic("ecs_render_prep: rendered_entities mismatch") }
+if (int(default(stats["mesh_registry_size"], 0)) != 1) { panic("ecs_render_prep: mesh_registry_size mismatch") }
+if (int(default(stats["material_registry_size"], 0)) != 1) { panic("ecs_render_prep: material_registry_size mismatch") }
+if (int(default(stats["texture_registry_size"], 0)) != 0) { panic("ecs_render_prep: texture_registry_size mismatch") }
+
+print("ecs_render_prep: ok")

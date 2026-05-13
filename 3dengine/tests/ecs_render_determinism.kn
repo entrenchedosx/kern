@@ -1,0 +1,40 @@
+let u = import("src/index.kn")
+let ecs = u["ecs"]
+def v3(x, y, z) { return {"x": float(default(x, 0.0)), "y": float(default(y, 0.0)), "z": float(default(z, 0.0))} }
+
+def run_once() {
+    let w = ecs["world_create"]()
+    let e1 = ecs["world_create_entity"](w)
+    let e2 = ecs["world_create_entity"](w)
+    let e3 = ecs["world_create_entity"](w)
+    ecs["world_add_transform"](w, e1, ecs["transform_make"](v3(10, 20, 2), null, null))
+    ecs["world_add_transform"](w, e2, ecs["transform_make"](v3(12, 20, 1), null, null))
+    ecs["world_add_transform"](w, e3, ecs["transform_make"](v3(14, 20, 3), null, null))
+    ecs["world_add_mesh"](w, e1, ecs["mesh_make_cube"]())
+    ecs["world_add_mesh"](w, e2, ecs["mesh_make_quad"]())
+    ecs["world_add_mesh"](w, e3, ecs["mesh_make_cube"]())
+    ecs["world_add_material"](w, e1, ecs["material_make"](v3(0.3, 0.6, 0.9), "m.blue", null))
+    ecs["world_add_material"](w, e2, ecs["material_make"](v3(0.1, 0.9, 0.4), "m.green", null))
+    ecs["world_add_material"](w, e3, ecs["material_make"](v3(0.9, 0.2, 0.2), "m.red", null))
+    ecs["world_run_fixed_pipeline"](w, 1.0 / 60.0)
+    let cmds = default(w["render"]["commands"], [])
+    let c0 = default(cmds[0], {})
+    let c1 = default(cmds[1], {})
+    let c2 = default(cmds[2], {})
+    let e0 = default(c0["entity"], {})
+    let e1s = default(c1["entity"], {})
+    let e2s = default(c2["entity"], {})
+    let s0 = default(c0["screen"], {})
+    let s1 = default(c1["screen"], {})
+    let s2 = default(c2["screen"], {})
+    let sig = str(default(e0["index"], -1)) + ":" + str(default(e0["generation"], -1)) + "|" + str(default(c0["depth_value"], 0.0)) + "|" + str(default(c0["material_id"], "")) + "|" + str(default(c0["texture_id"], "")) + "|" + str(default(s0["x"], 0)) + "," + str(default(s0["y"], 0)) + ";" + str(default(e1s["index"], -1)) + ":" + str(default(e1s["generation"], -1)) + "|" + str(default(c1["depth_value"], 0.0)) + "|" + str(default(c1["material_id"], "")) + "|" + str(default(c1["texture_id"], "")) + "|" + str(default(s1["x"], 0)) + "," + str(default(s1["y"], 0)) + ";" + str(default(e2s["index"], -1)) + ":" + str(default(e2s["generation"], -1)) + "|" + str(default(c2["depth_value"], 0.0)) + "|" + str(default(c2["material_id"], "")) + "|" + str(default(c2["texture_id"], "")) + "|" + str(default(s2["x"], 0)) + "," + str(default(s2["y"], 0))
+    return sig
+}
+
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let a = run_once()
+let b = run_once()
+if (a != b) { panic("ecs_render_determinism: command signature mismatch") }
+print("ecs_render_determinism: ok")

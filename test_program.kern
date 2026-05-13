@@ -1,0 +1,9 @@
+# Simple test program for Kern compiler
+print 10 + 32;
+let x = 42;
+print x;
+if (x > 0) {
+    print "positive";
+} else {
+    print "negative";
+}

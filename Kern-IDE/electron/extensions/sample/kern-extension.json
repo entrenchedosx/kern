@@ -1,0 +1,13 @@
+{
+  "name": "sample",
+  "main": "main.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "sample.hello",
+        "title": "Sample: Log Hello to console",
+        "category": "Sample"
+      }
+    ]
+  }
+}

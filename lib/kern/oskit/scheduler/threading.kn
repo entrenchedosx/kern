@@ -1,0 +1,53 @@
+// oskit scheduler/threading.kn
+
+let _threads = []
+let _next_id = 1
+let _cursor = 0
+
+def create(task_fn, priority) {
+    let t = {}
+    t["id"] = _next_id
+    _next_id = _next_id + 1
+    t["fn"] = task_fn
+    t["priority"] = priority == null ? 0 : int(priority)
+    t["state"] = "ready"
+    push(_threads, t)
+    return t["id"]
+}
+
+def run_round_robin(ticks) {
+    if (len(_threads) == 0) { return 0 }
+    let n = int(ticks)
+    if (n <= 0) { n = 1 }
+    let i = 0
+    while (i < n) {
+        let t = _threads[_cursor]
+        if (t["state"] == "ready" && t["fn"] != null) {
+            t["fn"]()
+            _threads[_cursor] = t
+        }
+        _cursor = (_cursor + 1) % len(_threads)
+        i = i + 1
+    }
+    return n
+}
+
+def run_priority_once() {
+    if (len(_threads) == 0) { return 0 }
+    let best = -1
+    let bestPri = -2147483648
+    let i = 0
+    while (i < len(_threads)) {
+        let t = _threads[i]
+        if (t["state"] == "ready" && t["priority"] > bestPri) {
+            bestPri = t["priority"]
+            best = i
+        }
+        i = i + 1
+    }
+    if (best < 0) { return 0 }
+    let t2 = _threads[best]
+    t2["fn"]()
+    _threads[best] = t2
+    return 1
+}

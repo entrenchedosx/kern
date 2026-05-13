@@ -1,0 +1,11 @@
+m = import("automation")
+
+h = m.spawn(["cmd", "/c", "ping 127.0.0.1 -n 6 >nul"])
+st = m.wait_process(h, 1)
+
+assert_eq(has(st, "timed_out"), true)
+assert_eq(st.timed_out, true)
+
+m.kill_process(h)
+
+print("OK: test_module_automation_timeout")

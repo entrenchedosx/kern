@@ -1,0 +1,5 @@
+let audit = import("sec.audit")
+let ev = audit["create_event"]("user:7", "admin.grant", "role:editor", "ok", { "by": "root" })
+let sig = audit["sign_event"](ev, "audit-key")
+let vr = audit["verify_event"](ev, sig, "audit-key")
+print(json_stringify(vr, 2))

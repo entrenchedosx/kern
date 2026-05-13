@@ -1,0 +1,81 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+let vec3 = import("src/math/vec3.kn")
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+def world_sig(world, e) {
+    let t = default(ecs["world_get_transform"](world, e), {})
+    let p = default(t["local_position"], {})
+    let extra = float(default(world["auto_extra"], 0.0))
+    return str(default(p["x"], 0.0)) + "|" + str(default(p["y"], 0.0)) + "|" + str(default(p["z"], 0.0)) + "|" + str(extra) + "|" + str(int(default(ecs["world_entity_count"](world), 0)))
+}
+
+def make_world() {
+    let w = ecs["world_create"]()
+    w["auto_extra"] = 0.0
+    let e = ecs["world_create_entity"](w)
+    ecs["world_add_transform"](w, e, ecs["transform_make"](vec3["zero"](), null, null))
+    ecs["world_add_velocity"](w, e, ecs["velocity_make"](vec3["make"](2, 0, 0)))
+
+    let s_vel = lambda (world, dt) => {
+        let q = ecs["world_query"](world, ["velocity"])
+        let i = 0
+        while (i < int(default(q["count"], 0))) {
+            let v = q["components"]["velocity"][i]
+            let lin = default(v["linear"], vec3["zero"]())
+            v["linear"] = vec3["make"](float(default(lin["x"], 0.0)) + 0.1, float(default(lin["y"], 0.0)), float(default(lin["z"], 0.0)))
+            i = i + 1
+        }
+    }
+    let s_reg = lambda (world, dt) => { world["auto_extra"] = float(default(world["auto_extra"], 0.0)) + float(default(dt, 0.0)) }
+    let s_tr = lambda (world, dt) => {
+        let q = ecs["world_query"](world, ["transform", "velocity"])
+        let i = 0
+        while (i < int(default(q["count"], 0))) {
+            let t = q["components"]["transform"][i]
+            let v = q["components"]["velocity"][i]
+            let p = default(t["local_position"], vec3["zero"]())
+            let lin = default(v["linear"], vec3["zero"]())
+            t["local_position"] = vec3["make"](float(default(p["x"], 0.0)) + float(default(lin["x"], 0.0)) * float(default(dt, 0.0)), float(default(p["y"], 0.0)), float(default(p["z"], 0.0)))
+            t["dirty"] = true
+            i = i + 1
+        }
+    }
+
+    if (!ecs["world_register_system"](w, "POST_SIMULATION", "auto.vel", s_vel, [], {"write_mask": ["velocity"]})) { panic("ecs_parallel_auto: register auto.vel failed") }
+    if (!ecs["world_register_system"](w, "POST_SIMULATION", "auto.reg", s_reg, [], {"write_mask": ["registry"]})) { panic("ecs_parallel_auto: register auto.reg failed") }
+    if (!ecs["world_register_system"](w, "POST_SIMULATION", "auto.tr", s_tr, ["auto.vel"], {"write_mask": ["transform"]})) { panic("ecs_parallel_auto: register auto.tr failed") }
+    return {"world": w, "entity": e}
+}
+
+def run_mode(mode) {
+    let made = make_world()
+    let w = made["world"]
+    let e = made["entity"]
+    let i = 0
+    while (i < 80) {
+        if (mode == "serial") { ecs["world_run_fixed_pipeline"](w, 1.0 / 60.0) }
+        else {
+            if (mode == "parallel") { ecs["world_run_fixed_pipeline_parallel"](w, 1.0 / 60.0) }
+            else { ecs["world_run_fixed_pipeline_auto"](w, 1.0 / 60.0, {"min_systems_for_parallel": 2, "min_parallel_ratio": 0.25, "allow_render_prep_parallel": false}) }
+        }
+        i = i + 1
+    }
+    return {"sig": world_sig(w, e), "graph_hash": str(default(ecs["world_scheduler_conflict_graph_hash"](w)["hash"], "")), "stats": ecs["world_parallel_runtime_stats"](w)}
+}
+
+let serial = run_mode("serial")
+let parallel = run_mode("parallel")
+let auto = run_mode("auto")
+
+if (str(default(serial["sig"], "")) != str(default(parallel["sig"], ""))) { panic("ecs_parallel_auto: serial and parallel diverged") }
+if (str(default(serial["sig"], "")) != str(default(auto["sig"], ""))) { panic("ecs_parallel_auto: serial and auto diverged") }
+if (str(default(serial["graph_hash"], "")) != str(default(auto["graph_hash"], ""))) { panic("ecs_parallel_auto: serial and auto graph hash mismatch") }
+
+let ast = default(auto["stats"], {})
+if (str(default(ast["mode"], "")) != "auto") { panic("ecs_parallel_auto: stats mode should be auto") }
+if (int(default(ast["auto_parallel_stages"], 0)) <= 0) { panic("ecs_parallel_auto: expected auto to select parallel stage(s)") }
+if (len(default(ast["policy_decisions"], [])) == 0) { panic("ecs_parallel_auto: expected policy decisions") }
+
+print("ecs_parallel_auto: ok")

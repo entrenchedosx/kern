@@ -1,0 +1,2 @@
+# Kern IDE uses only the Python standard library (tkinter) at runtime.
+# Optional (for PyInstaller builds): pyinstaller

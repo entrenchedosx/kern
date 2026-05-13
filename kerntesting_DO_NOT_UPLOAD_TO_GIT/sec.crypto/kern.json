@@ -1,0 +1,7 @@
+{
+  "name": "sec.crypto",
+  "version": "1.0.0",
+  "main": "src/index.kn",
+  "description": "Security and crypto helpers for Kern applications.",
+  "dependencies": {}
+}

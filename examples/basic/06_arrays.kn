@@ -1,0 +1,11 @@
+// arrays: array(), push, len, index
+let arr = array(10, 20, 30)
+print("len =", len(arr))
+print("arr[0] =", arr[0])
+           push(arr, 40)
+print("after push:", len(arr))
+for i in range(0, len(arr)) {
+print(arr[i])
+}
+
+

@@ -1,0 +1,6 @@
+// parser behavior coverage
+if (true) {
+    print("ok")
+} else {
+    print("bad")
+}

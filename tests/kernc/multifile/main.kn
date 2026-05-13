@@ -1,0 +1,4 @@
+let helpers = import("lib/helpers")
+let m = import("lib/math_utils")
+print(helpers.add_base(5))
+print(m.mul2(7))

@@ -1,0 +1,15 @@
+// List files in a directory whose names end with a suffix (e.g. ".kn").
+// import("lib/kern/stdlib/fs/glob_simple.kn")
+
+def list_files_suffix(dir_path, suffix) {
+    let names = listDir(dir_path)
+    let out = array()
+    let i = 0
+    while (i < len(names)) {
+        let n = names[i]
+        if (ends_with(n, suffix)) { push(out, n) }
+        i = i + 1
+    }
+    sort(out)
+    return out
+}

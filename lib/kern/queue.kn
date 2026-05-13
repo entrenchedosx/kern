@@ -1,0 +1,29 @@
+// kern queue — import("lib/kern/queue.kn") — FIFO using array (enqueue at end, dequeue from front)
+// queue_new(), queue_enqueue(q, x), queue_dequeue(q), queue_peek(q), queue_empty(q), queue_size(q)
+
+def queue_new() {
+    return array()
+}
+
+def queue_enqueue(q, x) {
+    push(q, x)
+    return q
+}
+
+def queue_dequeue(q) {
+    if (len(q) == 0) { throw "queue underflow" }
+    return remove_at(q, 0)
+}
+
+def queue_peek(q) {
+    if (len(q) == 0) { return null }
+    return q[0]
+}
+
+def queue_empty(q) {
+    return len(q) == 0
+}
+
+def queue_size(q) {
+    return len(q)
+}

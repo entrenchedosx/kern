@@ -1,0 +1,192 @@
+// 05_arrays_and_collections.kn - Arrays, maps, and data structures
+
+print("=== Arrays (Lists) ===")
+
+// Creating arrays
+let empty = []
+let numbers = [1, 2, 3, 4, 5]
+let mixed = [1, "two", 3.0, true, null]
+let nested = [[1, 2], [3, 4], [5, 6]]
+
+// Accessing elements
+print("First: " + numbers[0])
+print("Last: " + numbers[len(numbers) - 1])
+print("Length: " + len(numbers))
+
+// Modifying arrays
+numbers[0] = 100
+print("After modification: " + numbers)
+
+// Adding elements
+numbers.append(6)
+print("After append: " + numbers)
+
+// Inserting at position
+numbers.insert(2, 999)
+print("After insert at 2: " + numbers)
+
+// Removing elements
+numbers.removeAt(2)
+print("After removeAt 2: " + numbers)
+
+print("")
+print("=== Array Operations ===")
+
+let arr = [3, 1, 4, 1, 5, 9, 2, 6]
+
+// Slicing
+print("Slice [2:5]: " + arr[2:5])  // [4, 1, 5]
+print("Slice [:4]: " + arr[:4])    // [3, 1, 4, 1]
+print("Slice [5:]: " + arr[5:])    // [9, 2, 6]
+
+// Finding elements
+print("Index of 5: " + arr.indexOf(5))
+print("Contains 9: " + arr.contains(9))
+
+// Sorting
+let sorted = arr.sort()
+print("Sorted: " + sorted)
+
+// Reversing
+let reversed = arr.reverse()
+print("Reversed: " + reversed)
+
+// Joining
+let words = ["Hello", "World"]
+print("Joined: " + words.join(" "))
+
+print("")
+print("=== Array Iteration ===")
+
+// For each
+for item in arr {
+    print("Item: " + item)
+}
+
+// With index
+for idx in range(len(arr)) {
+    print("Index " + idx + ": " + arr[idx])
+}
+
+// Map (if available)
+// let doubled = arr.map(def (x) { return x * 2 })
+
+// Filter (if available)
+// let evens = arr.filter(def (x) { return x % 2 == 0 })
+
+// Reduce (if available)
+// let sum = arr.reduce(def (acc, x) { return acc + x }, 0)
+
+print("")
+print("=== Maps (Dictionaries) ===")
+
+// Creating maps
+let emptyMap = {}
+let person = {
+    name: "Alice",
+    age: 30,
+    city: "New York"
+}
+
+// Accessing
+print("Name: " + person["name"])
+print("Age: " + person["age"])
+
+// Alternative access (if supported)
+// print("City: " + person.city)
+
+// Modifying
+person["age"] = 31
+person["country"] = "USA"  // Adding new key
+print("Updated: " + person)
+
+// Checking existence
+print("Has 'name': " + (person["name"] != null))
+print("Has 'email': " + (person["email"] != null))
+
+// Removing
+person.remove("city")
+print("After removing city: " + person)
+
+// Keys and values
+print("Keys: " + person.keys())
+print("Values: " + person.values())
+
+// Iterating
+for key in person {
+    print(key + " => " + person[key])
+}
+
+print("")
+print("=== Nested Structures ===")
+
+let students = [
+    {name: "Alice", scores: [95, 87, 92]},
+    {name: "Bob", scores: [78, 85, 80]},
+    {name: "Carol", scores: [92, 95, 98]}
+]
+
+for student in students {
+    let name = student["name"]
+    let scores = student["scores"]
+    let total = 0
+    for s in scores {
+        total = total + s
+    }
+    let average = total / len(scores)
+    print(name + " average: " + average)
+}
+
+print("")
+print("=== Multi-dimensional Arrays ===")
+
+// Matrix
+let matrix = [
+    [1, 2, 3],
+    [4, 5, 6],
+    [7, 8, 9]
+]
+
+print("Matrix[1][2]: " + matrix[1][2])  // 6
+
+// Transpose (example algorithm)
+def transpose(m) {
+    let rows = len(m)
+    let cols = len(m[0])
+    let result = []
+    
+    for j in range(cols) {
+        let newRow = []
+        for i in range(rows) {
+            newRow.append(m[i][j])
+        }
+        result.append(newRow)
+    }
+    
+    return result
+}
+
+let transposed = transpose(matrix)
+print("Transposed: " + transposed)
+
+print("")
+print("=== Sets (unique values) ===")
+
+// Simulating sets with maps
+let set1 = {a: true, b: true, c: true}
+let set2 = {b: true, c: true, d: true}
+
+// Union
+let union = {}
+for k in set1 { union[k] = true }
+for k in set2 { union[k] = true }
+print("Union keys: " + union.keys())
+
+// Intersection
+let intersection = {}
+for k in set1 {
+    if (set2[k] != null) {
+        intersection[k] = true
+    }
+}
+print("Intersection keys: " + intersection.keys())

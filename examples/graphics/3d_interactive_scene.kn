@@ -1,0 +1,82 @@
+let g3 = import("g3d")
+
+g3.createWindow(1100, 760, "Kern g3d - Interactive Scene")
+g3.clear(14, 18, 28)
+g3.setProjection("perspective")
+g3.setFov(120)
+g3.setCamera(10.0, 8.0, 10.0, 0.0, 1.0, 0.0)
+g3.setCameraMode("manual")
+g3.setDebug(true)
+g3.showStats(true)
+
+let floor = g3.createObject("plane", 28.0, 28.0)
+let box1 = g3.createObject("cube", 1.8)
+let box2 = g3.createObject("cube", 1.4)
+let orb = g3.createObject("sphere", 0.9)
+
+g3.setPosition(floor, 0.0, 0.0, 0.0)
+g3.setPosition(box1, -2.5, 1.0, 0.0)
+g3.setPosition(box2, 2.2, 0.8, -1.5)
+g3.setPosition(orb, 0.0, 1.0, 2.0)
+
+g3.setObjectColor(floor, 80, 85, 90)
+g3.setObjectColor(box1, 255, 140, 120)
+g3.setObjectColor(box2, 120, 255, 160)
+g3.setObjectColor(orb, 130, 180, 255)
+
+g3.setMaterial(box1, "lambert")
+g3.setMaterial(box2, "phong")
+g3.setMaterial(orb, "phong")
+g3.setTexture(box1, "@checker")
+
+g3.setAmbientLight(35, 35, 50)
+g3.addDirectionalLight(0.5, -1.0, -0.4, 255, 240, 210, 1.0)
+g3.addPointLight(0.0, 3.5, 0.0, 120, 170, 255, 0.8)
+
+let camX = 10.0
+let camY = 8.0
+let camZ = 10.0
+let yaw = 0.0
+let t = 0.0
+
+def update() {
+    t = t + 1.0
+    if (g3.isKeyDown("left")) { yaw = yaw - 0.02 }
+    if (g3.isKeyDown("right")) { yaw = yaw + 0.02 }
+    if (g3.isKeyDown("up")) { camZ = camZ - 0.12 }
+    if (g3.isKeyDown("down")) { camZ = camZ + 0.12 }
+    if (g3.isKeyDown("w")) { camY = camY + 0.08 }
+    if (g3.isKeyDown("s")) { camY = camY - 0.08 }
+
+    let tx = 0.0
+    let tz = 0.0
+    g3.setCamera(camX, camY, camZ, tx, 1.0, tz)
+
+    g3.setRotation(box1, 0.0, t * 0.8, 0.0)
+    g3.setRotation(box2, t * 0.5, t * 1.1, 0.0)
+
+    if (g3.isMouseDown("left")) {
+        let ray = g3.rayFromMouse()
+        let h1 = g3.intersectObject(box1, ray)
+        let h2 = g3.intersectObject(box2, ray)
+        let hs = g3.intersectObject(orb, ray)
+        if (h1.hit) { g3.setObjectColor(box1, 255, 255, 120) } else { g3.setObjectColor(box1, 255, 140, 120) }
+        if (h2.hit) { g3.setObjectColor(box2, 255, 255, 120) } else { g3.setObjectColor(box2, 120, 255, 160) }
+        if (hs.hit) { g3.setObjectColor(orb, 255, 230, 170) } else { g3.setObjectColor(orb, 130, 180, 255) }
+    }
+}
+
+def draw() {
+    g3.drawAll()
+}
+
+g3.run(update, draw)
+
+
+
+
+
+
+
+
+

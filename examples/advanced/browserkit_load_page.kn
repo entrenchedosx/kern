@@ -1,0 +1,37 @@
+// demo: Load webpage + parse DOM + apply CSS
+
+tabs = import("lib/kern/browserkit/ui/window_tabs.kn")
+domq = import("lib/kern/browserkit/dom/query.kn")
+jsrt = import("lib/kern/browserkit/js_engine/runtime.kn")
+
+def _timer_cb() { print("setTimeout fired") }
+
+let w = tabs.create(1000, 700)
+let tid = tabs.tab_open(w, "http://example.com")
+let t = tabs.active_tab(w)
+
+if (t == null || t["status"] != "ready") {
+    print("load failed")
+    if (t != null) {
+        print("status: " + t["status"])
+        if (has(t, "error") && t["error"] != "") { print("error: " + t["error"]) }
+    }
+} else {
+    print("loaded: " + t["url"])
+    let h1 = domq.query_one(t["dom"], "h1")
+    if (h1 != null) {
+        print("h1: " + h1["text"])
+    }
+
+    let ctx = jsrt.create_context(t["dom"])
+    jsrt.set_timeout(ctx, _timer_cb, 50)
+    jsrt.tick(ctx, 100)
+
+    print("done")
+}
+
+
+
+
+
+

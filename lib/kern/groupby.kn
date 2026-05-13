@@ -1,0 +1,15 @@
+// group arrays of maps — import("lib/kern/groupby.kn")
+// group_by_field(rows, key) -> map string -> array of rows
+
+def group_by_field(rows, key) {
+    let out = {}
+    let i = 0
+    while (i < len(rows)) {
+        let row = rows[i]
+        let k = str(row[key])
+        if (!has(out, k)) { out[k] = array() }
+        push(out[k], row)
+        i = i + 1
+    }
+    return out
+}

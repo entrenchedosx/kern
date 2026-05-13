@@ -1,0 +1,31 @@
+// messagebox_extern_demo.kn - Shows a Windows message box via FFI using extern def
+// Run with: kern --unsafe --ffi messagebox_extern_demo.kn
+
+// Declare the MessageBoxA function signature
+// MessageBoxA(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType) -> int
+extern def MessageBoxA(int hwnd, ptr text, ptr caption, int type) : int from "user32.dll"
+
+print("=== MESSAGEBOX EXTERN DEMO ===")
+print("")
+print("Opening Windows message box via FFI...")
+print("(Click OK to continue)")
+print("")
+
+unsafe {
+    // Call MessageBoxA with null HWND (0), message, caption, and MB_OK (0)
+    let result = MessageBoxA(0, "Hello from Kern FFI!\n\nThis was called using extern def.", "Kern Unsafe Demo", 0)
+    
+    print("MessageBox returned: " + result)
+    if (result == 1) {
+        print("You clicked OK!")
+    }
+}
+
+print("")
+print("=== DEMO COMPLETE ===")
+print("")
+print("This worked because:")
+print("  1. extern def declared the function signature with types")
+print("  2. --ffi flag enabled FFI support")
+print("  3. --unsafe flag allowed privileged operations")
+print("  4. unsafe { } block marked code as intentionally dangerous")

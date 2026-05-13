@@ -1,0 +1,6 @@
+netops = import("netops")
+
+u = netops.url_parse("https://example.com:443/path?q=1")
+q = netops.parse_query("a=1&b=two")
+print("url scheme:", u.scheme)
+print("query has a:", has(q, "a"))

@@ -1,0 +1,30 @@
+// oskit memory/paging.kn
+// virtual memory abstractions and page table metadata.
+
+let PAGE_SIZE = 4096
+let _maps = {}
+
+def map_page(virt, phys, flags) {
+    let e = {}
+    e["phys"] = int(phys)
+    e["flags"] = int(flags)
+    _maps[str(int(virt))] = e
+    return true
+}
+
+def unmap_page(virt) {
+    let k = str(int(virt))
+    if (!has(_maps, k)) { return false }
+    _maps[k] = null
+    return true
+}
+
+def translate_page(virt) {
+    let k = str(int(virt))
+    if (!has(_maps, k) || _maps[k] == null) { return null }
+    return _maps[k]["phys"]
+}
+
+def map_identity(addr, flags) {
+    return map_page(addr, addr, flags)
+}

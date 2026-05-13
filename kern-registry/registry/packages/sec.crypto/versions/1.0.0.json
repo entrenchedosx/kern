@@ -1,0 +1,11 @@
+{
+  "name": "sec.crypto",
+  "version": "1.0.0",
+  "main": "src/index.kn",
+  "dependencies": {},
+  "trusted": false,
+  "dist": {
+    "tarball": "../../../dist/sec.crypto/sec.crypto-1.0.0.tgz",
+    "shasum": "sha256-13b6f106680d369e65a1e2c786fe8457cdd82a8a28040e8df1c82577a29fd976"
+  }
+}

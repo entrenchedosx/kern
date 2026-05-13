@@ -1,0 +1,66 @@
+// kern ANSI color codes — import("lib/kern/color.kn")
+// ansi_red, ansi_green, ansi_yellow, ansi_blue, ansi_reset, ansi_bold, colorize
+
+def ansi_reset() {
+    return "\033[0m"
+}
+
+def ansi_bold() {
+    return "\033[1m"
+}
+
+def ansi_red() {
+    return "\033[31m"
+}
+
+def ansi_green() {
+    return "\033[32m"
+}
+
+def ansi_yellow() {
+    return "\033[33m"
+}
+
+def ansi_blue() {
+    return "\033[34m"
+}
+
+def ansi_magenta() {
+    return "\033[35m"
+}
+
+def ansi_cyan() {
+    return "\033[36m"
+}
+
+def ansi_white() {
+    return "\033[37m"
+}
+
+def ansi_bg_red() {
+    return "\033[41m"
+}
+
+def ansi_bg_green() {
+    return "\033[42m"
+}
+
+def colorize(s, color_fn) {
+    return color_fn() + s + ansi_reset()
+}
+
+def red(s) {
+    return ansi_red() + s + ansi_reset()
+}
+
+def green(s) {
+    return ansi_green() + s + ansi_reset()
+}
+
+def yellow(s) {
+    return ansi_yellow() + s + ansi_reset()
+}
+
+def bold(s) {
+    return ansi_bold() + s + ansi_reset()
+}

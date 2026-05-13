@@ -1,0 +1,17 @@
+h1 = sha1("abc")
+h2 = sha256("abc")
+assert_eq(len(h1), 40)
+assert_eq(len(h2), 64)
+
+p = path_normalize("a/../b//c")
+assert_eq(type(p), "string")
+
+def stable() {
+    return 99
+}
+
+out = retry_call(stable, 5, 1)
+assert_eq(type(out), "int")
+assert_eq(out, 99)
+
+print("OK: test_stdlib_hashing_and_config")

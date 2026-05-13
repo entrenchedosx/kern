@@ -1,0 +1,6 @@
+m = import("datatools")
+
+assert_eq(m.parse_int("abc"), null)
+assert_eq(m.parse_float("not-a-number"), null)
+
+print("OK: test_module_datatools_negative")

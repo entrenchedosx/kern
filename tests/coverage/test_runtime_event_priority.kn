@@ -1,0 +1,31 @@
+runtime_mod = import("lib/kern/runtime/modern/module.kn")
+commands = import("lib/kern/runtime/modern/commands.kn")
+
+let order = []
+
+@event("on_command", priority=5)
+def low_priority(ctx, payload) {
+    push(order, "low")
+    return null
+}
+
+@event("on_command", priority=100)
+def high_priority(ctx, payload) {
+    push(order, "high")
+    return null
+}
+
+@command("ping_priority")
+def ping_priority(ctx, args) {
+    return "pong"
+}
+
+let rt = runtime_mod.create_runtime({})
+let named = {}
+let r = commands.run_command(rt["commands"], rt["events"], rt["ctx"], "ping_priority", named)
+assert_eq(r["ok"], true)
+assert_eq(r["value"], "pong")
+assert_eq(len(order), 2)
+assert_eq(order[0], "high")
+assert_eq(order[1], "low")
+print("ok")

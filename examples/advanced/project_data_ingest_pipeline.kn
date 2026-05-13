@@ -1,0 +1,12 @@
+datatools = import("datatools")
+security = import("security")
+observability = import("observability")
+
+csv = "id,name,score\n1,Ada,98\n2,Linus,95\n"
+rows = datatools.csv_parse(csv)
+payload = datatools.json_stringify({rows: rows, count: len(rows)})
+digest = security.sha256(payload)
+
+print("rows:", len(rows))
+print("payload_digest_len:", len(digest))
+print("runtime:", observability.runtime_info().version)

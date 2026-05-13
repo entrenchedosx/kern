@@ -1,0 +1,16 @@
+// pointer + manual memory demo for Kern low-level mode.
+
+def main() {
+    unsafe {
+        let p: *int = alloc(8)
+        *p = 10
+        let v = *p
+        print("ptr value = " + str(v))
+        free(p)
+    }
+    return null
+}
+
+main()
+
+

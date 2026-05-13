@@ -1,0 +1,11 @@
+{
+  "name": "sec.crypto",
+  "description": "Security and crypto helpers for Kern applications.",
+  "trusted": false,
+  "latest": "1.0.0",
+  "versions": {
+    "1.0.0": {
+      "manifest": "versions/1.0.0.json"
+    }
+  }
+}

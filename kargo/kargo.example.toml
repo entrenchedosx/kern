@@ -1,0 +1,21 @@
+# Example kargo manifest (GitHub is the registry; tags are versions)
+name = "my-package"
+version = "1.0.0"
+description = "Example"
+author = "you"
+
+# Optional resolver flags (see kargo README)
+[kargo]
+# allow_prerelease = false   # default true: use a prerelease tag only if no stable tag satisfies all constraints
+# resolution_mode = "locked" # default "latest": locked = use kargo.lock only (CI); latest = resolve from GitHub tags
+
+# Future (not implemented yet): table-style git + rev pins, e.g.
+#   dep = { git = "owner/repo", rev = "abc123" }
+
+[dependencies]
+# Key is owner/repo, value is a semver range (or exact version):
+# acme/widgets = "^1.2.0"
+# other/crate = ">=2.0.0 <3.0.0"
+# Or alias key with full spec in value:
+# lib = "owner/repo@v1.2.3"
+# lib2 = "owner/repo@^1.0.0"

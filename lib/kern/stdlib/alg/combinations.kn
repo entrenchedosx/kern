@@ -1,0 +1,26 @@
+// Combinations of k elements (order ignored), small n.
+// import("lib/kern/stdlib/alg/combinations.kn")
+
+def _comb_rec(arr, k, start, prefix, out) {
+    if (k == 0) {
+        push(out, copy(prefix))
+        return
+    }
+    let i = start
+    while (i < len(arr)) {
+        push(prefix, arr[i])
+        _comb_rec(arr, k - 1, i + 1, prefix, out)
+        remove_at(prefix, len(prefix) - 1)
+        i = i + 1
+    }
+}
+
+def combinations(arr, k) {
+    if (k < 0) { throw "combinations: k must be >= 0" }
+    if (k == 0) { return array(array()) }
+    if (k > len(arr)) { return array() }
+    let out = array()
+    let prefix = array()
+    _comb_rec(arr, k, 0, prefix, out)
+    return out
+}

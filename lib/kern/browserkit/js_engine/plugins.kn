@@ -1,0 +1,39 @@
+import "./plugins.kn"
+// browserkit js_engine/plugins.kn
+// extension/plugin registry for browserkit.
+
+plugins = {}
+
+def _bk_fail(code, message, hint) {
+    throw Error(code + ": " + message + " | Hint: " + hint, code)
+}
+
+def register(name, plugin_obj) {
+    plugins[str(name)] = plugin_obj
+}
+
+def get(name) {
+    let k = str(name)
+    if (!has(plugins, k)) { return null }
+    return plugins[k]
+}
+
+def run_hook(name, hook, payload) {
+    let p = get(name)
+    if (p == null) { return null }
+    if (!has(p, hook)) {
+        _bk_fail("BROWSERKIT-PLUGIN-HOOK-MISSING",
+            "plugin '" + str(name) + "' does not expose hook '" + str(hook) + "'",
+            "Register the hook in the plugin object before calling run_hook.")
+    }
+    if (type(p[hook]) != "function") {
+        _bk_fail("BROWSERKIT-PLUGIN-HOOK-INVALID",
+            "plugin hook '" + str(hook) + "' is not callable",
+            "Ensure hook values are functions.")
+    }
+    return p[hook](payload)
+}
+
+def list_names() {
+    return keys(plugins)
+}

@@ -1,0 +1,33 @@
+[package]
+name = "kern-portable-bootstrap"
+version = "1.0.20"
+edition = "2021"
+license = "GPL-3.0"
+description = "Windows-first bootstrap: project kern-<version>/ env, delegate to local kern.exe (KERN_HOME)"
+repository = "https://github.com/entrenchedosx/kern"
+
+[[bin]]
+name = "kern-portable"
+path = "src/main.rs"
+
+[lib]
+name = "kern_portable_bootstrap"
+path = "src/lib.rs"
+
+[dependencies]
+rand = "0.8"
+flate2 = "1.0"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+time = { version = "0.3", features = ["formatting"] }
+tar = "0.4"
+thiserror = "1.0"
+toml = "0.8"
+zip = "0.6"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

@@ -1,0 +1,36 @@
+// Tiny 2D vector helpers as [x, y] arrays.
+// import("lib/kern/stdlib/math/vec2.kn")
+
+def v2(x, y) {
+    return array(x, y)
+}
+
+def v2_add(a, b) {
+    return array(a[0] + b[0], a[1] + b[1])
+}
+
+def v2_sub(a, b) {
+    return array(a[0] - b[0], a[1] - b[1])
+}
+
+def v2_scale(a, s) {
+    return array(a[0] * s, a[1] * s)
+}
+
+def v2_dot(a, b) {
+    return a[0] * b[0] + a[1] * b[1]
+}
+
+def v2_len_sq(a) {
+    return a[0] * a[0] + a[1] * a[1]
+}
+
+def v2_len(a) {
+    return sqrt(v2_len_sq(a))
+}
+
+def v2_norm(a) {
+    let l = v2_len(a)
+    if (l == 0) { return array(0.0, 0.0) }
+    return v2_scale(a, 1.0 / l)
+}

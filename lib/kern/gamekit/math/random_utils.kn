@@ -1,0 +1,26 @@
+// gamekit random utilities
+
+
+def randint(lo, hi) {
+    return random_int(lo, hi)
+}
+
+def randf(lo, hi) {
+    return random(lo, hi)
+}
+
+def choice(arr) {
+    if (arr == null || len(arr) == 0) { return null }
+    return random_choice(arr)
+}
+
+def shuffle_in_place(arr) {
+    random_shuffle(arr)
+    return arr
+}
+
+def chance(p) {
+    if (p <= 0.0) { return false }
+    if (p >= 1.0) { return true }
+    return random(0.0, 1.0) < p
+}

@@ -1,0 +1,12 @@
+// file I/O: write_file, read_file (permissions: filesystem.read + filesystem.write, or unsafe { })
+require("filesystem.read")
+require("filesystem.write")
+let path = "kern_example_temp.txt"
+write_file(path, "Hello from Kern")
+let content = read_file(path)
+print("read back:", content)
+delete_file(path)
+sleep(5000)
+
+
+

@@ -1,0 +1,50 @@
+// Basic sorting algorithm in Kern
+
+print("=== Sorting Algorithm Demo ===")
+
+// Bubble sort implementation
+def bubble_sort(arr) {
+    let n = len(arr)
+    for i in range(0, n) {
+        for j in range(0, n - i - 1) {
+            if (arr[j] > arr[j + 1]) {
+                // Swap
+                let temp = arr[j]
+                arr[j] = arr[j + 1]
+                arr[j + 1] = temp
+            }
+        }
+    }
+    return arr
+}
+
+// Test data
+let data = array(64, 34, 25, 12, 22, 11, 90, 5)
+print("Original:", data)
+
+bubble_sort(data)
+print("Sorted:", data)
+
+// Binary search implementation
+def binary_search(arr, target) {
+    let left = 0
+    let right = len(arr) - 1
+    
+    while (left <= right) {
+        let mid = (left + right) / 2
+        if (arr[mid] == target) {
+            return mid
+        }
+        if (arr[mid] < target) {
+            left = mid + 1
+        } else {
+            right = mid - 1
+        }
+    }
+    return -1
+}
+
+let idx = binary_search(data, 25)
+print("Found 25 at index:", idx)
+
+print("=== Sorting demo complete ===")

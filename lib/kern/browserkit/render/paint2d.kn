@@ -1,0 +1,102 @@
+// browserkit render/paint2d.kn
+// paint DOM using g2d.
+
+g = import("g2d")
+
+def _parse_color(s, fallback_r, fallback_g, fallback_b) {
+    let out = {}
+    out["r"] = fallback_r
+    out["g"] = fallback_g
+    out["b"] = fallback_b
+    if (s == null) { return out }
+    let t = trim(lower(str(s)))
+    if (starts_with(t, "#") && len(t) == 7) {
+        let r = parse_int("0x" + slice(t, 1, 3))
+        let gg = parse_int("0x" + slice(t, 3, 5))
+        let b = parse_int("0x" + slice(t, 5, 7))
+        if (r != null) { out["r"] = r }
+        if (gg != null) { out["g"] = gg }
+        if (b != null) { out["b"] = b }
+    } else {
+        if (t == "red") { out["r"] = 220; out["g"] = 60; out["b"] = 60 }
+        else {
+            if (t == "green") { out["r"] = 60; out["g"] = 180; out["b"] = 90 }
+            else {
+                if (t == "blue") { out["r"] = 70; out["g"] = 110; out["b"] = 220 }
+                else {
+                    if (t == "white") { out["r"] = 240; out["g"] = 240; out["b"] = 240 }
+                    else {
+                        if (t == "black") { out["r"] = 20; out["g"] = 20; out["b"] = 20 }
+                    }
+                }
+            }
+        }
+    }
+    return out
+}
+
+def _text_of(node) {
+    if (node["type"] == "text") { return node["text"] }
+    if (node["text"] != null && node["text"] != "") { return node["text"] }
+    let i = 0
+    while (i < len(node["children"])) {
+        let c = node["children"][i]
+        if (c["type"] == "text") { return c["text"] }
+        i = i + 1
+    }
+    return ""
+}
+
+def _is_structural(node) {
+    if (node == null || node["type"] != "element") { return false }
+    let t = lower(str(node["tag"]))
+    return t == "document" || t == "html" || t == "body"
+}
+
+def _paint_node(node) {
+    if (!has(node, "layout")) { return }
+    let x = node["layout"]["x"]
+    let y = node["layout"]["y"]
+    let w = node["layout"]["w"]
+    let h = node["layout"]["h"]
+
+    if (node["type"] == "element") {
+        let st = has(node, "computed_style") ? node["computed_style"] : {}
+        let bg = has(st, "background") ? st["background"] : (has(st, "background-color") ? st["background-color"] : "#2b334f")
+        let fg = has(st, "color") ? st["color"] : "#e8ecff"
+        let bgc = _parse_color(bg, 43, 51, 79)
+        let fgc = _parse_color(fg, 232, 236, 255)
+
+        let draw_box = true
+        if (_is_structural(node) && !has(st, "background") && !has(st, "background-color")) {
+            draw_box = false
+        }
+        if (draw_box) {
+            g.fillRect(x, y, w, h, bgc["r"], bgc["g"], bgc["b"], 255)
+            g.drawRect(x, y, w, h, 130, 150, 190, 255)
+        }
+        let txt = _text_of(node)
+        if (txt != "") {
+            g.drawText(txt, x + 8, y + 8, null, fgc["r"], fgc["g"], fgc["b"], 255)
+        }
+    } else {
+        // text children are rendered by their owning element to avoid duplicates.
+    }
+}
+
+def render_document(root) {
+    if (g == null || root == null) { return false }
+    let stack = [root]
+    let idx = 0
+    while (idx < len(stack)) {
+        let node = stack[idx]
+        idx = idx + 1
+        _paint_node(node)
+        let i = 0
+        while (i < len(node["children"])) {
+            push(stack, node["children"][i])
+            i = i + 1
+        }
+    }
+    return true
+}

@@ -1,0 +1,34 @@
+// Memory pool basics: create, allocate, free
+// Demonstrates the formal kernel allocator spec with safe arithmetic
+
+print("=== Memory Pool Basic Demo ===")
+
+// Create a pool with 32-byte blocks, 10 slots
+let pool_id = pool_create(32, 10)
+print("Created pool:", pool_id)
+
+// Allocate from pool
+let ptr1 = pool_alloc(pool_id)
+print("Allocated ptr1:", ptr1)
+
+let ptr2 = pool_alloc(pool_id)
+print("Allocated ptr2:", ptr2)
+
+// Free back to pool
+pool_free(ptr1, pool_id)
+print("Freed ptr1")
+
+// Reallocate - should reuse the freed slot
+let ptr3 = pool_alloc(pool_id)
+print("Reallocated ptr3 (should reuse slot):", ptr3)
+
+// Free all
+pool_free(ptr2, pool_id)
+pool_free(ptr3, pool_id)
+print("Freed all allocations")
+
+// Destroy pool
+pool_destroy(pool_id)
+print("Destroyed pool")
+
+print("=== Pool demo complete ===")

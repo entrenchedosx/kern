@@ -1,0 +1,449 @@
+// event bus with propagation control and basic error capture.
+
+def create_bus() {
+    let bus = {}
+    bus["next_id"] = 1
+    return bus
+}
+
+def _listener_entry(id, handler, once_flag, priority, stop_on_error, retries, retry_delay_ms, timeout_ms, max_failures, cooldown_ms, max_circuit_trips) {
+    let e = {}
+    e["id"] = id
+    e["handler"] = handler
+    e["once"] = once_flag
+    e["priority"] = int(priority)
+    e["stop_on_error"] = stop_on_error == true
+    e["retries"] = int(retries)
+    e["retry_delay_ms"] = int(retry_delay_ms)
+    e["timeout_ms"] = int(timeout_ms)
+    e["max_failures"] = int(max_failures)
+    e["cooldown_ms"] = int(cooldown_ms)
+    e["max_circuit_trips"] = int(max_circuit_trips)
+    e["fail_count"] = 0
+    e["blocked_until_ms"] = 0
+    e["circuit_trips"] = 0
+    e["quarantined"] = false
+    return e
+}
+
+def _insert_listener_sorted(arr, entry) {
+    let out = []
+    let inserted = false
+    let i = 0
+    while (i < len(arr)) {
+        let cur = arr[i]
+        let cp = 0
+        if (has(cur, "priority")) { cp = int(cur["priority"]) }
+        if (!inserted && int(entry["priority"]) > cp) {
+            push(out, entry)
+            inserted = true
+        }
+        push(out, cur)
+        i = i + 1
+    }
+    if (!inserted) { push(out, entry) }
+    return out
+}
+
+def on(bus, event_name, handler, priority, stop_on_error, retries, retry_delay_ms, timeout_ms, max_failures, cooldown_ms, max_circuit_trips) {
+    let name = str(event_name)
+    let ek = "evt:" + name
+    if (!has(bus, ek)) { bus[ek] = [] }
+    let id = bus["next_id"]
+    bus["next_id"] = id + 1
+    let arr = bus[ek]
+    let p = 0
+    if (priority != null) { p = int(priority) }
+    let soe = false
+    if (stop_on_error != null && stop_on_error == true) { soe = true }
+    let r = 0
+    if (retries != null) { r = int(retries) }
+    let d = 0
+    if (retry_delay_ms != null) { d = int(retry_delay_ms) }
+    let t = 0
+    if (timeout_ms != null) { t = int(timeout_ms) }
+    let mf = 0
+    if (max_failures != null) { mf = int(max_failures) }
+    let cd = 0
+    if (cooldown_ms != null) { cd = int(cooldown_ms) }
+    let mct = 0
+    if (max_circuit_trips != null) { mct = int(max_circuit_trips) }
+    bus[ek] = _insert_listener_sorted(arr, _listener_entry(id, handler, false, p, soe, r, d, t, mf, cd, mct))
+    return id
+}
+
+def once(bus, event_name, handler, priority, stop_on_error, retries, retry_delay_ms, timeout_ms, max_failures, cooldown_ms, max_circuit_trips) {
+    let name = str(event_name)
+    let ek = "evt:" + name
+    if (!has(bus, ek)) { bus[ek] = [] }
+    let id = bus["next_id"]
+    bus["next_id"] = id + 1
+    let arr = bus[ek]
+    let p = 0
+    if (priority != null) { p = int(priority) }
+    let soe = false
+    if (stop_on_error != null && stop_on_error == true) { soe = true }
+    let r = 0
+    if (retries != null) { r = int(retries) }
+    let d = 0
+    if (retry_delay_ms != null) { d = int(retry_delay_ms) }
+    let t = 0
+    if (timeout_ms != null) { t = int(timeout_ms) }
+    let mf = 0
+    if (max_failures != null) { mf = int(max_failures) }
+    let cd = 0
+    if (cooldown_ms != null) { cd = int(cooldown_ms) }
+    let mct = 0
+    if (max_circuit_trips != null) { mct = int(max_circuit_trips) }
+    bus[ek] = _insert_listener_sorted(arr, _listener_entry(id, handler, true, p, soe, r, d, t, mf, cd, mct))
+    return id
+}
+
+def _reset_listener_state(listener) {
+    listener["fail_count"] = 0
+    listener["blocked_until_ms"] = 0
+    listener["circuit_trips"] = 0
+    listener["quarantined"] = false
+    return listener
+}
+
+def reset_listener(bus, event_name, listener_id) {
+    let ek = "evt:" + str(event_name)
+    if (!has(bus, ek)) { return false }
+    let arr = bus[ek]
+    let i = 0
+    let changed = false
+    while (i < len(arr)) {
+        if (int(arr[i]["id"]) == int(listener_id)) {
+            arr[i] = _reset_listener_state(arr[i])
+            changed = true
+            break
+        }
+        i = i + 1
+    }
+    bus[ek] = arr
+    return changed
+}
+
+def reset_event(bus, event_name) {
+    let ek = "evt:" + str(event_name)
+    if (!has(bus, ek)) { return 0 }
+    let arr = bus[ek]
+    let i = 0
+    while (i < len(arr)) {
+        arr[i] = _reset_listener_state(arr[i])
+        i = i + 1
+    }
+    bus[ek] = arr
+    return len(arr)
+}
+
+def reset_all(bus) {
+    let ks = keys(bus)
+    let i = 0
+    let total = 0
+    while (i < len(ks)) {
+        let k = str(ks[i])
+        if (starts_with(k, "evt:")) {
+            let arr = bus[k]
+            let j = 0
+            while (j < len(arr)) {
+                arr[j] = _reset_listener_state(arr[j])
+                j = j + 1
+            }
+            bus[k] = arr
+            total = total + len(arr)
+        }
+        i = i + 1
+    }
+    return total
+}
+
+// snapshot listener metadata + circuit state for dashboards / IDE tooling (no handler bodies).
+def _snapshot_listener(e) {
+    let s = {}
+    if (has(e, "id")) { s["id"] = e["id"] }
+    if (has(e, "priority")) { s["priority"] = e["priority"] }
+    if (has(e, "once")) { s["once"] = e["once"] }
+    if (has(e, "stop_on_error")) { s["stop_on_error"] = e["stop_on_error"] }
+    if (has(e, "retries")) { s["retries"] = e["retries"] }
+    if (has(e, "retry_delay_ms")) { s["retry_delay_ms"] = e["retry_delay_ms"] }
+    if (has(e, "timeout_ms")) { s["timeout_ms"] = e["timeout_ms"] }
+    if (has(e, "max_failures")) { s["max_failures"] = e["max_failures"] }
+    if (has(e, "cooldown_ms")) { s["cooldown_ms"] = e["cooldown_ms"] }
+    if (has(e, "max_circuit_trips")) { s["max_circuit_trips"] = e["max_circuit_trips"] }
+    if (has(e, "fail_count")) { s["fail_count"] = e["fail_count"] }
+    if (has(e, "blocked_until_ms")) { s["blocked_until_ms"] = e["blocked_until_ms"] }
+    if (has(e, "circuit_trips")) { s["circuit_trips"] = e["circuit_trips"] }
+    if (has(e, "quarantined")) { s["quarantined"] = e["quarantined"] }
+    if (has(e, "handler")) { s["handler_type"] = type(e["handler"]) }
+    return s
+}
+
+// stable order for IDE diffs: ascending listener id (insertion sort; n is small).
+def _sort_snapshots_by_listener_id(snaps) {
+    let n = len(snaps)
+    let i = 1
+    while (i < n) {
+        let j = i
+        while (j > 0) {
+            let aj = int(snaps[j]["id"])
+            let aj1 = int(snaps[j - 1]["id"])
+            if (aj1 <= aj) { break }
+            let t = snaps[j - 1]
+            snaps[j - 1] = snaps[j]
+            snaps[j] = t
+            j = j - 1
+        }
+        i = i + 1
+    }
+    return snaps
+}
+
+// named inspect_event (not inspect) to avoid colliding with the VM builtin inspect.
+def inspect_event(bus, event_name) {
+    let name = str(event_name)
+    let ek = "evt:" + name
+    let out = {}
+    out["event"] = name
+    out["listeners"] = []
+    if (!has(bus, ek)) {
+        out["count"] = 0
+        return out
+    }
+    let arr = bus[ek]
+    let i = 0
+    while (i < len(arr)) {
+        push(out["listeners"], _snapshot_listener(arr[i]))
+        i = i + 1
+    }
+    out["listeners"] = _sort_snapshots_by_listener_id(out["listeners"])
+    out["count"] = len(out["listeners"])
+    return out
+}
+
+def inspect_all_events(bus) {
+    let names = []
+    let ks = keys(bus)
+    let i = 0
+    while (i < len(ks)) {
+        let k = str(ks[i])
+        if (starts_with(k, "evt:")) {
+            push(names, slice(k, 4, len(k)))
+        }
+        i = i + 1
+    }
+    sort(names)
+    let out = {}
+    let j = 0
+    while (j < len(names)) {
+        let evname = names[j]
+        out[evname] = inspect_event(bus, evname)
+        j = j + 1
+    }
+    return out
+}
+
+def off(bus, event_name, listener_id) {
+    let name = str(event_name)
+    let ek = "evt:" + name
+    if (!has(bus, ek)) { return false }
+    let kept = []
+    let i = 0
+    let listeners = bus[ek]
+    while (i < len(listeners)) {
+        let e = listeners[i]
+        if (int(e["id"]) != int(listener_id)) { push(kept, e) }
+        i = i + 1
+    }
+    bus[ek] = kept
+    return true
+}
+
+def emit(bus, event_name, ctx, payload) {
+    let name = str(event_name)
+    let ek = "evt:" + name
+    if (!has(bus, ek)) {
+        let empty_res = {}
+        empty_res["delivered"] = 0
+        empty_res["stopped"] = false
+        empty_res["errors"] = []
+        return empty_res
+    }
+    let listeners = bus[ek]
+    let kept = []
+    let errors = []
+    let listener_stats = []
+    let delivered = 0
+    let stopped = false
+    let attempts_total = 0
+    let retries_total = 0
+    let timeout_total = 0
+    let circuit_skips = 0
+    let quarantine_skips = 0
+    let last_error = null
+    let i = 0
+    while (i < len(listeners)) {
+        let e = listeners[i]
+        let now_ms = int(monotonic_time() * 1000)
+        let blocked_until = 0
+        if (has(e, "blocked_until_ms")) { blocked_until = int(e["blocked_until_ms"]) }
+        let quarantined = has(e, "quarantined") && e["quarantined"] == true
+        let keep_listener = true
+        let result = null
+        let stop_due_error = false
+        let listener_attempts = 0
+        let listener_retries = 0
+        let listener_timed_out = false
+        let listener_error = null
+        let listener_ok = false
+        let listener_skipped = false
+        let listener_circuit_open = false
+        let listener_quarantined = false
+        let retries_left = 0
+        if (has(e, "retries")) { retries_left = int(e["retries"]) }
+        let retry_delay = 0
+        if (has(e, "retry_delay_ms")) { retry_delay = int(e["retry_delay_ms"]) }
+        let timeout_limit = 0
+        if (has(e, "timeout_ms")) { timeout_limit = int(e["timeout_ms"]) }
+        if (quarantined) {
+            listener_skipped = true
+            listener_quarantined = true
+            quarantine_skips = quarantine_skips + 1
+        } else {
+            if (now_ms < blocked_until) {
+                listener_skipped = true
+                listener_circuit_open = true
+                circuit_skips = circuit_skips + 1
+            } else {
+                let handled = false
+                while (!handled) {
+                    listener_attempts = listener_attempts + 1
+                    attempts_total = attempts_total + 1
+                    let started = monotonic_time()
+                    let call_out = __safe_invoke2(e["handler"], ctx, payload)
+                    let elapsed_ms = int((monotonic_time() - started) * 1000)
+                    let timed_out = timeout_limit > 0 && elapsed_ms > timeout_limit
+                    if (has(call_out, "ok") && call_out["ok"] == true) {
+                        if (timed_out) {
+                            if (retries_left > 0) {
+                                retries_left = retries_left - 1
+                                listener_retries = listener_retries + 1
+                                retries_total = retries_total + 1
+                                if (retry_delay > 0) { sleep_ms(retry_delay) }
+                                continue
+                            }
+                            let err = "listener timeout: " + str(elapsed_ms) + "ms > " + str(timeout_limit) + "ms"
+                            push(errors, err)
+                            listener_error = err
+                            last_error = err
+                            listener_timed_out = true
+                            timeout_total = timeout_total + 1
+                            if (has(e, "stop_on_error") && e["stop_on_error"] == true) { stop_due_error = true }
+                            handled = true
+                        } else {
+                            if (has(call_out, "result")) { result = call_out["result"] }
+                            delivered = delivered + 1
+                            listener_ok = true
+                            handled = true
+                        }
+                    } else {
+                        if (retries_left > 0) {
+                            retries_left = retries_left - 1
+                            listener_retries = listener_retries + 1
+                            retries_total = retries_total + 1
+                            if (retry_delay > 0) { sleep_ms(retry_delay) }
+                            continue
+                        }
+                        let err = "listener error"
+                        if (has(call_out, "error")) { err = call_out["error"] }
+                        push(errors, err)
+                        listener_error = err
+                        last_error = err
+                        if (has(e, "stop_on_error") && e["stop_on_error"] == true) { stop_due_error = true }
+                        handled = true
+                    }
+                }
+            }
+        }
+        let max_failures = 0
+        if (has(e, "max_failures")) { max_failures = int(e["max_failures"]) }
+        let cooldown_ms = 0
+        if (has(e, "cooldown_ms")) { cooldown_ms = int(e["cooldown_ms"]) }
+        if (listener_ok) {
+            e["fail_count"] = 0
+            e["blocked_until_ms"] = 0
+        } else {
+            if (!listener_skipped) {
+                let fail_count = 0
+                if (has(e, "fail_count")) { fail_count = int(e["fail_count"]) }
+                fail_count = fail_count + 1
+                e["fail_count"] = fail_count
+                if (max_failures > 0 && fail_count >= max_failures) {
+                    let until_ms = int(monotonic_time() * 1000) + cooldown_ms
+                    e["blocked_until_ms"] = until_ms
+                    e["fail_count"] = 0
+                    let trips = 0
+                    if (has(e, "circuit_trips")) { trips = int(e["circuit_trips"]) }
+                    trips = trips + 1
+                    e["circuit_trips"] = trips
+                    let max_trips = 0
+                    if (has(e, "max_circuit_trips")) { max_trips = int(e["max_circuit_trips"]) }
+                    if (max_trips > 0 && trips >= max_trips) {
+                        e["quarantined"] = true
+                        e["blocked_until_ms"] = 0
+                    }
+                }
+            }
+        }
+        let st = {}
+        if (has(e, "id")) { st["id"] = e["id"] } else { st["id"] = -1 }
+        st["attempts"] = listener_attempts
+        st["retries_used"] = listener_retries
+        st["timed_out"] = listener_timed_out
+        st["ok"] = listener_ok
+        st["skipped"] = listener_skipped
+        st["circuit_open"] = listener_circuit_open
+        st["quarantined"] = listener_quarantined
+        if (has(e, "circuit_trips")) { st["circuit_trips"] = e["circuit_trips"] }
+        if (listener_error != null) { st["error"] = listener_error }
+        push(listener_stats, st)
+        if (e["once"] == true) {
+            keep_listener = false
+        }
+        if (keep_listener) { push(kept, e) }
+        if (stop_due_error) {
+            stopped = true
+            let j = i + 1
+            while (j < len(listeners)) {
+                push(kept, listeners[j])
+                j = j + 1
+            }
+            break
+        }
+        if (result != null && has(result, "stop") && result["stop"] == true) {
+            stopped = true
+            // keep remaining listeners as-is if propagation stopped.
+            let j = i + 1
+            while (j < len(listeners)) {
+                push(kept, listeners[j])
+                j = j + 1
+            }
+            break
+        }
+        i = i + 1
+    }
+    bus[ek] = kept
+    let out = {}
+    out["delivered"] = delivered
+    out["stopped"] = stopped
+    out["errors"] = errors
+    out["attempts"] = attempts_total
+    out["retries_used"] = retries_total
+    out["timeouts"] = timeout_total
+    out["circuit_skips"] = circuit_skips
+    out["quarantine_skips"] = quarantine_skips
+    out["last_error"] = last_error
+    out["listener_stats"] = listener_stats
+    return out
+}

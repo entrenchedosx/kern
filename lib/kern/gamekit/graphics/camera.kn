@@ -1,0 +1,16 @@
+// gamekit graphics/camera.kn
+
+def camera2d(x, y, zoom) {
+    return { "x": float(x), "y": float(y), "zoom": float(zoom) }
+}
+
+def move(cam, dx, dy) {
+    cam["x"] = float(cam["x"]) + float(dx)
+    cam["y"] = float(cam["y"]) + float(dy)
+    return cam
+}
+
+def set_zoom(cam, zoom) {
+    cam["zoom"] = float(zoom)
+    return cam
+}

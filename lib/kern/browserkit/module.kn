@@ -1,0 +1,30 @@
+// browserkit/module.kn
+// import convenience helpers.
+
+def use_http() { return import("lib/kern/browserkit/network/http.kn") }
+def use_ws() { return import("lib/kern/browserkit/network/ws.kn") }
+def use_loader() { return import("lib/kern/browserkit/network/loader.kn") }
+def use_protocols() { return import("lib/kern/browserkit/network/protocols.kn") }
+def use_cache() { return import("lib/kern/browserkit/network/cache.kn") }
+
+def use_dom_tree() { return import("lib/kern/browserkit/dom/tree.kn") }
+def use_dom_query() { return import("lib/kern/browserkit/dom/query.kn") }
+def use_dom_events() { return import("lib/kern/browserkit/dom/events.kn") }
+def use_html() { return import("lib/kern/browserkit/html/parser.kn") }
+
+def use_css_parser() { return import("lib/kern/browserkit/css/parser.kn") }
+def use_style_engine() { return import("lib/kern/browserkit/css/style_engine.kn") }
+
+def use_js_runtime() { return import("lib/kern/browserkit/js_engine/runtime.kn") }
+def use_plugins() { return import("lib/kern/browserkit/js_engine/plugins.kn") }
+
+def use_layout() { return import("lib/kern/browserkit/render/layout.kn") }
+def use_painter() { return import("lib/kern/browserkit/render/paint2d.kn") }
+def use_incremental_renderer() { return import("lib/kern/browserkit/render/incremental.kn") }
+
+def use_window_tabs() { return import("lib/kern/browserkit/ui/window_tabs.kn") }
+def use_events() { return import("lib/kern/browserkit/ui/events.kn") }
+
+def use_storage() { return import("lib/kern/browserkit/storage/local.kn") }
+def use_security() { return import("lib/kern/browserkit/security/policy.kn") }
+def use_csp() { return import("lib/kern/browserkit/security/csp.kn") }

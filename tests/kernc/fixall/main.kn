@@ -1,0 +1,8 @@
+import "./helper.kn"
+
+
+def add(a, b): int {
+    return null
+}
+
+print("fixall fixture")

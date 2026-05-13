@@ -1,0 +1,5 @@
+1	LOAD_GLOBAL print
+2	CONST_STR Hello, Kern
+3	CALL 1
+4	POP
+5	HALT

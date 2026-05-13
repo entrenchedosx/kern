@@ -1,0 +1,11 @@
+{
+  "entry": "examples/oskit_minimal_kernel.kn",
+  "output": "dist/kernel.bin",
+  "target": "kernel",
+  "freestanding": true,
+  "kernel_iso": false,
+  "kernel_cross_prefix": "x86_64-elf-",
+  "kernel_arch": "x86_64",
+  "bootloader": "grub",
+  "optimization": 2
+}

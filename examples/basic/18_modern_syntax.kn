@@ -1,0 +1,35 @@
+// Map comprehensions, invoke + argument spread, ??=, repeat-while, with_cleanup.
+
+let squares = { n: n * n for n in [1, 2, 3, 4] }
+print("squares[3] =", squares[3])
+
+let evens_only = { n: n for n in [1, 2, 3, 4] if n == 2 || n == 4 }
+print("even keys count =", len(keys(evens_only)))
+
+def triple_sum(a, b, c) {
+    return a + b + c
+}
+print("invoke list ->", invoke(triple_sum, [10, 20, 30]))
+
+let tail = [2, 3]
+print("spread tail ->", triple_sum(1, ...tail))
+
+let opt = null
+opt ??= 100
+opt ??= 999
+print("after ??=", opt)
+
+let n = 0
+repeat {
+    n = n + 1
+} while (n < 3)
+print("repeat-while n =", n)
+
+let closed = false
+let handle = {
+    "close": lambda (self) => { closed = true }
+}
+with handle as h {
+    print("inside with, has close =", h["close"] != null)
+}
+print("resource closed =", closed)

@@ -1,0 +1,98 @@
+// gamekit ECS world
+
+def create_world() {
+    let w = {}
+    w["next_entity"] = 1
+    w["entities"] = {}
+    w["components"] = {}
+    w["systems"] = []
+    w["tags"] = {}
+    return w
+}
+
+def create_entity(world, name) {
+    let id = world.next_entity
+    world.next_entity = id + 1
+    world.entities[str(id)] = {"id": id, "name": name, "alive": true}
+    return id
+}
+
+def destroy_entity(world, entity_id) {
+    let k = str(entity_id)
+    if (has(world.entities, k)) {
+        world.entities[k]["alive"] = false
+    }
+}
+
+def add_tag(world, entity_id, tag) {
+    let k = str(entity_id)
+    if (!has(world.tags, k)) { world.tags[k] = {} }
+    world.tags[k][tag] = true
+}
+
+def has_tag(world, entity_id, tag) {
+    let k = str(entity_id)
+    return has(world.tags, k) && has(world.tags[k], tag)
+}
+
+def add_component(world, entity_id, component_name, data) {
+    let ck = component_name
+    let ek = str(entity_id)
+    if (!has(world.components, ck)) {
+        world.components[ck] = {}
+    }
+    world.components[ck][ek] = data
+    return data
+}
+
+def has_component(world, entity_id, component_name) {
+    let ck = component_name
+    let ek = str(entity_id)
+    return has(world.components, ck) && has(world.components[ck], ek)
+}
+
+def get_component(world, entity_id, component_name) {
+    if (!has_component(world, entity_id, component_name)) { return null }
+    return world.components[component_name][str(entity_id)]
+}
+
+def remove_component(world, entity_id, component_name) {
+    if (!has_component(world, entity_id, component_name)) { return false }
+    world.components[component_name][str(entity_id)] = null
+    return true
+}
+
+def query(world, required_components) {
+    let out = array()
+    for k in keys(world.entities) {
+        let e = world.entities[k]
+        if (e == null || !e.alive) { continue }
+        let ok = true
+        let i = 0
+        while (i < len(required_components)) {
+            if (!has_component(world, e.id, required_components[i])) {
+                ok = false
+                break
+            }
+            i = i + 1
+        }
+        if (ok) { push(out, e.id) }
+    }
+    return out
+}
+
+def add_system(world, name, required_components, update_fn) {
+    let sys = {"name": name, "required": required_components, "update": update_fn}
+    push(world.systems, sys)
+    return len(world.systems) - 1
+}
+
+def update(world, dt) {
+    let i = 0
+    while (i < len(world.systems)) {
+        let s = world.systems[i]
+        let entities = query(world, s.required)
+        s.update(world, entities, dt)
+        i = i + 1
+    }
+}

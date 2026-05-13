@@ -1,0 +1,16 @@
+// Numeric intervals and saturation.
+// import("lib/kern/stdlib/math/interval.kn")
+
+def clamp(x, lo, hi) {
+    if (x < lo) { return lo }
+    if (x > hi) { return hi }
+    return x
+}
+
+def clamp01(x) {
+    return clamp(x, 0.0, 1.0)
+}
+
+def in_range(x, lo, hi) {
+    return x >= lo and x <= hi
+}

@@ -1,0 +1,8 @@
+m = import("netops")
+assert_eq(has(m, "url_parse"), true)
+assert_eq(has(m, "parse_query"), true)
+u = m.url_parse("https://example.com/a?x=1")
+q = m.parse_query("x=1&y=2")
+assert_eq(has(u, "scheme"), true)
+assert_eq(has(q, "x"), true)
+print("OK: test_module_netops")

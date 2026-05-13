@@ -1,0 +1,386 @@
+// 04_pathfinding.kn - A* and Dijkstra pathfinding
+
+print("=== Pathfinding Algorithms ===")
+
+print("")
+print("=== Grid Setup ===")
+
+let GRID_WIDTH = 10
+let GRID_HEIGHT = 10
+
+// Create grid with obstacles
+let grid = []
+for y in range(GRID_HEIGHT) {
+    let row = []
+    for x in range(GRID_WIDTH) {
+        // Some obstacles
+        if ((x == 3 && y > 2 && y < 7) ||
+            (x == 7 && y > 3 && y < 8) ||
+            (y == 5 && x > 3 && x < 7)) {
+            row.append(1)  // Wall
+        } else {
+            row.append(0)  // Empty
+        }
+    }
+    grid.append(row)
+}
+
+// Print grid
+def printGrid(path) {
+    for y in range(GRID_HEIGHT) {
+        let line = ""
+        for x in range(GRID_WIDTH) {
+            let isPath = false
+            for p in path {
+                if (p.x == x && p.y == y) {
+                    isPath = true
+                    break
+                }
+            }
+            
+            if (isPath) {
+                line = line + "* "
+            } else if (grid[y][x] == 1) {
+                line = line + "# "
+            } else {
+                line = line + ". "
+            }
+        }
+        print(line)
+    }
+}
+
+print("Grid (0,0 is top-left, # is wall):")
+printGrid([])
+
+print("")
+print("=== Dijkstra's Algorithm ===")
+
+def dijkstra(start, end) {
+    let dist = {}
+    let prev = {}
+    let unvisited = []
+    
+    // Initialize
+    for y in range(GRID_HEIGHT) {
+        for x in range(GRID_WIDTH) {
+            let key = x + "," + y
+            dist[key] = 1000000  // Infinity
+            prev[key] = null
+            unvisited.append({x: x, y: y})
+        }
+    }
+    
+    let startKey = start.x + "," + start.y
+    dist[startKey] = 0
+    
+    while (len(unvisited) > 0) {
+        // Find unvisited node with smallest distance
+        let minDist = 1000000
+        let minIdx = -1
+        
+        for i in range(len(unvisited)) {
+            let u = unvisited[i]
+            let key = u.x + "," + u.y
+            if (dist[key] < minDist) {
+                minDist = dist[key]
+                minIdx = i
+            }
+        }
+        
+        if (minIdx == -1) {
+            break  // No reachable nodes left
+        }
+        
+        let u = unvisited.removeAt(minIdx)
+        let uKey = u.x + "," + u.y
+        
+        // Check if reached destination
+        if (u.x == end.x && u.y == end.y) {
+            break
+        }
+        
+        // Check neighbors
+        let neighbors = [
+            {x: u.x + 1, y: u.y},
+            {x: u.x - 1, y: u.y},
+            {x: u.x, y: u.y + 1},
+            {x: u.x, y: u.y - 1}
+        ]
+        
+        for v in neighbors {
+            // Check bounds
+            if (v.x < 0 || v.x >= GRID_WIDTH ||
+                v.y < 0 || v.y >= GRID_HEIGHT) {
+                continue
+            }
+            
+            // Check if wall
+            if (grid[v.y][v.x] == 1) {
+                continue
+            }
+            
+            let vKey = v.x + "," + v.y
+            let alt = dist[uKey] + 1  // All edges weight 1
+            
+            if (alt < dist[vKey]) {
+                dist[vKey] = alt
+                prev[vKey] = u
+            }
+        }
+    }
+    
+    // Reconstruct path
+    let path = []
+    let u = end
+    let endKey = end.x + "," + end.y
+    
+    if (prev[endKey] != null || (u.x == start.x && u.y == start.y)) {
+        while (u != null) {
+            path.insert(0, u)
+            let key = u.x + "," + u.y
+            u = prev[key]
+        }
+    }
+    
+    return path
+}
+
+let start1 = {x: 1, y: 1}
+let end1 = {x: 8, y: 8}
+
+print("Dijkstra from (" + start1.x + "," + start1.y + ") to (" + end1.x + "," + end1.y + ")")
+let path1 = dijkstra(start1, end1)
+print("Path length: " + len(path1))
+print("Path: ")
+for p in path1 {
+    print("  (" + p.x + "," + p.y + ")")
+}
+printGrid(path1)
+
+print("")
+print("=== A* Algorithm ===")
+
+// Manhattan distance heuristic
+def heuristic(a, b) {
+    return abs(a.x - b.x) + abs(a.y - b.y)
+}
+
+def abs(n) {
+    return if (n < 0) { -n } else { n }
+}
+
+def aStar(start, end) {
+    // Open set (to explore)
+    let openSet = [start]
+    
+    // Closed set (already evaluated)
+    let closedSet = {}
+    
+    // Cost from start
+    let gScore = {}
+    let startKey = start.x + "," + start.y
+    gScore[startKey] = 0
+    
+    // Estimated total cost
+    let fScore = {}
+    fScore[startKey] = heuristic(start, end)
+    
+    // Came from
+    let cameFrom = {}
+    
+    while (len(openSet) > 0) {
+        // Find node in openSet with lowest fScore
+        let minF = 1000000
+        let minIdx = -1
+        
+        for i in range(len(openSet)) {
+            let node = openSet[i]
+            let key = node.x + "," + node.y
+            let f = if (fScore[key] != null) { fScore[key] } else { 1000000 }
+            if (f < minF) {
+                minF = f
+                minIdx = i
+            }
+        }
+        
+        if (minIdx == -1) {
+            break
+        }
+        
+        let current = openSet.removeAt(minIdx)
+        let currentKey = current.x + "," + current.y
+        closedSet[currentKey] = true
+        
+        // Check if goal reached
+        if (current.x == end.x && current.y == end.y) {
+            // Reconstruct path
+            let path = []
+            let node = current
+            while (node != null) {
+                path.insert(0, node)
+                let key = node.x + "," + node.y
+                node = cameFrom[key]
+            }
+            return path
+        }
+        
+        // Check neighbors
+        let neighbors = [
+            {x: current.x + 1, y: current.y},
+            {x: current.x - 1, y: current.y},
+            {x: current.x, y: current.y + 1},
+            {x: current.x, y: current.y - 1}
+        ]
+        
+        for neighbor in neighbors {
+            // Check bounds
+            if (neighbor.x < 0 || neighbor.x >= GRID_WIDTH ||
+                neighbor.y < 0 || neighbor.y >= GRID_HEIGHT) {
+                continue
+            }
+            
+            // Check if wall
+            if (grid[neighbor.y][neighbor.x] == 1) {
+                continue
+            }
+            
+            let neighborKey = neighbor.x + "," + neighbor.y
+            
+            // Skip if in closed set
+            if (closedSet[neighborKey] != null) {
+                continue
+            }
+            
+            let tentativeG = gScore[currentKey] + 1
+            
+            // Check if neighbor not in open set
+            let inOpenSet = false
+            for node in openSet {
+                if (node.x == neighbor.x && node.y == neighbor.y) {
+                    inOpenSet = true
+                    break
+                }
+            }
+            
+            if (!inOpenSet) {
+                openSet.append(neighbor)
+            } else if (tentativeG >= if (gScore[neighborKey] != null) { gScore[neighborKey] } else { 1000000 }) {
+                continue
+            }
+            
+            // This path is the best until now
+            cameFrom[neighborKey] = current
+            gScore[neighborKey] = tentativeG
+            fScore[neighborKey] = tentativeG + heuristic(neighbor, end)
+        }
+    }
+    
+    return []  // No path found
+}
+
+let start2 = {x: 1, y: 8}
+let end2 = {x: 8, y: 1}
+
+print("A* from (" + start2.x + "," + start2.y + ") to (" + end2.x + "," + end2.y + ")")
+let path2 = aStar(start2, end2)
+print("Path length: " + len(path2))
+print("Path: ")
+for p in path2 {
+    print("  (" + p.x + "," + p.y + ")")
+}
+printGrid(path2)
+
+print("")
+print("=== Comparison ===")
+
+print("Dijkstra explores all directions equally (no heuristic)")
+print("A* uses heuristic to prioritize promising directions")
+print("Both guarantee shortest path on uniform grids")
+print("A* is typically faster when heuristic is admissible")
+
+print("")
+print("=== Greedy Best-First Search (for comparison) ===")
+
+def greedyBFS(start, end) {
+    // Like A* but only uses heuristic (greedy)
+    let openSet = [start]
+    let closedSet = {}
+    let cameFrom = {}
+    
+    while (len(openSet) > 0) {
+        // Find lowest heuristic
+        let minH = 1000000
+        let minIdx = -1
+        
+        for i in range(len(openSet)) {
+            let h = heuristic(openSet[i], end)
+            if (h < minH) {
+                minH = h
+                minIdx = i
+            }
+        }
+        
+        let current = openSet.removeAt(minIdx)
+        let currentKey = current.x + "," + current.y
+        
+        if (current.x == end.x && current.y == end.y) {
+            // Reconstruct
+            let path = []
+            let node = current
+            while (node != null) {
+                path.insert(0, node)
+                let key = node.x + "," + node.y
+                node = cameFrom[key]
+            }
+            return path
+        }
+        
+        closedSet[currentKey] = true
+        
+        // Neighbors
+        let neighbors = [
+            {x: current.x + 1, y: current.y},
+            {x: current.x - 1, y: current.y},
+            {x: current.x, y: current.y + 1},
+            {x: current.x, y: current.y - 1}
+        ]
+        
+        for neighbor in neighbors {
+            if (neighbor.x < 0 || neighbor.x >= GRID_WIDTH ||
+                neighbor.y < 0 || neighbor.y >= GRID_HEIGHT) {
+                continue
+            }
+            if (grid[neighbor.y][neighbor.x] == 1) {
+                continue
+            }
+            
+            let key = neighbor.x + "," + neighbor.y
+            if (closedSet[key] != null) {
+                continue
+            }
+            
+            // Check if already in openSet
+            let inOpen = false
+            for n in openSet {
+                if (n.x == neighbor.x && n.y == neighbor.y) {
+                    inOpen = true
+                    break
+                }
+            }
+            
+            if (!inOpen) {
+                cameFrom[key] = current
+                openSet.append(neighbor)
+            }
+        }
+    }
+    
+    return []
+}
+
+let path3 = greedyBFS(start2, end2)
+print("Greedy BFS path length: " + len(path3))
+print("Note: Greedy BFS is NOT guaranteed to find shortest path!")
+
+print("Done!")

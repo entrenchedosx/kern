@@ -1,0 +1,37 @@
+// kern env helpers — import("lib/kern/env_utils.kn")
+// env_get_required, env_get_int, env_get_float, env_get_bool (uses env_get)
+
+def env_get_required(name) {
+    let v = env_get(name)
+    if (v == null or (type(v) == "string" and len(v) == 0)) {
+        throw "Missing required env: " + name
+    }
+    return v
+}
+
+def env_get_int(name, default_val) {
+    let v = env_get(name)
+    if (v == null) { return default_val }
+    if (type(v) == "int" or type(v) == "float") { return int(v) }
+    let n = parse_int(str(v))
+    if (n == null) { return default_val }
+    return n
+}
+
+def env_get_float(name, default_val) {
+    let v = env_get(name)
+    if (v == null) { return default_val }
+    if (type(v) == "int" or type(v) == "float") { return float(v) }
+    let n = parse_float(str(v))
+    if (n == null) { return default_val }
+    return n
+}
+
+def env_get_bool(name, default_val) {
+    let v = env_get(name)
+    if (v == null) { return default_val }
+    let s = lower(str(v))
+    if (s == "1" or s == "true" or s == "yes" or s == "on") { return true }
+    if (s == "0" or s == "false" or s == "no" or s == "off") { return false }
+    return default_val
+}

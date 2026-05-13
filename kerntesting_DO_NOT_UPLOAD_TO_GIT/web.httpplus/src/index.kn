@@ -1,0 +1,76 @@
+// web.httpplus - resilient HTTP wrappers
+
+let _log = import("sys.log")
+
+def _ok(value) { return { "ok": true, "value": value, "error": "", "code": "ok" } }
+def _err(code, message) { return { "ok": false, "value": null, "error": str(default(message, "")), "code": str(default(code, "error")) } }
+
+def _safe_json(raw) {
+    try { return json_parse(str(default(raw, ""))) } catch (e) { return null }
+}
+
+def _sleep_backoff(attempt, base_ms) {
+    let a = int(default(attempt, 1))
+    let base = int(default(base_ms, 200))
+    let wait = base
+    let i = 1
+    while (i < a) { wait = wait * 2; i = i + 1 }
+    sleep_ms(wait)
+}
+
+def get(url) {
+    require("network.http")
+    let u = str(default(url, ""))
+    if (u == "") { return _err("url.empty", "url is required") }
+    try {
+        return _ok(http_get(u))
+    } catch (e) {
+        return _err("http.get_failed", str(e))
+    }
+}
+
+def get_json(url) {
+    let r = get(url)
+    if (!r["ok"]) { return r }
+    let parsed = _safe_json(r["value"])
+    if (parsed == null) { return _err("json.invalid", "response was not valid json") }
+    return _ok(parsed)
+}
+
+def post_json(url, body_obj) {
+    require("network.http")
+    let u = str(default(url, ""))
+    if (u == "") { return _err("url.empty", "url is required") }
+    let body = json_stringify(default(body_obj, {}))
+    try {
+        return _ok(http_post(u, body))
+    } catch (e) {
+        return _err("http.post_failed", str(e))
+    }
+}
+
+def request_with_retry(method, url, body_obj, retries, base_backoff_ms, logger) {
+    let m = upper(str(default(method, "GET")))
+    let tries = int(default(retries, 2))
+    if (tries < 1) { tries = 1 }
+    let lg = default(logger, _log["create_logger"]({ "name": "web.httpplus", "level": "info" }))
+
+    let attempt = 1
+    while (attempt <= tries) {
+        let res = null
+        if (m == "POST") {
+            res = post_json(url, body_obj)
+        } else {
+            res = get(url)
+        }
+        if (res["ok"]) {
+            _log["info"](lg, "http request success", { "attempt": attempt, "method": m, "url": url })
+            return res
+        }
+        _log["warn"](lg, "http request failed", { "attempt": attempt, "method": m, "url": url, "error": res["error"] })
+        if (attempt < tries) { _sleep_backoff(attempt, base_backoff_ms) }
+        attempt = attempt + 1
+    }
+
+    return _err("http.retry_exhausted", "request failed after retries")
+}

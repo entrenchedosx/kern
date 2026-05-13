@@ -1,0 +1,10 @@
+// Expect connection refused to 127.0.0.1:1 quickly (nothing listens on port 1).
+require("network.tcp")
+let r = tcp_connect("127.0.0.1", 1)
+if r["ok"] {
+    print("FAIL: expected tcp_connect to fail")
+    exit_code(1)
+} else {
+    print("ok refused")
+    exit_code(0)
+}

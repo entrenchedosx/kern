@@ -1,0 +1,29 @@
+// immutable-ish context carrier for command/event/task execution.
+
+def create_context(capabilities_policy, args_map) {
+    let ctx = {}
+    let t = {}
+    t["epoch"] = time()
+    t["mono"] = monotonic_time()
+    ctx["time"] = t
+    let envm = {}
+    envm["cwd"] = cwd()
+    envm["pid"] = getpid()
+    envm["platform"] = platform()
+    ctx["env"] = envm
+    ctx["args"] = args_map
+    ctx["meta"] = {}
+    ctx["capabilities"] = capabilities_policy
+    ctx["logger"] = null
+    return ctx
+}
+
+def with_logger(ctx, logger_obj) {
+    ctx["logger"] = logger_obj
+    return ctx
+}
+
+def put_meta(ctx, key, value) {
+    ctx["meta"][str(key)] = value
+    return ctx
+}

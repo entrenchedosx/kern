@@ -1,0 +1,24 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+let vec3 = import("src/math/vec3.kn")
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+def run_once() {
+    let w = ecs["world_create"]()
+    let e = ecs["world_create_entity"](w)
+    ecs["world_add_transform"](w, e, ecs["transform_make"](vec3["zero"](), null, null))
+    ecs["world_add_velocity"](w, e, ecs["velocity_make"](vec3["make"](2, 0, 0)))
+    let i = 0
+    while (i < 120) {
+        ecs["world_run_fixed_pipeline"](w, 1.0 / 60.0)
+        i = i + 1
+    }
+    let t = ecs["world_get_transform"](w, e)
+    return t["local_position"]["x"]
+}
+
+let a = run_once()
+let b = run_once()
+if (a != b) { panic("ecs_determinism: deterministic run mismatch") }
+print("ecs_determinism: ok")

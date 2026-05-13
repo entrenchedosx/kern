@@ -1,0 +1,5 @@
+// random: use an alias so `random.random` is not confusing to read.
+import "random" as rnd
+print("random_int:", rnd.random_int(1, 6))
+let bag = array("red", "green", "blue")
+print("random_choice:", rnd.random_choice(bag))

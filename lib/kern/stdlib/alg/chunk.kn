@@ -1,0 +1,15 @@
+// Fixed-size non-overlapping chunks (last chunk may be shorter).
+// import("lib/kern/stdlib/alg/chunk.kn")
+
+def chunks(arr, size) {
+    if (size <= 0) { throw "chunks: size must be > 0" }
+    let out = array()
+    let i = 0
+    while (i < len(arr)) {
+        let end = i + size
+        if (end > len(arr)) { end = len(arr) }
+        push(out, slice(arr, i, end))
+        i = i + size
+    }
+    return out
+}

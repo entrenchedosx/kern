@@ -1,0 +1,11 @@
+{
+  "name": "sys.log",
+  "version": "1.0.1",
+  "main": "src/index.kn",
+  "dependencies": {},
+  "trusted": false,
+  "dist": {
+    "tarball": "https://github.com/entrenchedosx/kern/releases/download/sys.log-v1.0.1/sys.log-1.0.1.tgz",
+    "shasum": "sha256-1417ed9fe650451f2c179a8e2c7192f41884a593090f193d7fa54e522319af30"
+  }
+}

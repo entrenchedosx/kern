@@ -1,0 +1,20 @@
+// browserkit/render/incremental.kn
+
+let _dirty = []
+
+def _bk_fail(code, message, hint) {
+    throw Error(code + ": " + message + " | Hint: " + hint, code)
+}
+
+def mark_dirty(node) {
+    push(_dirty, node)
+}
+
+def pending() { return len(_dirty) }
+
+def flush(layout_engine, paint_engine, root) {
+    if (len(_dirty) == 0) { return false }
+    _bk_fail("BROWSERKIT-NOT-IMPLEMENTED",
+        "incremental renderer flush has no verified engine contract",
+        "Use render/layout + render/paint2d full pass until incremental pipeline is implemented.")
+}

@@ -1,0 +1,29 @@
+def main() {
+    let input = import("kern::input")
+    if (input == null) {
+        print("kern::input module unavailable")
+        return null
+    }
+
+    let onA = lambda (ev) => {
+        print("key callback:", ev.key, ev.type)
+    }
+
+    let onMove = lambda (ev) => {
+        print("mouse callback:", ev.x, ev.y, ev.type)
+    }
+
+    input.onKey(65, onA)
+    input.onMouse("move", onMove)
+
+    env_set("KERN_ALLOW_INPUT_SIM", "1")
+    input.simulateKey(65)
+    input.simulateMouse(120, 240)
+    let drained = input.poll()
+    print("events drained:", drained)
+    return null
+}
+
+main()
+
+

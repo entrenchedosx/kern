@@ -1,0 +1,24 @@
+// ASCII character class tests (single-character strings).
+// import("lib/kern/stdlib/string/ctype.kn")
+
+def is_digit_c(c) {
+    return len(c) == 1 and c[0] >= "0" and c[0] <= "9"
+}
+
+def is_alpha_c(c) {
+    if (len(c) != 1) { return false }
+    let x = c[0]
+    return (x >= "a" and x <= "z") or (x >= "A" and x <= "Z")
+}
+
+def is_space_c(c) {
+    if (len(c) != 1) { return false }
+    let x = c[0]
+    return x == " " or x == "\t" or x == "\n" or x == "\r"
+}
+
+def is_hex_c(c) {
+    if (len(c) != 1) { return false }
+    let x = c[0]
+    return is_digit_c(c) or (x >= "a" and x <= "f") or (x >= "A" and x <= "F")
+}

@@ -1,0 +1,63 @@
+// modern runtime bundle for event-driven developer tooling.
+
+capabilities = import("lib/kern/runtime/modern/capabilities.kn")
+context_mod = import("lib/kern/runtime/modern/context.kn")
+events = import("lib/kern/runtime/modern/events.kn")
+commands = import("lib/kern/runtime/modern/commands.kn")
+scheduler = import("lib/kern/runtime/modern/scheduler.kn")
+async_rt = import("lib/kern/runtime/modern/async_runtime.kn")
+streams = import("lib/kern/runtime/modern/streams.kn")
+plugins = import("lib/kern/runtime/modern/plugins.kn")
+state_mod = import("lib/kern/runtime/modern/state.kn")
+logging = import("lib/kern/runtime/modern/logging.kn")
+fs = import("lib/kern/runtime/modern/system_fs.kn")
+process = import("lib/kern/runtime/modern/system_process.kn")
+devices = import("lib/kern/runtime/modern/system_devices.kn")
+
+def create_runtime(args_map) {
+    let policy = capabilities.create_policy()
+    let bus = events.create_bus()
+    let sched = scheduler.create_scheduler()
+    let rt_async = async_rt.create_async_runtime(sched)
+    let registry = commands.create_registry()
+    let plugin_registry = plugins.create_registry()
+    let imm = {}
+    imm["version"] = "modern-runtime-1"
+    let state = state_mod.create_state({}, imm)
+    let ctx = context_mod.create_context(policy, args_map)
+    let logger = logging.create_logger("kern.runtime")
+    context_mod.with_logger(ctx, logger)
+
+    let runtime = {}
+    runtime["ctx"] = ctx
+    runtime["policy"] = policy
+    runtime["events"] = bus
+    runtime["commands"] = registry
+    runtime["scheduler"] = sched
+    runtime["async"] = rt_async
+    runtime["streams"] = streams
+    runtime["plugins"] = plugin_registry
+    runtime["state"] = state
+    runtime["logging"] = logging
+    runtime["capabilities"] = capabilities
+    let system = {}
+    system["fs"] = fs
+    system["process"] = process
+    system["devices"] = devices
+    runtime["system"] = system
+
+    // bind decorator-defined commands/events before startup hooks fire.
+    __runtime_apply_decorators(runtime)
+
+    // core lifecycle events.
+    let start_payload = {}
+    start_payload["time"] = ctx["time"]
+    events.emit(bus, "on_start", ctx, start_payload)
+
+    return runtime
+}
+
+def shutdown(runtime) {
+    events.emit(runtime["events"], "on_shutdown", runtime["ctx"], {})
+    return true
+}

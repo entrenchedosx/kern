@@ -1,0 +1,8 @@
+datatools = import("datatools")
+
+j = datatools.json_parse("{\"x\": 1, \"y\": 2}")
+t = datatools.toml_stringify({a: 1})
+rows = datatools.csv_parse("a,b\n1,2\n")
+print("json has x:", has(j, "x"))
+print("toml len > 0:", len(t) > 0)
+print("csv rows:", len(rows))

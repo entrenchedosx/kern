@@ -1,0 +1,11 @@
+cam_mod = import("lib/kern/gamekit/graphics/camera.kn")
+
+let cam = cam_mod.camera2d(10, 20, 1.0)
+cam_mod.move(cam, 5, -2)
+if (cam["x"] != 15) { throw "camera x move failed" }
+if (cam["y"] != 18) { throw "camera y move failed" }
+
+cam_mod.set_zoom(cam, 2.5)
+if (cam["zoom"] != 2.5) { throw "camera zoom failed" }
+
+print("test_gamekit_camera_module: pass")

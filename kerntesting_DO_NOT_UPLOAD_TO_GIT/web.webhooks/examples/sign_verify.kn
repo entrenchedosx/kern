@@ -1,0 +1,5 @@
+let hooks = import("web.webhooks")
+let payload = { "order_id": "o-1", "status": "paid" }
+let sig = hooks["sign_payload"](payload, "whsec_test")
+let check = hooks["verify_payload"](payload, "whsec_test", sig)
+print(json_stringify(check, 2))

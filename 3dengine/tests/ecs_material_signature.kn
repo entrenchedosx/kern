@@ -1,0 +1,20 @@
+let u = import("src/index.kn")
+let ecs = u["ecs"]
+def v3(x, y, z) { return {"x": float(x), "y": float(y), "z": float(z)} }
+
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let w = ecs["world_create"]()
+let black = ecs["material_make"](v3(0.0, 0.0, 0.0), "m.shared", null)
+let white = ecs["material_make"](v3(1.0, 1.0, 1.0), "m.shared", null)
+let hid_b = ecs["world_register_material"](w, black)
+let hid_w = ecs["world_register_material"](w, white)
+if (str(default(hid_b, "")) == "" || str(default(hid_w, "")) == "") { panic("ecs_material_signature: register failed") }
+if (hid_b == hid_w) { panic("ecs_material_signature: black and white must not dedupe (same material_id)") }
+if (int(ecs["world_material_registry_size"](w)) != 2) { panic("ecs_material_signature: expected two materials") }
+
+let hid_b2 = ecs["world_register_material"](w, ecs["material_make"](v3(0.0, 0.0, 0.0), "m.shared", null))
+if (hid_b2 != hid_b) { panic("ecs_material_signature: identical black should dedupe") }
+
+print("ecs_material_signature: ok")

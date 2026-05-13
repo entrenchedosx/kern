@@ -1,0 +1,20 @@
+// oskit drivers/timer.kn
+
+let _ticks = 0
+let _hz = 100
+
+def setup(hz) {
+    _hz = int(hz)
+    if (_hz <= 0) { _hz = 100 }
+    _ticks = 0
+    return _hz
+}
+
+def tick() {
+    _ticks = _ticks + 1
+    return _ticks
+}
+
+def ticks() { return _ticks }
+def hz() { return _hz }
+def ms() { return int((_ticks * 1000) / _hz) }

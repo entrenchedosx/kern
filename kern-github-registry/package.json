@@ -1,0 +1,19 @@
+{
+  "name": "kern-github-registry",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "kern-gh-pkg": "cli/entry.js"
+  },
+  "scripts": {
+    "start": "node ./cli/entry.js --help"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "dependencies": {
+    "semver": "^7.7.2",
+    "tar": "^7.4.3"
+  }
+}

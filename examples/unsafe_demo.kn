@@ -1,0 +1,79 @@
+// unsafe_demo.kn - Demonstrates unsafe block for FFI calls
+// This example uses FFI to call Windows kernel32.dll functions
+
+print("=== UNSAFE BLOCK DEMO ===")
+print("")
+
+// Import the interop module for FFI
+let interop = import("interop")
+print("Interop module loaded: " + interop)
+
+// To use FFI, we need to be in an unsafe block
+print("")
+print("Entering unsafe block to call Windows API...")
+
+unsafe {
+    print("  Inside unsafe block!")
+    
+    // Allow kernel32.dll for FFI calls
+    print("  Allowing kernel32.dll...")
+    interop.ffi_allow_library("kernel32.dll")
+    print("  kernel32.dll allowed!")
+    
+    // Call GetTickCount - returns milliseconds since system start
+    print("")
+    print("  Calling GetTickCount()...")
+    let tickCount = interop.ffi_call("kernel32.dll", "GetTickCount", "u32", "win64", [])
+    print("  GetTickCount() = " + tickCount + " ms")
+    
+    // Convert to seconds for readability
+    let seconds = tickCount / 1000
+    let minutes = seconds / 60
+    let hours = minutes / 60
+    print("  System uptime: " + hours + " hours, " + (minutes % 60) + " minutes, " + (seconds % 60) + " seconds")
+    
+    print("")
+    print("  --- EMAIL DEMO ---")
+    print("  Opening default email client to send email to owner@kerncode.art...")
+    
+    // Allow shell32.dll for ShellExecute
+    print("  Allowing shell32.dll...")
+    interop.ffi_allow_library("shell32.dll")
+    
+    // Build mailto: URI with subject and body
+    let mailtoUri = "mailto:owner@kerncode.art?subject=Hello%20from%20Kern&body=This%20email%20was%20sent%20from%20Kern%20FFI%20demo"
+    
+    // Call ShellExecuteA to open default mail client
+    // ShellExecuteA(HWND, operation, file, params, dir, showCmd)
+    // We use 0 for HWND (null), "open" for operation, mailto: as file
+    print("  Calling ShellExecuteA...")
+    let result = interop.ffi_call("shell32.dll", "ShellExecuteA", "u64", "win64", [
+        0,                          // hwnd (null)
+        "open",                     // operation ("open")
+        mailtoUri,                  // file (mailto: URI)
+        "",                         // parameters (not needed for mailto)
+        "",                         // directory (not needed)
+        1                           // SW_SHOWNORMAL = 1
+    ])
+    print("  ShellExecuteA returned: " + result + " (>32 means success on Windows)")
+    
+    if (result > 32) {
+        print("  SUCCESS: Email client should have opened!")
+    } else {
+        print("  NOTE: Could not open email client (error code: " + result + ")")
+    }
+    
+    print("")
+    print("  Exiting unsafe block...")
+}
+
+print("")
+print("Back in safe code!")
+print("")
+print("=== DEMO COMPLETE ===")
+print("")
+print("Note: The unsafe block was required because:")
+print("  1. ffi_allow_library() is a privileged operation")
+print("  2. ffi_call() executes native code outside VM sandbox")
+print("")
+print("Run with: kern --unsafe --ffi unsafe_demo.kn")

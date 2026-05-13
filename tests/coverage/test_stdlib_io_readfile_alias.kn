@@ -1,0 +1,4 @@
+io = import("io")
+assert_eq(type(io.readFile), "function")
+assert_eq(type(io.read_file), "function")
+print("OK: test_stdlib_io_readfile_alias")

@@ -1,0 +1,20 @@
+// oskit boot/builder.kn
+
+def build_kernel(entry, out_bin) {
+    let cmd = "kernc --target kernel " + quote(entry) + " -o " + quote(out_bin) + " --freestanding"
+    return exec_capture(cmd)
+}
+
+def build_iso(entry, out_bin) {
+    let cmd = "kernc --target kernel " + quote(entry) + " -o " + quote(out_bin) + " --freestanding --iso"
+    return exec_capture(cmd)
+}
+
+def run_qemu(entry, out_bin) {
+    let cmd = "kernc --target kernel " + quote(entry) + " -o " + quote(out_bin) + " --freestanding --run-qemu"
+    return exec_capture(cmd)
+}
+
+def quote(s) {
+    return "\"" + replace(str(s), "\"", "\\\"") + "\""
+}

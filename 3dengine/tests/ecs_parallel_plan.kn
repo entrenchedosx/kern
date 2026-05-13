@@ -1,0 +1,44 @@
+let u = import("src/headless.kn")
+let ecs = u["ecs"]
+ecs["set_debug"](false)
+ecs["set_logging"](false)
+
+let w = ecs["world_create"]()
+
+let pass = lambda (world, dt) => { return null }
+
+if (!ecs["world_register_system"](w, "POST_SIMULATION", "plan.a", pass, [])) { panic("ecs_parallel_plan: register plan.a failed") }
+if (!ecs["world_register_system"](w, "POST_SIMULATION", "plan.b", pass, [], {"write_mask": ["velocity"]})) { panic("ecs_parallel_plan: register plan.b failed") }
+if (!ecs["world_register_system"](w, "POST_SIMULATION", "plan.c", pass, ["plan.a"], {"write_mask": ["registry"]})) { panic("ecs_parallel_plan: register plan.c failed") }
+
+let plan = ecs["world_scheduler_parallel_plan"](w)
+let stages = default(plan["stages"], [])
+if (len(stages) == 0) { panic("ecs_parallel_plan: stages missing") }
+let post = null
+let i = 0
+while (i < len(stages)) {
+    let s = default(stages[i], {})
+    if (str(default(s["stage"], "")) == "POST_SIMULATION") { post = s; i = len(stages) } else { i = i + 1 }
+}
+if (post == null) { panic("ecs_parallel_plan: POST_SIMULATION stage missing") }
+let batches = default(post["batches"], [])
+let has_parallel = false
+i = 0
+while (i < len(batches)) {
+    if (len(default(batches[i], [])) >= 2) { has_parallel = true; i = len(batches) } else { i = i + 1 }
+}
+if (!has_parallel) { panic("ecs_parallel_plan: expected at least one parallel-capable batch") }
+
+let conflicts = default(post["conflicts"], [])
+let found_dep_conflict = false
+i = 0
+while (i < len(conflicts)) {
+    let c = default(conflicts[i], {})
+    let a = str(default(c["a"], ""))
+    let b = str(default(c["b"], ""))
+    let r = str(default(c["reason"], ""))
+    if (((a == "plan.c" && b == "plan.a") || (a == "plan.a" && b == "plan.c")) && r == "dependency") { found_dep_conflict = true; i = len(conflicts) } else { i = i + 1 }
+}
+if (!found_dep_conflict) { panic("ecs_parallel_plan: expected dependency conflict between plan.a and plan.c") }
+
+print("ecs_parallel_plan: ok")

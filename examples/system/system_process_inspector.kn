@@ -1,0 +1,37 @@
+def main() {
+    let process = import("kern::process")
+    if (process == null) {
+        print("kern::process module unavailable")
+        return null
+    }
+
+    let rows = process.list()
+    print("process count:", len(rows))
+
+    if (len(rows) > 0) {
+        let first = rows[0]
+        print("first process pid:", first.pid)
+        print("first process name:", first.name)
+        print("first process memory:", first.memory)
+
+        let h = process.open(first.pid)
+        print("open handle:", h)
+        if (h >= 0) {
+            let meta = process.metadata(h)
+            print("metadata pid:", meta.pid)
+            print("metadata name:", meta.name)
+            print("metadata memory:", meta.memory)
+            process.close(h)
+        }
+    }
+
+    return null
+}
+
+main()
+
+
+
+
+
+

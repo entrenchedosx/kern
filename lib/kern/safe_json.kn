@@ -1,0 +1,22 @@
+// jSON helpers — import("lib/kern/safe_json.kn")
+// safe_json_parse(s) — rejects non-string; wraps json_parse in try/catch (VM errors are rare; parser is lenient).
+// safe_json_stringify(v) — wraps json_stringify in try/catch.
+
+def safe_json_parse(s) {
+    if (type(s) != "string") {
+        return { "ok": false, "error": "safe_json_parse: expected string" }
+    }
+    try {
+        return { "ok": true, "value": json_parse(s) }
+    } catch (e) {
+        return { "ok": false, "error": str(e) }
+    }
+}
+
+def safe_json_stringify(v) {
+    try {
+        return { "ok": true, "value": json_stringify(v) }
+    } catch (e) {
+        return { "ok": false, "error": str(e) }
+    }
+}

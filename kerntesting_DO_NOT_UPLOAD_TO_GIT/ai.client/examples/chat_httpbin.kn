@@ -1,0 +1,4 @@
+let ai = import("ai.client")
+let c = ai["create_client"]({ "provider": "custom", "endpoint": "https://httpbin.org/post", "model": "demo-model", "retries": 2 })
+let r = ai["chat_complete"](c, [{ "role": "user", "content": "hello from kern" }], { "temperature": 0.1 }, null)
+print(json_stringify(r, 2))

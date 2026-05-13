@@ -1,0 +1,74 @@
+// browserkit render/layout.kn
+// very simple vertical flow layout with box-model-ish style keys.
+
+def _px(style, key, default_val) {
+    if (style == null || !has(style, key)) { return default_val }
+    let v = replace(str(style[key]), "px", "")
+    return int(v)
+}
+
+def _is_structural(tag) {
+    let t = lower(str(tag))
+    return t == "document" || t == "html" || t == "body"
+}
+
+def layout_tree(root, viewport_w) {
+    let cursor_y = 10
+    let stack = []
+    push(stack, [root, 0])
+
+    while (len(stack) > 0) {
+        let item = remove_at(stack, len(stack) - 1)
+        let node = item[0]
+        let depth = item[1]
+
+        if (node["type"] == "text") {
+            node["layout"] = {}
+            node["layout"]["x"] = 16 + depth * 10
+            node["layout"]["y"] = cursor_y
+            node["layout"]["w"] = viewport_w - 32
+            node["layout"]["h"] = 0
+        } else {
+            let st = has(node, "computed_style") ? node["computed_style"] : {}
+            let tag = has(node, "tag") ? node["tag"] : ""
+            let structural = _is_structural(tag)
+            let auto_container = structural
+            if (auto_container && has(st, "height")) { auto_container = false }
+            if (auto_container && has(st, "padding")) { auto_container = false }
+            if (auto_container && has(st, "margin")) { auto_container = false }
+            if (auto_container && has(st, "background")) { auto_container = false }
+            if (auto_container && has(st, "background-color")) { auto_container = false }
+            let margin = _px(st, "margin", 4)
+            let padding = _px(st, "padding", 6)
+            let h = _px(st, "height", 30)
+            if (auto_container) {
+                margin = 0
+                padding = 0
+                h = 0
+            }
+            let x = 16 + depth * 10 + margin
+            let y = cursor_y + margin
+            let w = viewport_w - (x + 20)
+            if (w < 40) { w = 40 }
+            let box_h = h + padding * 2
+
+            node["layout"] = {}
+            node["layout"]["x"] = x
+            node["layout"]["y"] = y
+            node["layout"]["w"] = w
+            node["layout"]["h"] = box_h
+
+            if (!auto_container) {
+                cursor_y = y + box_h + margin
+            }
+        }
+
+        let i = len(node["children"]) - 1
+        while (i >= 0) {
+            push(stack, [node["children"][i], depth + 1])
+            i = i - 1
+        }
+    }
+
+    return root
+}
