@@ -1,0 +1,482 @@
+// Star Defender — Advanced 3D Space Shooter
+// ============================================
+// Demonstrates: g3d 3D engine, arrays, maps, math builtins,
+//   random generation, collision detection, keyboard input,
+//   wave-based enemy spawning, particles, game state management
+// ============================================
+
+// ── Module Import ──
+let g3 = import("g3d")
+
+// ── Constants (map-based config) ──
+let CFG = { "width": 1024, "height": 768, "title": "Star Defender", "playerSpeed": 8.0, "bulletSpeed": 28.0, "enemyBaseSpeed": 3.5, "asteroidSpeed": 2.0, "fireCooldown": 0.18, "spawnInterval": 1.2, "maxEnemies": 12 }
+
+// ── Game State (global, mutable) ──
+score = 0
+health = 100
+wave = 1
+waveEnemiesSpawned = 0
+waveEnemiesTotal = 5
+gameOver = false
+paused = false
+fireTimer = 0.0
+spawnTimer = 0.0
+starfield = array()
+enemies = array()
+bullets = array()
+asteroids = array()
+particles = array()
+
+// ── Player Object ──
+playerId = -1
+playerInvuln = 0.0
+
+// Track delta time
+lastTime = time()
+
+// ═══════════════════════════════════════════
+//  SPAWNING
+// ═══════════════════════════════════════════
+
+def spawnEnemy() {
+    if (len(enemies) >= CFG["maxEnemies"]) { return }
+
+    let x = random(-7, 7)
+    let y = random(2, 8)
+    let z = random(-5, -2)
+
+    let e = g3.createObject("sphere", 0.45)
+    g3.setObjectColor(e, random(180, 255), random(30, 80), random(30, 80))
+    g3.setPosition(e, x, y, z)
+    g3.setMaterial(e, "lambert")
+    push(enemies, e)
+
+    waveEnemiesSpawned = waveEnemiesSpawned + 1
+}
+
+def spawnAsteroid() {
+    let size = random(3, 8) / 10.0
+    let x = random(-9, 9)
+    let y = random(-6, 6)
+    let z = random(-12, -3)
+
+    let a = g3.createObject("cube", size)
+    g3.setObjectColor(a, random(100, 160), random(90, 140), random(70, 110))
+    g3.setPosition(a, x, y, z)
+    g3.setRotation(a, random(0, 360), random(0, 360), random(0, 360))
+    push(asteroids, a)
+}
+
+def spawnBullet() {
+    let cam = g3.getCamera()
+    let b = g3.createObject("sphere", 0.12)
+    g3.setObjectColor(b, 0, 220, 255)
+    g3.setPosition(b, cam["px"], cam["py"], cam["pz"] + 1.0)
+    push(bullets, b)
+}
+
+// ── Particle burst at a world position ──
+def burstParticles(cx, cy, cz, r, gn, bn, count) {
+    for i in range(0, count) {
+        let p = g3.createObject("sphere", random(3, 8) / 100.0)
+        g3.setObjectColor(p,
+            clamp(r + random(-40, 40), 0, 255),
+            clamp(gn + random(-40, 40), 0, 255),
+            clamp(bn + random(-40, 40), 0, 255))
+        g3.setPosition(p, cx, cy, cz)
+        // Store particle as map with velocity and lifetime
+        let data = { "id": p, "vx": random(-30, 30) / 10.0, "vy": random(-30, 30) / 10.0, "vz": random(-30, 30) / 10.0, "life": random(5, 15) / 10.0 }
+        push(particles, data)
+    }
+}
+
+// ═══════════════════════════════════════════
+//  INPUT
+// ═══════════════════════════════════════════
+
+def handleInput(dt) {
+    if (gameOver) {
+        if (g3.isKeyPressed("r")) { restartGame() }
+        return
+    }
+    if (g3.isKeyPressed("escape")) {
+        g3.closeWindow()
+        return
+    }
+
+    // Pause toggle
+    if (g3.isKeyPressed("p")) { paused = !paused }
+
+    // Movement
+    let dx = 0.0
+    let dy = 0.0
+    if (g3.isKeyDown("a") || g3.isKeyDown("left"))  { dx = -1.0 }
+    if (g3.isKeyDown("d") || g3.isKeyDown("right")) { dx = 1.0 }
+    if (g3.isKeyDown("w") || g3.isKeyDown("up"))    { dy = 1.0 }
+    if (g3.isKeyDown("s") || g3.isKeyDown("down"))  { dy = -1.0 }
+
+    if (dx != 0 || dy != 0) {
+        let speed = CFG["playerSpeed"]
+        // Normalise diagonal
+        if (dx != 0 && dy != 0) {
+            let inv = 0.7071
+            dx = dx * inv
+            dy = dy * inv
+        }
+        g3.moveCamera(dx * speed * dt, dy * speed * dt, 0)
+        // Move player ship to match camera
+        let cam = g3.getCamera()
+        let px = cam["px"]
+        let py = cam["py"]
+        g3.setPosition(playerId,
+            clamp(px, -8.0, 8.0),
+            clamp(py, -5.0, 5.0),
+            0)
+    }
+
+    // Shooting
+    fireTimer = fireTimer + dt
+    if (g3.isKeyDown("space") && fireTimer >= CFG["fireCooldown"]) {
+        spawnBullet()
+        fireTimer = 0.0
+    }
+}
+
+// ═══════════════════════════════════════════
+//  UPDATE
+// ═══════════════════════════════════════════
+
+def update() {
+    // Compute delta time
+    let now = time()
+    let dt = now - lastTime
+    if (dt < 0.001) { dt = 0.016 }
+    if (dt > 0.05)  { dt = 0.05 }
+    lastTime = now
+
+    if (paused) { return }
+
+    // Invulnerability countdown
+    if (playerInvuln > 0) {
+        playerInvuln = playerInvuln - dt
+    }
+
+    handleInput(dt)
+
+    if (gameOver) { return }
+
+    // ── Move starfield (parallax scrolling) ──
+    for i in range(0, len(starfield)) {
+        let s = starfield[i]
+        let info = g3.getObject(s)
+        let sz = info["pz"] + (0.3 + (info["py"] + 5) * 0.05) * dt
+        if (sz > 10) { sz = random(-40, -10) / 1.0 }
+        g3.setPosition(s, info["px"], info["py"], sz)
+    }
+
+    // ── Move bullets ──
+    i = 0
+    while (i < len(bullets)) {
+        let info = g3.getObject(bullets[i])
+        let pz = info["pz"] + CFG["bulletSpeed"] * dt
+        if (pz > 15) {
+            g3.destroyObject(bullets[i])
+            // Remove from array by swapping with last
+            bullets[i] = bullets[len(bullets) - 1]
+            bullets = slice(bullets, 0, len(bullets) - 1)
+        } else {
+            g3.setPosition(bullets[i], info["px"], info["py"], pz)
+            i = i + 1
+        }
+    }
+
+    // ── Move enemies toward player ──
+    i = 0
+    while (i < len(enemies)) {
+        let info = g3.getObject(enemies[i])
+        let ex = info["px"]
+        let ey = info["py"]
+        let ez = info["pz"]
+
+        // Direction to player (camera)
+        let cam = g3.getCamera()
+        let dx = cam["px"] - ex
+        let dy = cam["py"] - ey
+        let dz = 0 - ez
+        let dist = sqrt(dx * dx + dy * dy + dz * dz)
+        if (dist > 0.01) {
+            let speed = CFG["enemyBaseSpeed"] + wave * 0.3
+            let nx = dx / dist
+            let ny = dy / dist
+            let nz = dz / dist
+            g3.setPosition(enemies[i],
+                ex + nx * speed * dt,
+                ey + ny * speed * dt,
+                ez + nz * speed * dt)
+        }
+
+        // Check collision with player
+        if (g3.objectIntersects(enemies[i], playerId)) {
+            if (playerInvuln <= 0) {
+                health = health - 15
+                playerInvuln = 1.5
+                burstParticles(cam["px"], cam["py"], 0, 255, 100, 0, 12)
+                if (health <= 0) {
+                    health = 0
+                    gameOver = true
+                    burstParticles(cam["px"], cam["py"], 0, 0, 200, 255, 30)
+                    print("GAME OVER — Final Score: " + score)
+                }
+            }
+            // Destroy enemy on hit
+            let einfo = g3.getObject(enemies[i])
+            burstParticles(einfo["px"], einfo["py"], einfo["pz"], 255, 200, 50, 8)
+            g3.destroyObject(enemies[i])
+            enemies[i] = enemies[len(enemies) - 1]
+            enemies = slice(enemies, 0, len(enemies) - 1)
+            score = score + 10
+        } else {
+            // If enemy passed behind player, remove it
+            if (ez > 3) {
+                if (score > 0) { score = score - 2 }
+                g3.destroyObject(enemies[i])
+                enemies[i] = enemies[len(enemies) - 1]
+                enemies = slice(enemies, 0, len(enemies) - 1)
+            } else {
+                i = i + 1
+            }
+        }
+    }
+
+    // ── Spawn enemies ──
+    if (waveEnemiesSpawned < waveEnemiesTotal) {
+        spawnTimer = spawnTimer + dt
+        let interval = max(0.3, CFG["spawnInterval"] - wave * 0.08)
+        if (spawnTimer >= interval) {
+            spawnEnemy()
+            spawnTimer = 0.0
+        }
+    } else {
+        // Wave complete when all enemies destroyed
+        if (len(enemies) == 0) {
+            wave = wave + 1
+            waveEnemiesSpawned = 0
+            waveEnemiesTotal = min(5 + wave * 3, 40)
+            spawnTimer = 0.0
+            print("Wave " + wave + " — " + waveEnemiesTotal + " enemies")
+            // Bonus score for clearing wave
+            score = score + wave * 5
+        }
+    }
+
+    // ── Move asteroids ──
+    i = 0
+    while (i < len(asteroids)) {
+        let info = g3.getObject(asteroids[i])
+        let az = info["pz"] + CFG["asteroidSpeed"] * dt
+        if (az > 10) {
+            g3.destroyObject(asteroids[i])
+            asteroids[i] = asteroids[len(asteroids) - 1]
+            asteroids = slice(asteroids, 0, len(asteroids) - 1)
+        } else {
+            g3.setPosition(asteroids[i], info["px"], info["py"], az)
+            g3.setRotation(asteroids[i],
+                info["rx"] + 30 * dt,
+                info["ry"] + 45 * dt,
+                info["rz"] + 20 * dt)
+
+            // Asteroid collision with player
+            if (g3.objectIntersects(asteroids[i], playerId)) {
+                if (playerInvuln <= 0) {
+                    health = health - 20
+                    playerInvuln = 2.0
+                    let cam = g3.getCamera()
+                    burstParticles(cam["px"], cam["py"], 0, 200, 120, 40, 15)
+                    if (health <= 0) {
+                        health = 0
+                        gameOver = true
+                        burstParticles(cam["px"], cam["py"], 0, 0, 200, 255, 30)
+                        print("GAME OVER — Final Score: " + score)
+                    }
+                }
+                burstParticles(info["px"], info["py"], info["pz"], 180, 140, 80, 10)
+                g3.destroyObject(asteroids[i])
+                asteroids[i] = asteroids[len(asteroids) - 1]
+                asteroids = slice(asteroids, 0, len(asteroids) - 1)
+            }
+
+            // Bullet-asteroid collision
+            j = 0
+            while (j < len(bullets)) {
+                if (g3.objectIntersects(asteroids[i], bullets[j])) {
+                    burstParticles(info["px"], info["py"], info["pz"], 200, 160, 80, 15)
+                    g3.destroyObject(asteroids[i])
+                    asteroids[i] = asteroids[len(asteroids) - 1]
+                    asteroids = slice(asteroids, 0, len(asteroids) - 1)
+                    g3.destroyObject(bullets[j])
+                    bullets[j] = bullets[len(bullets) - 1]
+                    bullets = slice(bullets, 0, len(bullets) - 1)
+                    score = score + 5
+                    i = 1000  // break outer loop
+                    j = 1000
+                } else {
+                    j = j + 1
+                }
+            }
+            i = i + 1
+        }
+    }
+
+    // ── Bullet-Enemy collision ──
+    i = 0
+    while (i < len(bullets)) {
+        j = 0
+        while (j < len(enemies)) {
+            if (g3.objectIntersects(bullets[i], enemies[j])) {
+                let einfo = g3.getObject(enemies[j])
+                burstParticles(einfo["px"], einfo["py"], einfo["pz"], 255, 180, 50, 10)
+                g3.destroyObject(enemies[j])
+                enemies[j] = enemies[len(enemies) - 1]
+                enemies = slice(enemies, 0, len(enemies) - 1)
+                g3.destroyObject(bullets[i])
+                bullets[i] = bullets[len(bullets) - 1]
+                bullets = slice(bullets, 0, len(bullets) - 1)
+                score = score + 10
+                i = 1000
+                j = 1000
+            } else {
+                j = j + 1
+            }
+        }
+        i = i + 1
+    }
+
+    // ── Particles update ──
+    i = 0
+    while (i < len(particles)) {
+        let p = particles[i]
+        let life = p["life"] - dt
+        if (life <= 0) {
+            g3.destroyObject(p["id"])
+            particles[i] = particles[len(particles) - 1]
+            particles = slice(particles, 0, len(particles) - 1)
+        } else {
+            let info = g3.getObject(p["id"])
+            g3.setPosition(p["id"],
+                info["px"] + p["vx"] * dt,
+                info["py"] + p["vy"] * dt,
+                info["pz"] + p["vz"] * dt)
+            g3.setScale(p["id"],
+                max(0.01, life * 1.5),
+                max(0.01, life * 1.5),
+                max(0.01, life * 1.5))
+            p["life"] = life
+            i = i + 1
+        }
+    }
+
+    // ── Spawn new asteroids periodically ──
+    if (len(asteroids) < 3 + wave && random(0, 100) < 2) {
+        spawnAsteroid()
+    }
+}
+
+// ═══════════════════════════════════════════
+//  DRAW
+// ═══════════════════════════════════════════
+
+def draw() {
+    // Player invulnerability blink
+    if (playerInvuln > 0 && int(playerInvuln * 10) % 2 == 0) {
+        g3.setObjectColor(playerId, 255, 255, 255)
+    } else {
+        g3.setObjectColor(playerId, 0, 180, 255)
+    }
+
+    // Draw world-space reticle near player
+    if (!gameOver) {
+        g3.drawCube(0, -2, 0.8, 0.05)
+    }
+}
+
+// ═══════════════════════════════════════════
+//  INITIALISATION
+// ═══════════════════════════════════════════
+
+def initGame() {
+    g3.createWindow(CFG["width"], CFG["height"], CFG["title"])
+    g3.setCameraMode("manual")
+    g3.setCamera(0, 0, 18, 0, 0, 0)
+    g3.setFov(65)
+    g3.setAmbientLight(30, 30, 50)
+    g3.addDirectionalLight(0.5, -1, 0.3, 220, 220, 255, 0.8)
+    g3.showStats(false)
+    g3.clear(5, 5, 15)
+
+    // Player ship — elongated cube with team colour
+    playerId = g3.createObject("cube", 0.7)
+    g3.setObjectColor(playerId, 0, 180, 255)
+    g3.setScale(playerId, 0.7, 0.4, 1.2)
+    g3.setPosition(playerId, 0, -2, 0)
+
+    // Starfield — 200 tiny white spheres at random positions
+    for i in range(0, 200) {
+        let star = g3.createObject("sphere", 0.04)
+        g3.setObjectColor(star, 200, 220, 255)
+        g3.setPosition(star,
+            random(-50, 50) / 1.0,
+            random(-50, 50) / 1.0,
+            random(-40, 10) / 1.0)
+        g3.setVisible(star, true)
+        push(starfield, star)
+    }
+
+    // Spawn initial asteroids
+    for i in range(0, 4) {
+        spawnAsteroid()
+    }
+}
+
+// ═══════════════════════════════════════════
+//  GAME LOOP
+// ═══════════════════════════════════════════
+
+def gameLoop() {
+    initGame()
+    print("=== Star Defender ===")
+    print("WASD/Arrows — Move | Space — Fire | P — Pause | R — Restart")
+
+    // Run the main loop (calls "update" and "draw" each frame)
+    g3.run("update", "draw")
+
+    // Cleanup
+    g3.closeWindow()
+    print("Thanks for playing! Score: " + score)
+}
+
+def restartGame() {
+    // Reset global state
+    score = 0
+    health = 100
+    wave = 1
+    waveEnemiesSpawned = 0
+    waveEnemiesTotal = 5
+    gameOver = false
+    paused = false
+    fireTimer = 0.0
+    spawnTimer = 0.0
+    starfield = array()
+    enemies = array()
+    bullets = array()
+    asteroids = array()
+    particles = array()
+    playerId = -1
+    playerInvuln = 0.0
+    lastTime = time()
+
+    print("Restarting...")
+    gameLoop()
+}
+
+// ── Entry point ──
+gameLoop()
