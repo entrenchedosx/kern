@@ -91,7 +91,15 @@ else()
     # MinGW on Windows: force static libstdc++/libgcc linkage to resolve
     # .refptr (DLL import thunk) and __emutls_v (TLS emulation) symbols
     # that appear in lambda bodies inside registerAllBuiltins().
-    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} -static-libstdc++ -static-libgcc")
+    # NOTE: We keep only -static-libgcc here. The -static-libstdc++ flag
+    # is a GCC driver option that expands to "-Bstatic -lstdc++ -Bdynamic"
+    # at a position AFTER our target_link_libraries entries, and that
+    # -Bdynamic resets the linker to dynamic mode BEFORE MinGW's implicit
+    # -lpthread at the end, causing libwinpthread-1.dll to be imported.
+    # Instead, we use explicit -Wl,-Bstatic -lstdc++ in target_link_libraries
+    # (see below) so there is no trailing -Bdynamic and the implicit
+    # -lpthread finds libwinpthread.a (static) instead of libwinpthread.dll.a.
+    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} -static-libgcc")
   endif()
   
   # Safe
@@ -365,6 +373,34 @@ kern_apply_strict_warnings(kargo)
 if(WIN32)
   target_link_libraries(kern_core PUBLIC psapi winhttp wininet ws2_32)
   target_link_libraries(kern PRIVATE advapi32 shell32)
+  # Force static embedding of libstdc++, libgcc, and libwinpthread into every
+  # executable that links kern_core, so the resulting .exe has zero DLL
+  # dependencies (no libstdc++-6.dll, no libgcc_s_seh-1.dll, no
+  # libwinpthread-1.dll) and runs on a bare Windows system.
+  #
+  # We use -Wl,-Bstatic (NOT GCC's -static-libstdc++ driver flag) because:
+  #   - GCC's -static-libstdc++ expands to -Bstatic -lstdc++ -Bdynamic at a
+  #     position AFTER our target_link_libraries entries.
+  #   - That -Bdynamic resets the linker to dynamic mode BEFORE MinGW's
+  #     LIB_SPEC adds the implicit -lpthread at the very end of the command.
+  #   - The implicit -lpthread then finds libwinpthread.dll.a (import lib)
+  #     instead of libwinpthread.a, adding the DLL to the PE import table.
+  #
+  # By using -Wl,-Bstatic WITHOUT a trailing -Wl,-Bdynamic, the linker stays
+  # in static mode for all subsequent library searches, including the implicit
+  # -lpthread from MinGW's LIB_SPEC. In static mode, -lpthread finds
+  # libwinpthread.a (the real static archive, already resolved → no-op).
+  # MinGW system import libraries (kernel32, advapi32, etc.) are named
+  # lib*.a with no separate .dll.a variant, so they work identically in
+  # both static and dynamic modes.
+  #
+  # NOTE: These go via target_link_libraries → $LINK_LIBRARIES (after
+  # object files), so libraries are searched when symbols are unresolved.
+  target_link_libraries(kern PRIVATE -Wl,-Bstatic -lstdc++ -lwinpthread)
+  target_link_libraries(kern_repl PRIVATE -Wl,-Bstatic -lstdc++ -lwinpthread)
+  target_link_libraries(kernc PRIVATE -Wl,-Bstatic -lstdc++ -lwinpthread)
+  target_link_libraries(kern_lsp PRIVATE -Wl,-Bstatic -lstdc++ -lwinpthread)
+  target_link_libraries(kern-scan PRIVATE -Wl,-Bstatic -lstdc++ -lwinpthread)
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/kern_logo.ico")
     add_custom_command(
       TARGET kern
