@@ -1,10 +1,10 @@
 # Kern Programming Language
 
-Kern is a lightweight, memory-safe, dynamically typed scripting language and custom bytecode Virtual Machine, purpose-built for game development and systems scripting.
+Kern is a **general-purpose scripting language** designed for everyday programming. It combines **Python-like ergonomics** -- clean indentation-based syntax, UFCS method calls, for-in loops, closures -- with **C++-level performance** via a custom bytecode Virtual Machine written in C++17.
 
-It was born from a concrete problem: game developers were using fragile dictionaries, clunky global variables, and manual index-based loops to write what should have been simple game logic. Kern replaces all of that with **strict Structs**, **native Vec3 math**, **memory-safe error handling**, and a **clean, modern syntax** -- all without sacrificing runtime performance.
+Every language feature exists because it solves a real problem: Structs replace fragile dictionaries, native Vec3 eliminates dozens of global position variables, the `?` operator replaces nested error-checking, and `defer` automates resource cleanup. The result is a language that reads like a modern script but runs on a hand-tuned VM with zero external dependencies.
 
-The entire compiler and VM are written in C++17 with zero external dependencies. You can build the executable from source in under 30 seconds with a single command.
+The entire compiler and VM are written in **C++17 with zero external dependencies**. You can build a **portable, standalone executable** from source in under 30 seconds with a single command -- no runtime DLLs required.
 
 ---
 
@@ -177,10 +177,10 @@ set "PATH=C:\msys64\mingw64\bin;%PATH%" ^
   kern/core/value.cpp kern/runtime/vm/vm.cpp kern/runtime/vm/http_get_winhttp.cpp ^
   kern/runtime/core/scheduler.cpp kern/runtime/bindings/native_bindings.cpp ^
   kern/runtime/core/module_registry.cpp kern/cli/main.cpp ^
-  -o kern.exe -lwinhttp
+  -o kern.exe -lwinhttp -static-libgcc -static-libstdc++ -static
 ```
 
-This compiles all 13 source files with full optimization (`-O3`) and links them into `kern.exe`. The build should complete in 10-30 seconds.
+This compiles all 13 source files with full optimization (`-O3`), statically links the MinGW runtime (no external DLLs needed), and produces a **portable `kern.exe`** that runs on any Windows machine. Build completes in 10-30 seconds.
 
 ### Run the Integration Test
 
@@ -192,7 +192,8 @@ You will see the Grand Unification Integration Test execute all three test suite
 
 ```
 === Struct V1 Test ===
-e.y = 25.000000
+e.y =
+25.000000
 
 === Result ? Operator Test ===
 Div by zero
