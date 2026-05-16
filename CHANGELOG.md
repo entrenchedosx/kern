@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [2.2.0] - 2026-05-16
+
 ### Added
 
 - **v3.0 Phase 1: VM-Native Cooperative Coroutines** (2026-05-15T15:38 UTC+1)
@@ -76,6 +80,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - **`SmallString` ODR fix:** [`kern/core/value.cpp`](kern/core/value.cpp) — removed out-of-line `SmallString` constructor, destructor, copy/move assignment, `c_str()`, `size()`, `toString()`, `operator==`, and `operator<` implementations (lines 9–132) that conflicted with inline definitions in [`kern/core/value.hpp`](kern/core/value.hpp), causing linker multiply-defined-symbol errors.
   - **CMake:** [`CMakeLists.txt`](CMakeLists.txt) — added `ffi_module.cpp` to `VM_SOURCES`; added `kern_ffi_test` executable target linking to `kern_core` with `KERN_BUILD_ID` and strict warnings.
   - **Integration tests:** [`kern/tools/ffi_test.cpp`](kern/tools/ffi_test.cpp) — 10 tests covering the full FFI surface: `testFfiLoadAndCallNoArgs` (call no-arg function, read exit code), `testFfiBindAtoi` (bind `atoi`, parse multiple strings to ints), `testFfiFromKernScript` (FFI from Kern source via compiler pipeline), `testFfiInvalidLibrary` (non-existent path returns nil), `testFfiInvalidFunction` (non-existent export returns nil), `testFfiFree` (load → bind → free → verify handle released), `testFfiMessageBoxSignature` (4-param signature `ptr+string+string+int`), `testFfiFloatReturn` (bind `sqrt` from `msvcrt.dll`, verify float return), `testFfiAtoiFromKern` (end-to-end Kern script loading `msvcrt.dll`, binding `atoi`, calling it, summing results; Windows uses raw string literal to avoid concatenation issues with indented `if` blocks).
+
+---
+
+## [2.1.0] - 2026-05-13
+
+### Added
+
+- Structs and UFCS (Uniform Function Call Syntax)
+- Defer statements and Result? sugar
+- Collection library enhancements
+- Native Vec3 math support
+- Bytecode verifier hardening
+- Various performance and stability improvements
 
 ---
 

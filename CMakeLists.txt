@@ -21,7 +21,7 @@ if(WIN32 AND MSVC)
   endif()
 endif()
 
-project(Kern LANGUAGES CXX VERSION 2.0.0)
+project(Kern LANGUAGES CXX VERSION 2.2.0)
 enable_language(C)
 
 include(cmake/kern_paths.cmake)
