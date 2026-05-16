@@ -106,11 +106,27 @@ static bool stackMinAndDelta(const Instruction& inst, size_t codeSize, size_t st
         case Opcode::BIT_XOR:
         case Opcode::SHL:
         case Opcode::SHR:
+        // fast-path typed arithmetic (same stack behavior as generic)
+        case Opcode::ADD_INT:
+        case Opcode::SUB_INT:
+        case Opcode::MUL_INT:
+        case Opcode::DIV_INT:
+        case Opcode::ADD_FLOAT:
+        case Opcode::SUB_FLOAT:
+        case Opcode::MUL_FLOAT:
+        case Opcode::DIV_FLOAT:
+        // fast-path typed comparisons
+        case Opcode::EQ_INT:
+        case Opcode::EQ_FLOAT:
+        case Opcode::LT_INT:
+        case Opcode::LT_FLOAT:
             *minDepth = 2;
             *delta = -1;
             return true;
         case Opcode::NEG:
         case Opcode::NOT:
+        case Opcode::NEG_INT:
+        case Opcode::NEG_FLOAT:
             *minDepth = 1;
             *delta = 0;
             return true;

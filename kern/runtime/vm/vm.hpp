@@ -22,8 +22,19 @@
 #include <stdexcept>
 #include <atomic>
 #include <string>
+#include <future>
+#include <optional>
 
 namespace kern {
+
+// ─── Coroutine support for cooperative multi-tasking ────────────────────
+enum class CoroutineState : uint8_t {
+    RUNNING,  // Active or ready to resume
+    YIELDED,  // Suspended, waiting for resume via resumeAll()
+    DEAD      // Completed or errored
+};
+
+// ─────────────────────────────────────────────────────────────────────────
 
 // Forward declarations
 class Allocator;
@@ -99,6 +110,33 @@ struct ExceptionFrame {
         : handlerPc(handler), stackBase(stack), frameCount(frames), catchIp(0), stackMark(stack) {}
 };
 
+// ─── Coroutine struct (must be after CallFrame and ExceptionFrame) ────────
+struct Coroutine {
+    CoroutineState state = CoroutineState::RUNNING;
+
+    // Execution state snapshot (mirrors VM's execution members)
+    Bytecode code;
+    std::vector<std::string> stringConstants;
+    std::vector<Value> valueConstants;
+    size_t ip = 0;
+    std::vector<ValuePtr> locals;
+    std::vector<ValuePtr> stack;
+    std::vector<CallFrame> callFrames;
+    std::vector<StackFrame> callStack;
+    std::vector<std::vector<ValuePtr>> frameLocals;
+    std::vector<std::vector<std::pair<ValuePtr, std::vector<ValuePtr>>>> deferStack;
+    std::vector<std::pair<ValuePtr, size_t>> iterStack;
+    std::vector<size_t> tryStack;
+    std::vector<ExceptionFrame> exceptionStack;
+    std::vector<std::tuple<Bytecode, std::vector<std::string>, std::vector<Value>, std::string>> codeFrameStack;
+    std::shared_ptr<ScriptCode> currentScript;
+    std::string activeSourcePath;
+    int unsafeDepth = 0;
+    ValuePtr yieldedValue;  // The value produced by the last yield
+    uint64_t wakeTimestampMs = 0;  // Time (ms) before which this coroutine should NOT be resumed; 0 = no constraint
+    std::optional<std::future<std::string>> pendingStringTask;  // Non-blocking string I/O future (e.g. fs_read_async)
+};
+
 // VM Configuration
 struct VMConfig {
     size_t initialStackSize = 1024;
@@ -156,6 +194,57 @@ public:
     void run();
     Result<Value> runFunction(const std::string& name, std::vector<Value> args);
     
+    // Cooperative coroutine scheduling: resume all YIELDED coroutines
+    // in a round-robin pass until all are DEAD.
+    void resumeAll(uint64_t currentTimeMs = 0);
+
+    /// Returns true if any coroutines are still alive (YIELDED or RUNNING state).
+    /// The host can use this after run() to decide whether to loop with resumeAll().
+    bool hasActiveCoroutines() const;
+
+    /// Start a new coroutine from a function object, bypassing the generator
+    /// call path (the codegen marks any yield-containing function as a generator,
+    /// so a normal CALL would just create a GeneratorObject).  This method
+    /// creates a fresh Coroutine entry and saves it as YIELDED so the next
+    /// resumeAll() pass will pick it up.
+    /// Returns the coroutine index.
+    size_t startCoroutine(FunctionPtr fn, std::vector<ValuePtr> args);
+
+    /// Yield the currently active coroutine for at least `ms` milliseconds.
+    /// The coroutine will not be resumed by resumeAll() until the host clock
+    /// (currentTimeMs) advances past wakeTime = storedClock + ms.
+    /// Intended to be called from a native builtin (e.g. kern_sleep).
+    void sleepCurrentCoroutine(uint64_t ms);
+
+    /// Start an asynchronous file read on a background thread.
+    /// The current coroutine will yield until the future completes.
+    /// Called from the kern_fs_read_async builtin.
+    void startAsyncFileRead(const std::string& path);
+
+    /// Start an asynchronous HTTP GET on a background thread.
+    /// The current coroutine will yield until the future completes.
+    /// Called from the kern_http_get_async builtin.
+    void startAsyncHttpGet(const std::string& url);
+
+    /// Start an asynchronous HTTP POST on a background thread.
+    /// The current coroutine will yield until the future completes.
+    /// Called from the kern_http_post_async builtin.
+    void startAsyncHttpPost(const std::string& url, const std::string& payload);
+
+    /// Hot-reload the VM with new bytecode.  Kills all active coroutines
+    /// (except coroutine 0 / the main thread), replaces the bytecode and
+    /// constant pools, resets execution state, and re-runs the top-level
+    /// script so that global function definitions are rebound.
+    /// After this call, the host should resume the coroutine loop normally;
+    /// the new top-level script may start fresh coroutines via
+    /// kern_start_coroutine, which resumeAll() will pick up.
+    void hotReload(const Bytecode& code,
+                   const std::vector<std::string>& stringConstants,
+                   const std::vector<Value>& valueConstants);
+
+    // Encrypted bytecode loading (.knb with ChaCha20)
+    bool loadBytecodeFromFile(const std::string& path);
+    
     // Module system
     void registerModule(const std::string& name, ModuleInitFn init);
     Result<Value> importModule(const std::string& name);
@@ -178,8 +267,16 @@ public:
     void setDecoratorRegistry(ValuePtr registry);
     ValuePtr getDecoratorRegistry() const;
     
+    // Runtime guards
+    RuntimeGuardPolicy getRuntimeGuards() const;
+    RuntimeGuardPolicy& mutableRuntimeGuards();
+    void setRuntimeGuards(RuntimeGuardPolicy policy);
+
     // Missing methods
     const std::vector<std::string>& getCliArgs() const;
+    void setCliArgs(std::vector<std::string> args);
+    void setActiveSourcePath(const std::string& path);
+    bool hasResult() const;
     size_t getCallStackDepth() const;
     std::vector<StackFrame> getCallStackSlice(size_t start = 0, size_t count = -1) const;
     void resetCycleCount();
@@ -188,12 +285,10 @@ public:
     uint64_t getStepLimit() const;
     void setMaxCallDepth(size_t depth);
     size_t getMaxCallDepth() const;
-    void setCallbackStepGuard(bool enabled);
-    bool getCallbackStepGuard() const;
+    void setCallbackStepGuard(uint64_t enabled);
+    uint64_t getCallbackStepGuard() const;
     size_t unsafeDepth() const;
     bool isInUnsafeContext() const;
-    RuntimeGuardPolicy getRuntimeGuards() const;
-    RuntimeGuardPolicy& mutableRuntimeGuards();
     
     // Script exit code management
     void setScriptExitCode(int64_t code);
@@ -240,9 +335,13 @@ public:
     
     // Value calling (for builtins)
     ValuePtr callValue(ValuePtr callee, const std::vector<ValuePtr>& args);
+    // Coroutine scheduling helpers
+    void saveCurrentCoroutineState();
+    void restoreCoroutineState(const Coroutine& cor);
     
     // Missing method declarations from vm.cpp
     void runInstruction(const Instruction& inst);
+
     kern::ValuePtr getResult();
     std::string getOperandStr(const Instruction& inst);
     size_t getOperandU64(const Instruction& inst);
@@ -289,7 +388,7 @@ private:
     std::shared_ptr<GeneratorObject> activeGenerator;
     bool vmTraceEnabled_ = false;
     
-    ValuePtr runtimeGuards;
+    RuntimeGuardPolicy runtimeGuards_;
     std::vector<std::string> cliArgs;
     
     // Modules
@@ -298,10 +397,16 @@ private:
     
     // Decorator registry
     ValuePtr decoratorRegistry;
-    
     // Execution control
     std::atomic<bool> stopRequested;
     uint64_t instructionCount;
+    // Coroutine scheduler state
+    std::vector<Coroutine> coroutines_;
+    size_t activeCoroutineId_ = 0;
+    bool coroutineYieldRequested_ = false;
+    uint64_t currentTimeMs_ = 0;  // Set by resumeAll() each tick; used by sleepCurrentCoroutine()
+
+
     
     // Builtins
     std::vector<BuiltinFn> builtins;

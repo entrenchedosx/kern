@@ -8,6 +8,8 @@
  * this .cpp, GCC properly emits all typeinfo structures.
  */
 #include "builtins.hpp"
+#include "ffi_module.hpp"
+#include "json_parser.hpp"
 
 namespace kern {
 
@@ -439,12 +441,11 @@ void registerAllBuiltins(VM& vm) {
     });
     setGlobalFn("Instance", i - 1);
 
-    // jSON support
+    // JSON support (uses JsonParser from json_parser.hpp)
     makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
         if (args.empty() || !args[0] || args[0]->type != Value::Type::STRING) return Value::nil();
-        JsonParser p{ std::get<std::string>(args[0]->data), 0 };
-        ValuePtr v = p.parseValue();
-        return v ? Value(*v) : Value::nil();
+        JsonParser parser(std::get<std::string>(args[0]->data));
+        return parser.parse();
     });
     setGlobalFn("json_parse", i - 1);
 
@@ -6391,5 +6392,104 @@ void registerAllBuiltins(VM& vm) {
         return Value::fromVec3(v->x / len, v->y / len, v->z / len);
     });
     setGlobalFn("vec3_normalize", i - 1);
+
+    // ─── Coroutine builtins ──────────────────────────────────────────────
+    // kern_start_coroutine(fn, argsArray) — start a yield-capable function
+    // as a cooperative coroutine, bypassing the generator call path.
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        if (args.size() < 1 || !args[0]) return Value::nil();
+        if (args[0]->type != Value::Type::FUNCTION) return Value::nil();
+        auto& fn = std::get<FunctionPtr>(args[0]->data);
+        if (!fn) return Value::nil();
+        std::vector<ValuePtr> fnArgs;
+        if (args.size() >= 2 && args[1] && args[1]->type == Value::Type::ARRAY) {
+            fnArgs = std::get<std::vector<ValuePtr>>(args[1]->data);
+        }
+        size_t corId = vm->startCoroutine(fn, std::move(fnArgs));
+        return Value::fromInt(static_cast<int64_t>(corId));
+    });
+    setGlobalFn("kern_start_coroutine", i - 1);
+
+    // kern_coroutine_active() — returns true if any coroutines are still alive.
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> /*args*/) {
+        return Value::fromBool(vm->hasActiveCoroutines());
+    });
+    setGlobalFn("kern_coroutine_active", i - 1);
+
+    // kern_sleep(ms) — yield the current coroutine for at least `ms` milliseconds.
+    // The VM thread is never blocked; the coroutine simply won't be resumed
+    // by resumeAll() until the host clock advances past the wake time.
+    // Requires the host to call resumeAll(currentTimeMs) with a monotonic clock.
+    makeBuiltin(i++, [toInt](VM* vm, std::vector<ValuePtr> args) {
+        uint64_t ms = (args.size() >= 1 && args[0])
+            ? static_cast<uint64_t>(std::max<int64_t>(0, toInt(args[0]))) : 0;
+        vm->sleepCurrentCoroutine(ms);
+        return Value::nil();
+    });
+    setGlobalFn("kern_sleep", i - 1);
+    // ─────────────────────────────────────────────────────────────────────
+
+    // kern_fs_read_async(path) — read a file on a background thread without
+    // blocking the VM.  The current coroutine yields until the data is ready.
+    // The return value is the file contents as a string (or empty on error).
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        std::string path;
+        if (args.size() >= 1 && args[0]) {
+            path = args[0]->toString();
+        }
+        vm->startAsyncFileRead(path);
+        return Value::nil();
+    });
+    setGlobalFn("kern_fs_read_async", i - 1);
+    // ─────────────────────────────────────────────────────────────────────
+
+    // kern_http_get_async(url) — fetch a URL on a background thread without
+    // blocking the VM.  The current coroutine yields until the response arrives.
+    // The return value is the response body as a string (or empty on error).
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        std::string url;
+        if (args.size() >= 1 && args[0]) {
+            url = args[0]->toString();
+        }
+        vm->startAsyncHttpGet(url);
+        return Value::nil();
+    });
+    setGlobalFn("kern_http_get_async", i - 1);
+    // ─────────────────────────────────────────────────────────────────────
+
+    // kern_json_parse(json_string) — synchronous, zero-dependency JSON parser.
+    // Parses a JSON string into a Kern Value (Map, Array, String, Int, Float, Bool, or Nil).
+    // Returns nil on malformed input.
+    makeBuiltin(i++, [](VM*, std::vector<ValuePtr> args) {
+        std::string jsonStr;
+        if (args.size() >= 1 && args[0]) {
+            jsonStr = args[0]->toString();
+        }
+        JsonParser parser(jsonStr);
+        return parser.parse();
+    });
+    setGlobalFn("kern_json_parse", i - 1);
+    // ─────────────────────────────────────────────────────────────────────
+
+    // kern_http_post_async(url, payload) — send an HTTP POST with a JSON body
+    // on a background thread without blocking the VM.  The current coroutine
+    // yields until the response arrives.  The return value is the response body
+    // as a string (or empty on error).  Sets Content-Type: application/json.
+    makeBuiltin(i++, [](VM* vm, std::vector<ValuePtr> args) {
+        std::string url;
+        if (args.size() >= 1 && args[0]) {
+            url = args[0]->toString();
+        }
+        std::string payload;
+        if (args.size() >= 2 && args[1]) {
+            payload = args[1]->toString();
+        }
+        vm->startAsyncHttpPost(url, payload);
+        return Value::nil();
+    });
+    setGlobalFn("kern_http_post_async", i - 1);
+    // ─────────────────────────────────────────────────────────────────────
+    // FFI Module (v5.0 Phase 2)
+    registerFfiBuiltins(vm);
 }
 } // namespace kern

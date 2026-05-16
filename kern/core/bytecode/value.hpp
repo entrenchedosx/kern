@@ -22,6 +22,7 @@ struct InstanceObject;
 struct GeneratorObject;
 struct Vec3Object;
 struct StructObject;
+struct FfiClosure;
 
 using ValuePtr = std::shared_ptr<Value>;
 using StructPtr = std::shared_ptr<StructObject>;
@@ -30,6 +31,7 @@ using ClassPtr = std::shared_ptr<ClassObject>;
 using InstancePtr = std::shared_ptr<InstanceObject>;
 using GeneratorPtr = std::shared_ptr<GeneratorObject>;
 using Vec3Ptr = std::shared_ptr<Vec3Object>;
+using FfiClosurePtr = std::shared_ptr<FfiClosure>;
 
 struct Vec3Object {
     double x = 0.0;
@@ -42,8 +44,14 @@ struct StructObject {
     std::unordered_map<std::string, ValuePtr> fields;
 };
 
+struct FfiClosure {
+    void* fnPtr;                    // raw function address from GetProcAddress/dlsym
+    std::string returnType;         // "void", "int", "float", "string", "ptr"
+    std::vector<std::string> paramTypes;  // each: "int", "float", "string", "ptr", "bool"
+};
+
 struct Value {
-    enum class Type { NIL, BOOL, INT, FLOAT, STRING, ARRAY, MAP, FUNCTION, CLASS, INSTANCE, GENERATOR, PTR, VEC3, STRUCT };
+    enum class Type { NIL, BOOL, INT, FLOAT, STRING, ARRAY, MAP, FUNCTION, CLASS, INSTANCE, GENERATOR, PTR, VEC3, STRUCT, FFI_FN };
     Type type = Type::NIL;
     std::variant<
         std::monostate,
@@ -59,7 +67,8 @@ struct Value {
         GeneratorPtr,
         void*,
         Vec3Ptr,
-        StructPtr
+        StructPtr,
+        FfiClosurePtr
     > data;
 
     Value() : type(Type::NIL), data(std::monostate{}) {}
@@ -91,12 +100,13 @@ struct Value {
     static Value fromInstance(InstancePtr i) { Value v; v.type = Type::INSTANCE; v.data = std::move(i); return v; }
     static Value fromGenerator(GeneratorPtr g) { Value v; v.type = Type::GENERATOR; v.data = std::move(g); return v; }
     static Value fromPtr(void* p) { Value v; v.type = Type::PTR; v.data = p; return v; }
-    static Value fromVec3(double x, double y, double z) { 
-        Value v; 
-        v.type = Type::VEC3; 
-        v.data = std::make_shared<Vec3Object>(Vec3Object{x, y, z}); 
-        return v; 
+    static Value fromVec3(double x, double y, double z) {
+        Value v;
+        v.type = Type::VEC3;
+        v.data = std::make_shared<Vec3Object>(Vec3Object{x, y, z});
+        return v;
     }
+    static Value fromFfi(FfiClosurePtr f) { Value v; v.type = Type::FFI_FN; v.data = std::move(f); return v; }
 
     bool isTruthy() const;
     std::string toString() const;

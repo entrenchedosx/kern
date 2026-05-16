@@ -67,21 +67,127 @@ class SmallString {
     
 public:
     SmallString() { sso.data[0] = '\0'; sso.size = 0; }
-    explicit SmallString(const char* str);
-    explicit SmallString(const std::string& str);
-    SmallString(const SmallString& other);
-    SmallString(SmallString&& other) noexcept;
-    ~SmallString();
     
-    SmallString& operator=(const SmallString& other);
-    SmallString& operator=(SmallString&& other) noexcept;
+    explicit SmallString(const char* str) {
+        size_t len = std::strlen(str);
+        if (len < SSO_CAPACITY) {
+            std::memcpy(sso.data, str, len);
+            sso.data[len] = '\0';
+            sso.size = static_cast<uint8_t>(len);
+        } else {
+            heap.ptr = new char[len + 1];
+            std::memcpy(heap.ptr, str, len);
+            heap.ptr[len] = '\0';
+            heap.size = len;
+            heap.capacity = len;
+            sso.size = 0x80;
+        }
+    }
     
-    const char* c_str() const;
-    size_t size() const;
-    std::string toString() const;
+    explicit SmallString(const std::string& str) {
+        size_t len = str.size();
+        if (len < SSO_CAPACITY) {
+            std::memcpy(sso.data, str.data(), len);
+            sso.data[len] = '\0';
+            sso.size = static_cast<uint8_t>(len);
+        } else {
+            heap.ptr = new char[len + 1];
+            std::memcpy(heap.ptr, str.data(), len);
+            heap.ptr[len] = '\0';
+            heap.size = len;
+            heap.capacity = len;
+            sso.size = 0x80;
+        }
+    }
     
-    bool operator==(const SmallString& other) const;
-    bool operator<(const SmallString& other) const;
+    SmallString(const SmallString& other) {
+        if (!other.isHeap()) {
+            std::memcpy(sso.data, other.sso.data, SSO_CAPACITY);
+            sso.size = other.sso.size;
+        } else {
+            heap.ptr = new char[other.heap.size + 1];
+            std::memcpy(heap.ptr, other.heap.ptr, other.heap.size);
+            heap.ptr[other.heap.size] = '\0';
+            heap.size = other.heap.size;
+            heap.capacity = other.heap.size;
+            sso.size = 0x80;
+        }
+    }
+    
+    SmallString(SmallString&& other) noexcept {
+        if (!other.isHeap()) {
+            std::memcpy(sso.data, other.sso.data, SSO_CAPACITY);
+            sso.size = other.sso.size;
+        } else {
+            heap.ptr = other.heap.ptr;
+            heap.size = other.heap.size;
+            heap.capacity = other.heap.capacity;
+            sso.size = 0x80;
+            other.sso.data[0] = '\0';
+            other.sso.size = 0;
+        }
+    }
+    
+    ~SmallString() {
+        if (isHeap()) delete[] heap.ptr;
+    }
+    
+    SmallString& operator=(const SmallString& other) {
+        if (this != &other) {
+            if (isHeap()) delete[] heap.ptr;
+            if (!other.isHeap()) {
+                std::memcpy(sso.data, other.sso.data, SSO_CAPACITY);
+                sso.size = other.sso.size;
+            } else {
+                heap.ptr = new char[other.heap.size + 1];
+                std::memcpy(heap.ptr, other.heap.ptr, other.heap.size);
+                heap.ptr[other.heap.size] = '\0';
+                heap.size = other.heap.size;
+                heap.capacity = other.heap.size;
+                sso.size = 0x80;
+            }
+        }
+        return *this;
+    }
+    
+    SmallString& operator=(SmallString&& other) noexcept {
+        if (this != &other) {
+            if (isHeap()) delete[] heap.ptr;
+            if (!other.isHeap()) {
+                std::memcpy(sso.data, other.sso.data, SSO_CAPACITY);
+                sso.size = other.sso.size;
+            } else {
+                heap.ptr = other.heap.ptr;
+                heap.size = other.heap.size;
+                heap.capacity = other.heap.capacity;
+                sso.size = 0x80;
+                other.sso.data[0] = '\0';
+                other.sso.size = 0;
+            }
+        }
+        return *this;
+    }
+    
+    const char* c_str() const {
+        return isHeap() ? heap.ptr : sso.data;
+    }
+    
+    size_t size() const {
+        return isHeap() ? heap.size : static_cast<size_t>(sso.size);
+    }
+    
+    std::string toString() const {
+        return std::string(c_str(), size());
+    }
+    
+    bool operator==(const SmallString& other) const {
+        if (size() != other.size()) return false;
+        return std::memcmp(c_str(), other.c_str(), size()) == 0;
+    }
+    
+    bool operator<(const SmallString& other) const {
+        return std::strcmp(c_str(), other.c_str()) < 0;
+    }
 };
 
 // Clean type aliases for variant compatibility
@@ -133,6 +239,23 @@ public:
     T unwrap() {
         if (!isOk) throw std::runtime_error("unwrap on error");
         return std::move(std::get<T>(data));
+    }
+};
+
+// Specialization for Result<void> – std::variant cannot hold void
+template<>
+class Result<void, ErrorValue> {
+    bool isOk_;
+    ErrorValue error_;
+public:
+    Result() : isOk_(true) {}
+    explicit Result(const ErrorValue& error) : isOk_(false), error_(error) {}
+    bool ok() const { return isOk_; }
+    bool isError() const { return !isOk_; }
+    ErrorValue& error() { return error_; }
+    const ErrorValue& error() const { return error_; }
+    void unwrap() {
+        if (!isOk_) throw std::runtime_error("unwrap on error");
     }
 };
 

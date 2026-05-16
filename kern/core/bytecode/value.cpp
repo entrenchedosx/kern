@@ -53,6 +53,7 @@ std::string Value::toString() const {
         case Type::INSTANCE: return "<instance>";
         case Type::GENERATOR: return "<generator>";
         case Type::PTR: return "<ptr>";
+        case Type::FFI_FN: return "<ffi>";
         case Type::VEC3: {
             auto& v = std::get<Vec3Ptr>(data);
             std::ostringstream oss;
@@ -85,6 +86,61 @@ bool Value::equals(const Value& other) const {
         }
         default: return false;
     }
+}
+
+std::string Value::typeName() const {
+    switch (type) {
+        case Type::NIL: return "nil";
+        case Type::BOOL: return "bool";
+        case Type::INT: return "int";
+        case Type::FLOAT: return "float";
+        case Type::STRING: return "string";
+        case Type::ARRAY: return "array";
+        case Type::MAP: return "map";
+        case Type::FUNCTION: return "function";
+        case Type::CLASS: return "class";
+        case Type::INSTANCE: return "instance";
+        case Type::GENERATOR: return "generator";
+        case Type::PTR: return "ptr";
+        case Type::FFI_FN: return "ffi";
+        case Type::VEC3: return "vec3";
+        case Type::STRUCT: return "struct";
+        default: return "unknown";
+    }
+}
+
+// ── Getter methods for native bindings ────────────────────────────────────
+
+int32_t Value::asInt() const {
+    if (type != Type::INT) {
+        throw std::runtime_error("Type mismatch: expected Int, got " + typeName());
+    }
+    return static_cast<int32_t>(std::get<int64_t>(data));
+}
+
+double Value::asFloat() const {
+    if (type != Type::FLOAT) {
+        throw std::runtime_error("Type mismatch: expected Float, got " + typeName());
+    }
+    return std::get<double>(data);
+}
+
+bool Value::asBool() const {
+    return isTruthy();
+}
+
+std::string Value::asString() const {
+    if (type != Type::STRING) {
+        throw std::runtime_error("Type mismatch: expected String, got " + typeName());
+    }
+    return std::get<std::string>(data);
+}
+
+Vec3Ptr Value::asVec3() const {
+    if (type != Type::VEC3) {
+        throw std::runtime_error("Type mismatch: expected Vec3, got " + typeName());
+    }
+    return std::get<Vec3Ptr>(data);
 }
 
 } // namespace kern

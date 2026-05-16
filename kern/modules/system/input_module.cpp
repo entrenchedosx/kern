@@ -34,17 +34,8 @@ struct InputContext {
 };
 
 static bool simulationAllowed() {
-#ifdef _WIN32
-    char* value = nullptr;
-    size_t len = 0;
-    _dupenv_s(&value, &len, "KERN_ALLOW_INPUT_SIM");
-    std::string env = value ? value : "";
-    if (value) std::free(value);
-    return env == "1";
-#else
     const char* env = kernGetEnv("KERN_ALLOW_INPUT_SIM");
     return env && std::string(env) == "1";
-#endif
 }
 
 static ValuePtr makeEventMap(const SystemEvent& ev) {

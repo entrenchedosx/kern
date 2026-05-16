@@ -4,6 +4,7 @@
 
 #include "codegen.hpp"
 #include "bytecode/bytecode_peephole.hpp"
+#include "bytecode/bytecode_serializer.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -168,6 +169,15 @@ bool CodeGenerator::tryResolveLocalSlot(const std::string& name, int64_t* outSlo
     if (local == static_cast<size_t>(-1)) return false;
     *outSlot = static_cast<int64_t>(local);
     return true;
+}
+
+std::string CodeGenerator::resolveType(const std::string& name) const {
+    // Walk scopes from innermost to outermost to find the variable's type.
+    for (auto it = typeScopes_.rbegin(); it != typeScopes_.rend(); ++it) {
+        auto found = it->find(name);
+        if (found != it->end()) return found->second;
+    }
+    return "";
 }
 
 void CodeGenerator::scanAssignTargetForCaptures(const Expr* t, size_t boundary, std::unordered_set<std::string>& seen,
@@ -441,6 +451,7 @@ void CodeGenerator::declareLocal(const std::string& name) {
 
 void CodeGenerator::beginScope() {
     scopes_.emplace_back();
+    typeScopes_.emplace_back();
     deferStack_.emplace_back();
 }
 
@@ -453,6 +464,7 @@ void CodeGenerator::endScope() {
         emitStmt(*it);
     }
     deferStack_.pop_back();
+    typeScopes_.pop_back();
     scopes_.pop_back();
 }
 
@@ -577,16 +589,48 @@ void CodeGenerator::emitExpr(const Expr* e) {
         if (tryConstantFoldBinary(x)) return;
         emitExpr(x->left.get());
         emitExpr(x->right.get());
+        // Resolve types of both operands for fast-path opcode selection
+        auto exprType = [&](const Expr* ex) -> std::string {
+            if (auto* id = dynamic_cast<const Identifier*>(ex))
+                return resolveType(id->name);
+            if (dynamic_cast<const IntLiteral*>(ex))
+                return "int";
+            if (dynamic_cast<const FloatLiteral*>(ex))
+                return "float";
+            return "";
+        };
+        std::string leftType = exprType(x->left.get());
+        std::string rightType = exprType(x->right.get());
+        bool bothInt = (leftType == "int" && rightType == "int");
+        bool bothFloat = (leftType == "float" && rightType == "float");
         switch (x->op) {
-            case TokenType::PLUS: emit(Opcode::ADD); break;
-            case TokenType::MINUS: emit(Opcode::SUB); break;
-            case TokenType::STAR: emit(Opcode::MUL); break;
-            case TokenType::SLASH: emit(Opcode::DIV); break;
+            case TokenType::PLUS:
+                if (bothInt) { emit(Opcode::ADD_INT); break; }
+                if (bothFloat) { emit(Opcode::ADD_FLOAT); break; }
+                emit(Opcode::ADD); break;
+            case TokenType::MINUS:
+                if (bothInt) { emit(Opcode::SUB_INT); break; }
+                if (bothFloat) { emit(Opcode::SUB_FLOAT); break; }
+                emit(Opcode::SUB); break;
+            case TokenType::STAR:
+                if (bothInt) { emit(Opcode::MUL_INT); break; }
+                if (bothFloat) { emit(Opcode::MUL_FLOAT); break; }
+                emit(Opcode::MUL); break;
+            case TokenType::SLASH:
+                if (bothInt) { emit(Opcode::DIV_INT); break; }
+                if (bothFloat) { emit(Opcode::DIV_FLOAT); break; }
+                emit(Opcode::DIV); break;
             case TokenType::PERCENT: emit(Opcode::MOD); break;
             case TokenType::STAR_STAR: emit(Opcode::POW); break;
-            case TokenType::EQ: emit(Opcode::EQ); break;
+            case TokenType::EQ:
+                if (bothInt) { emit(Opcode::EQ_INT); break; }
+                if (bothFloat) { emit(Opcode::EQ_FLOAT); break; }
+                emit(Opcode::EQ); break;
             case TokenType::NEQ: emit(Opcode::NE); break;
-            case TokenType::LT: emit(Opcode::LT); break;
+            case TokenType::LT:
+                if (bothInt) { emit(Opcode::LT_INT); break; }
+                if (bothFloat) { emit(Opcode::LT_FLOAT); break; }
+                emit(Opcode::LT); break;
             case TokenType::LE: emit(Opcode::LE); break;
             case TokenType::GT: emit(Opcode::GT); break;
             case TokenType::GE: emit(Opcode::GE); break;
@@ -1169,6 +1213,13 @@ void CodeGenerator::emitStmt(const Stmt* s) {
     if (auto* x = dynamic_cast<const VarDeclStmt*>(s)) {
         if (x->initializer) emitExpr(x->initializer.get());
         else emit(Opcode::CONST_NULL);
+        // Track declared type for fast-path opcode selection
+        if (x->hasType && !x->typeName.empty() && scopes_.size() > 1) {
+            typeScopes_.back()[x->name] = x->typeName;
+        } else if (x->hasType && !x->typeName.empty()) {
+            // Global scope — still store type info (used by function-level codegen later if needed)
+            typeScopes_.back()[x->name] = x->typeName;
+        }
         if (scopes_.size() == 1) {
             globals_[x->name] = 0;
             emit(Opcode::STORE_GLOBAL, addConstant(x->name));
@@ -1580,143 +1631,40 @@ void CodeGenerator::emitStmt(const Stmt* s) {
     //          key = __for_keys[__for_idx]; value = __for_map[key]; __for_idx++; body
     //      }
     if (auto* x = dynamic_cast<const ForInStmt*>(s)) {
+        emitExpr(x->iterable.get());
+        emit(Opcode::FOR_IN_ITER);
         beginScope();
         loopScopeDepthStack_.push_back(deferStack_.size() - 1);
         std::vector<size_t> breakJumps, continueJumps;
         std::string loopLabel;
-        if (x->valueVarName.empty()) {
-            // Single-variable for-in: iterate by index
-            declareLocal("__for_val");
-            size_t valSlot = scopes_.back()["__for_val"];
-            emitExpr(x->iterable.get());
-            emit(Opcode::STORE, static_cast<int64_t>(valSlot));
-
-            declareLocal("__for_idx");
-            size_t idxSlot = scopes_.back()["__for_idx"];
-            emit(Opcode::CONST_I64, int64_t(0));
-            emit(Opcode::STORE, static_cast<int64_t>(idxSlot));
-
-            declareLocal(x->varName);
-            size_t varSlot = scopes_.back()[x->varName];
-
-            breakPatches_.emplace_back();
-            continuePatches_.emplace_back();
-            loopLabels_.push_back(x->label);
-            loopStartStack_.push_back(0);
-            loopEndStack_.push_back(0);
-
-            size_t loopStart = code_.size();
-            loopStartStack_.back() = loopStart;
-
-            // while idx < ARRAY_LEN(val)
-            emit(Opcode::LOAD, static_cast<int64_t>(idxSlot));
-            emit(Opcode::LOAD, static_cast<int64_t>(valSlot));
-            emit(Opcode::ARRAY_LEN);
-            emit(Opcode::LT);
-            size_t exitJump = emit(Opcode::JMP_IF_FALSE, size_t(0));
-
-            // var = val[idx]
-            emit(Opcode::LOAD, static_cast<int64_t>(valSlot));
-            emit(Opcode::LOAD, static_cast<int64_t>(idxSlot));
-            emit(Opcode::GET_INDEX);
-            emit(Opcode::STORE, static_cast<int64_t>(varSlot));
-
-            // idx = idx + 1
-            emit(Opcode::LOAD, static_cast<int64_t>(idxSlot));
-            emit(Opcode::CONST_I64, int64_t(1));
-            emit(Opcode::ADD);
-            emit(Opcode::STORE, static_cast<int64_t>(idxSlot));
-
-            emitStmt(x->body.get());
-            emit(Opcode::JMP, loopStart);
-
-            // Save break/continue patches and pop stacks before endScope
-            breakJumps = std::move(breakPatches_.back());
-            continueJumps = std::move(continuePatches_.back());
-            loopLabel = loopLabels_.back();
-            breakPatches_.pop_back();
-            continuePatches_.pop_back();
-            loopLabels_.pop_back();
-            loopStartStack_.pop_back();
-            loopEndStack_.pop_back();
-            // exitJump patched before endScope (normal exit runs endScope defers)
-            patchJump(exitJump, code_.size());
-        } else {
-            // Two-variable for-in: for key, value in map
-            declareLocal("__for_map");
-            size_t mapSlot = scopes_.back()["__for_map"];
-            emitExpr(x->iterable.get());
-            emit(Opcode::STORE, static_cast<int64_t>(mapSlot));
-
-            // keys_array = keys(map)
-            emit(Opcode::LOAD_GLOBAL, addConstant("keys"));
-            emit(Opcode::LOAD, static_cast<int64_t>(mapSlot));
-            emit(Opcode::CALL, static_cast<size_t>(1));
-
-            declareLocal("__for_keys");
-            size_t keysSlot = scopes_.back()["__for_keys"];
-            emit(Opcode::STORE, static_cast<int64_t>(keysSlot));
-
-            declareLocal("__for_idx");
-            size_t idxSlot = scopes_.back()["__for_idx"];
-            emit(Opcode::CONST_I64, int64_t(0));
-            emit(Opcode::STORE, static_cast<int64_t>(idxSlot));
-
-            declareLocal(x->varName);
-            size_t keySlot = scopes_.back()[x->varName];
-
+        declareLocal(x->varName);
+        size_t keySlot = scopes_.back()[x->varName];
+        size_t valueSlot = static_cast<size_t>(-1);
+        if (!x->valueVarName.empty()) {
             declareLocal(x->valueVarName);
-            size_t valueSlot = scopes_.back()[x->valueVarName];
-
-            breakPatches_.emplace_back();
-            continuePatches_.emplace_back();
-            loopLabels_.push_back(x->label);
-            loopStartStack_.push_back(0);
-            loopEndStack_.push_back(0);
-
-            size_t loopStart = code_.size();
-            loopStartStack_.back() = loopStart;
-
-            // while idx < ARRAY_LEN(keys)
-            emit(Opcode::LOAD, static_cast<int64_t>(idxSlot));
-            emit(Opcode::LOAD, static_cast<int64_t>(keysSlot));
-            emit(Opcode::ARRAY_LEN);
-            emit(Opcode::LT);
-            size_t exitJump = emit(Opcode::JMP_IF_FALSE, size_t(0));
-
-            // key = keys[idx]
-            emit(Opcode::LOAD, static_cast<int64_t>(keysSlot));
-            emit(Opcode::LOAD, static_cast<int64_t>(idxSlot));
-            emit(Opcode::GET_INDEX);
-            emit(Opcode::STORE, static_cast<int64_t>(keySlot));
-
-            // value = map[key]
-            emit(Opcode::LOAD, static_cast<int64_t>(mapSlot));
-            emit(Opcode::LOAD, static_cast<int64_t>(keySlot));
-            emit(Opcode::GET_INDEX);
-            emit(Opcode::STORE, static_cast<int64_t>(valueSlot));
-
-            // idx = idx + 1
-            emit(Opcode::LOAD, static_cast<int64_t>(idxSlot));
-            emit(Opcode::CONST_I64, int64_t(1));
-            emit(Opcode::ADD);
-            emit(Opcode::STORE, static_cast<int64_t>(idxSlot));
-
-            emitStmt(x->body.get());
-            emit(Opcode::JMP, loopStart);
-
-            // Save break/continue patches and pop stacks before endScope
-            breakJumps = std::move(breakPatches_.back());
-            continueJumps = std::move(continuePatches_.back());
-            loopLabel = loopLabels_.back();
-            breakPatches_.pop_back();
-            continuePatches_.pop_back();
-            loopLabels_.pop_back();
-            loopStartStack_.pop_back();
-            loopEndStack_.pop_back();
-            // exitJump patched before endScope (normal exit runs endScope defers)
-            patchJump(exitJump, code_.size());
+            valueSlot = scopes_.back()[x->valueVarName];
         }
+        breakPatches_.emplace_back();
+        continuePatches_.emplace_back();
+        loopLabels_.push_back(x->label);
+        size_t loopStart = code_.size();
+        loopStartStack_.push_back(loopStart);
+        loopEndStack_.push_back(0);
+        emit(Opcode::FOR_IN_NEXT, keySlot, valueSlot);
+        size_t exitJump = emit(Opcode::JMP_IF_FALSE, size_t(0));
+        emitStmt(x->body.get());
+        emit(Opcode::JMP, loopStart);
+        // Save break/continue patches and pop stacks before endScope
+        breakJumps = std::move(breakPatches_.back());
+        continueJumps = std::move(continuePatches_.back());
+        loopLabel = loopLabels_.back();
+        breakPatches_.pop_back();
+        continuePatches_.pop_back();
+        loopLabels_.pop_back();
+        loopStartStack_.pop_back();
+        loopEndStack_.pop_back();
+        // exitJump patched before endScope (normal exit runs endScope defers)
+        patchJump(exitJump, code_.size());
         endScope();
         // break jumps patched AFTER endScope (break path already emitted defers inline)
         for (size_t at : breakJumps) patchJump(at, code_.size());
@@ -2021,7 +1969,11 @@ Bytecode CodeGenerator::generate(std::unique_ptr<Program> program) {
     emitProgram(program.get());
     emit(Opcode::HALT);
     applyBytecodePeephole(code_);
-    return std::move(code_);
+    return code_;
+}
+
+bool CodeGenerator::saveToFile(const std::string& path, bool encrypt) const {
+    return saveBytecodeToFile(path, code_, stringConstants_, valueConstants_, encrypt, "");
 }
 
 } // namespace kern

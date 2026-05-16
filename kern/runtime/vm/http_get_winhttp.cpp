@@ -212,6 +212,125 @@ void winInetGetTry(const std::string& url, bool ignoreCertErrors, std::string& b
     bodyOut.clear();
 }
 
+// ─── HTTP POST (background-thread safe) ────────────────────────────────
+// Sends a POST request with the given payload as the request body.
+// Sets Content-Type: application/json.
+void winHttpPostTry(const std::string& url, const std::string& payload, bool ignoreCertErrors, std::string& bodyOut) {
+    bodyOut.clear();
+    bool https = false;
+    std::string host, object;
+    INTERNET_PORT port = INTERNET_DEFAULT_HTTP_PORT;
+    if (!parseHttpUrl(url, https, host, port, object)) return;
+
+    const std::wstring whost = utf8ToWide(host);
+    const std::wstring wobj = utf8ToWide(object);
+    if (whost.empty() || wobj.empty()) return;
+
+    HINTERNET hSession =
+        WinHttpOpen(L"Kern/1.0 (WinHTTP)", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!hSession) return;
+
+    const DWORD ms = 60000;
+    WinHttpSetTimeouts(hSession, ms, ms, ms, ms);
+
+    DWORD secureProto = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2;
+#if defined(WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3)
+    secureProto |= WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
+#endif
+    WinHttpSetOption(hSession, 9 /* WINHTTP_OPTION_SECURE_PROTOCOL*/, &secureProto, sizeof(secureProto));
+
+    HINTERNET hConn = WinHttpConnect(hSession, whost.c_str(), port, 0);
+    if (!hConn) {
+        WinHttpCloseHandle(hSession);
+        return;
+    }
+
+    const DWORD openFlags = https ? WINHTTP_FLAG_SECURE : 0;
+
+    HINTERNET hReq = WinHttpOpenRequest(hConn, L"POST", wobj.c_str(), nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, openFlags);
+    if (!hReq) {
+        WinHttpCloseHandle(hConn);
+        WinHttpCloseHandle(hSession);
+        return;
+    }
+
+    if (ignoreCertErrors) {
+        DWORD dwFlags = SECURITY_FLAG_IGNORE_UNKNOWN_CA | SECURITY_FLAG_IGNORE_CERT_DATE_INVALID |
+                        SECURITY_FLAG_IGNORE_CERT_CN_INVALID | SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE;
+        WinHttpSetOption(hReq, WINHTTP_OPTION_SECURITY_FLAGS, &dwFlags, sizeof(dwFlags));
+    }
+
+    // Add Content-Type: application/json and other standard headers
+    static const wchar_t kHdr[] =
+        L"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Kern/1.0\r\n"
+        L"Accept: */* \r\n"
+        L"Accept-Encoding: identity\r\n"
+        L"Content-Type: application/json\r\n";
+
+    // Convert payload to wide-char for WinHttpSendRequest
+    std::wstring wPayload = utf8ToWide(payload);
+    LPVOID bodyData = const_cast<wchar_t*>(wPayload.c_str());
+    DWORD bodyLen = static_cast<DWORD>(wPayload.size() * sizeof(wchar_t));
+
+    // Pass the body data via the optional dwOptionalLength parameter
+    if (bodyLen > 0) {
+        // Encode payload as UTF-8 bytes for the actual request body
+        // WinHttpSendRequest with WINHTTP_NO_REQUEST_DATA means no initial data;
+        // we use WinHttpWriteData to send it.
+        if (!WinHttpSendRequest(hReq, kHdr, static_cast<DWORD>(-1), WINHTTP_NO_REQUEST_DATA, 0, bodyLen, 0)) {
+            WinHttpCloseHandle(hReq);
+            WinHttpCloseHandle(hConn);
+            WinHttpCloseHandle(hSession);
+            return;
+        }
+
+        // Write the payload as UTF-8 bytes
+        DWORD written = 0;
+        WinHttpWriteData(hReq, payload.data(), static_cast<DWORD>(payload.size()), &written);
+    } else {
+        if (!WinHttpSendRequest(hReq, kHdr, static_cast<DWORD>(-1), WINHTTP_NO_REQUEST_DATA, 0, 0, 0)) {
+            WinHttpCloseHandle(hReq);
+            WinHttpCloseHandle(hConn);
+            WinHttpCloseHandle(hSession);
+            return;
+        }
+    }
+
+    if (!WinHttpReceiveResponse(hReq, nullptr)) {
+        WinHttpCloseHandle(hReq);
+        WinHttpCloseHandle(hConn);
+        WinHttpCloseHandle(hSession);
+        return;
+    }
+
+    DWORD status = 0;
+    DWORD sz = sizeof(status);
+    if (WinHttpQueryHeaders(hReq, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, &status, &sz,
+            WINHTTP_NO_HEADER_INDEX)) {
+        if (status < 200 || status >= 300) {
+            WinHttpCloseHandle(hReq);
+            WinHttpCloseHandle(hConn);
+            WinHttpCloseHandle(hSession);
+            return;
+        }
+    }
+
+    for (;;) {
+        DWORD avail = 0;
+        if (!WinHttpQueryDataAvailable(hReq, &avail)) break;
+        if (avail == 0) break;
+        std::vector<char> buf(static_cast<size_t>(avail));
+        DWORD read = 0;
+        if (!WinHttpReadData(hReq, buf.data(), avail, &read)) break;
+        if (read == 0) break;
+        bodyOut.append(buf.data(), read);
+    }
+
+    WinHttpCloseHandle(hReq);
+    WinHttpCloseHandle(hConn);
+    WinHttpCloseHandle(hSession);
+}
+
 void stripBodyBom(std::string& b) {
     if (b.size() >= 3 && static_cast<unsigned char>(b[0]) == 0xEF && static_cast<unsigned char>(b[1]) == 0xBB &&
         static_cast<unsigned char>(b[2]) == 0xBF)
@@ -246,6 +365,28 @@ std::string kernHttpGetWinHttp(const std::string& urlRaw) {
     }
 
     winInetGetTry(url, true, body);
+    if (!body.empty()) {
+        stripBodyBom(body);
+        return body;
+    }
+
+    return "";
+}
+
+std::string kernHttpPostWinHttp(const std::string& urlRaw, const std::string& payload) {
+    std::string url = urlRaw;
+    trimAsciiWsAndBom(url);
+    if (url.empty()) return "";
+
+    std::string body;
+
+    winHttpPostTry(url, payload, false, body);
+    if (!body.empty()) {
+        stripBodyBom(body);
+        return body;
+    }
+
+    winHttpPostTry(url, payload, true, body);
     if (!body.empty()) {
         stripBodyBom(body);
         return body;

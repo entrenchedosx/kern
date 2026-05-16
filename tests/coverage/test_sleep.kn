@@ -1,0 +1,19 @@
+// Time-Aware Coroutine Sleep Integration Test
+//
+// Tests that kern_sleep(ms) yields the coroutine and the host loop's
+// resumeAll(currentTimeMs) does NOT resume it until at least `ms`
+// milliseconds of simulated clock time have passed.
+//
+// Expected output (real clock — timing may vary slightly):
+//   Before sleep
+//   After sleep  (printed ~50ms later)
+//
+// To run:  kern tests/coverage/test_sleep.kn
+
+def task() {
+    print("Before sleep")
+    kern_sleep(800)   // Sleep 800ms — clearly observable
+    print("After sleep")
+}
+
+kern_start_coroutine(task, [])

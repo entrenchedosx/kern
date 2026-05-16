@@ -1,0 +1,30 @@
+// Coroutine integration test
+//
+// The codegen marks ANY function containing `yield` as a generator
+// (SET_FUNC_GENERATOR).  Calling a generator-flagged function via
+// the CALL opcode just creates a GeneratorObject without executing
+// the body.  To bypass this, we use kern_start_coroutine(), which
+// creates a Coroutine entry directly so the resumeAll() loop in
+// the host picks it up.
+//
+// Expected output (VM::run() executes the main script first, then
+// resumeAll() runs the coroutine body through each yield):
+//   OK: test_coroutines
+//   a
+//   b
+//   c
+
+def task() {
+    print("a")
+    yield
+    print("b")
+    yield
+    print("c")
+}
+
+// Start task as a cooperative coroutine (returns coroutine ID).
+// The host's runSource() calls resumeAll() in a loop after run(),
+// which restores and runs the coroutine until each yield.
+kern_start_coroutine(task, [])
+
+print("OK: test_coroutines")

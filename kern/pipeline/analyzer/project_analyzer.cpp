@@ -399,7 +399,7 @@ static void collectAstDeclarationsFromStmt(const Stmt* s, ParsedFileInfo& file) 
         return;
     }
     if (const auto* df = dynamic_cast<const DeferStmt*>(s)) {
-        collectAstDeclarationsFromExpr(df->expr.get(), file);
+        collectAstDeclarationsFromStmt(df->statement.get(), file);
         return;
     }
     if (const auto* prog = dynamic_cast<const Program*>(s)) {

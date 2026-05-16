@@ -1,6 +1,7 @@
 #ifndef KERN_IR_IR_HPP
 #define KERN_IR_IR_HPP
 
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <vector>

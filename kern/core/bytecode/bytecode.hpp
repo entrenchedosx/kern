@@ -42,6 +42,13 @@ enum class Opcode : uint8_t {
     // arithmetic
     ADD, SUB, MUL, DIV, MOD, POW,
     NEG,
+    // fast-path typed arithmetic (bypass std::variant dispatch)
+    ADD_INT, SUB_INT, MUL_INT, DIV_INT,
+    ADD_FLOAT, SUB_FLOAT, MUL_FLOAT, DIV_FLOAT,
+    NEG_INT, NEG_FLOAT,
+    // fast-path typed comparison
+    EQ_INT, EQ_FLOAT,
+    LT_INT, LT_FLOAT,
     // comparison
     EQ, NE, LT, LE, GT, GE,
     // logical
@@ -137,6 +144,20 @@ inline const char* opcodeName(Opcode op) {
         case Opcode::MOD: return "MOD";
         case Opcode::POW: return "POW";
         case Opcode::NEG: return "NEG";
+        case Opcode::ADD_INT: return "ADD_INT";
+        case Opcode::SUB_INT: return "SUB_INT";
+        case Opcode::MUL_INT: return "MUL_INT";
+        case Opcode::DIV_INT: return "DIV_INT";
+        case Opcode::ADD_FLOAT: return "ADD_FLOAT";
+        case Opcode::SUB_FLOAT: return "SUB_FLOAT";
+        case Opcode::MUL_FLOAT: return "MUL_FLOAT";
+        case Opcode::DIV_FLOAT: return "DIV_FLOAT";
+        case Opcode::NEG_INT: return "NEG_INT";
+        case Opcode::NEG_FLOAT: return "NEG_FLOAT";
+        case Opcode::EQ_INT: return "EQ_INT";
+        case Opcode::EQ_FLOAT: return "EQ_FLOAT";
+        case Opcode::LT_INT: return "LT_INT";
+        case Opcode::LT_FLOAT: return "LT_FLOAT";
         case Opcode::EQ: return "EQ";
         case Opcode::NE: return "NE";
         case Opcode::LT: return "LT";

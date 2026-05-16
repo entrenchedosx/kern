@@ -4,7 +4,9 @@
 
 #include "vm.hpp"
 #include "builtins.hpp"
+#include "ffi_module.hpp"
 #include "bytecode_verifier.hpp"
+#include "bytecode/bytecode_serializer.hpp"
 #include "errors/vm_error_registry.hpp"
 #include "errors/errors.hpp"
 #include "platform/env_compat.hpp"
@@ -22,6 +24,7 @@ namespace kern {
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <fstream>
 
 namespace kern {
 
@@ -471,6 +474,16 @@ void VM::runInstruction(const Instruction& inst) {
                               inst.line, inst.column, 2, static_cast<int>(VMErrorCode::INVALID_OPERATION));
             break;
         }
+        case Opcode::ADD_INT: {
+            ValuePtr b = popStack(), a = popStack();
+            push(std::make_shared<Value>(Value::fromInt(toInt(a) + toInt(b))));
+            break;
+        }
+        case Opcode::ADD_FLOAT: {
+            ValuePtr b = popStack(), a = popStack();
+            push(std::make_shared<Value>(Value::fromFloat(toDouble(a) + toDouble(b))));
+            break;
+        }
         case Opcode::SUB: {
             ValuePtr b = popStack(), a = popStack();
             if (a->type == Value::Type::PTR && b->type == Value::Type::INT) {
@@ -491,6 +504,16 @@ void VM::runInstruction(const Instruction& inst) {
                               inst.line, inst.column, 2, static_cast<int>(VMErrorCode::INVALID_OPERATION));
             break;
         }
+        case Opcode::SUB_INT: {
+            ValuePtr b = popStack(), a = popStack();
+            push(std::make_shared<Value>(Value::fromInt(toInt(a) - toInt(b))));
+            break;
+        }
+        case Opcode::SUB_FLOAT: {
+            ValuePtr b = popStack(), a = popStack();
+            push(std::make_shared<Value>(Value::fromFloat(toDouble(a) - toDouble(b))));
+            break;
+        }
         case Opcode::MUL: {
             ValuePtr b = popStack(), a = popStack();
             requireNumeric(a, "MUL");
@@ -498,10 +521,36 @@ void VM::runInstruction(const Instruction& inst) {
             push(std::make_shared<Value>(Value::fromFloat(toDouble(a) * toDouble(b))));
             break;
         }
+        case Opcode::MUL_INT: {
+            ValuePtr b = popStack(), a = popStack();
+            push(std::make_shared<Value>(Value::fromInt(toInt(a) * toInt(b))));
+            break;
+        }
+        case Opcode::MUL_FLOAT: {
+            ValuePtr b = popStack(), a = popStack();
+            push(std::make_shared<Value>(Value::fromFloat(toDouble(a) * toDouble(b))));
+            break;
+        }
         case Opcode::DIV: {
             ValuePtr b = popStack(), a = popStack();
             requireNumeric(a, "DIV");
             requireNumeric(b, "DIV");
+            double den = toDouble(b);
+            if (den == 0)
+                throw VMError("Division by zero", inst.line, inst.column, 4, static_cast<int>(VMErrorCode::DIVISION_BY_ZERO));
+            push(std::make_shared<Value>(Value::fromFloat(toDouble(a) / den)));
+            break;
+        }
+        case Opcode::DIV_INT: {
+            ValuePtr b = popStack(), a = popStack();
+            int64_t den = toInt(b);
+            if (den == 0)
+                throw VMError("Division by zero", inst.line, inst.column, 4, static_cast<int>(VMErrorCode::DIVISION_BY_ZERO));
+            push(std::make_shared<Value>(Value::fromInt(toInt(a) / den)));
+            break;
+        }
+        case Opcode::DIV_FLOAT: {
+            ValuePtr b = popStack(), a = popStack();
             double den = toDouble(b);
             if (den == 0)
                 throw VMError("Division by zero", inst.line, inst.column, 4, static_cast<int>(VMErrorCode::DIVISION_BY_ZERO));
@@ -532,10 +581,30 @@ void VM::runInstruction(const Instruction& inst) {
             else push(std::make_shared<Value>(Value::fromInt(-toInt(v))));
             break;
         }
+        case Opcode::NEG_INT: {
+            ValuePtr v = popStack();
+            push(std::make_shared<Value>(Value::fromInt(-toInt(v))));
+            break;
+        }
+        case Opcode::NEG_FLOAT: {
+            ValuePtr v = popStack();
+            push(std::make_shared<Value>(Value::fromFloat(-toDouble(v))));
+            break;
+        }
         case Opcode::EQ: {
             ValuePtr b = popStack(), a = popStack();
             bool eq = (a && b) ? a->equals(*b) : (a.get() == b.get());
             push(std::make_shared<Value>(Value::fromBool(eq)));
+            break;
+        }
+        case Opcode::EQ_INT: {
+            ValuePtr b = popStack(), a = popStack();
+            push(std::make_shared<Value>(Value::fromBool(toInt(a) == toInt(b))));
+            break;
+        }
+        case Opcode::EQ_FLOAT: {
+            ValuePtr b = popStack(), a = popStack();
+            push(std::make_shared<Value>(Value::fromBool(toDouble(a) == toDouble(b))));
             break;
         }
         case Opcode::NE: {
@@ -548,6 +617,16 @@ void VM::runInstruction(const Instruction& inst) {
             ValuePtr b = popStack(), a = popStack();
             requireNumeric(a, "LT");
             requireNumeric(b, "LT");
+            push(std::make_shared<Value>(Value::fromBool(toDouble(a) < toDouble(b))));
+            break;
+        }
+        case Opcode::LT_INT: {
+            ValuePtr b = popStack(), a = popStack();
+            push(std::make_shared<Value>(Value::fromBool(toInt(a) < toInt(b))));
+            break;
+        }
+        case Opcode::LT_FLOAT: {
+            ValuePtr b = popStack(), a = popStack();
             push(std::make_shared<Value>(Value::fromBool(toDouble(a) < toDouble(b))));
             break;
         }
@@ -732,6 +811,9 @@ void VM::runInstruction(const Instruction& inst) {
                         ip_ = fn->entryPoint - 1;
                     }
                 }
+            } else if (callee->type == Value::Type::FFI_FN) {
+                auto& ffi = std::get<FfiClosurePtr>(callee->data);
+                push(std::make_shared<Value>(callFfiFunction(ffi.get(), args)));
             } else {
                 throw VMError("Invalid call target: value is not callable", inst.line, inst.column, 2,
                               static_cast<int>(VMErrorCode::INVALID_CALL_TARGET));
@@ -759,8 +841,19 @@ void VM::runInstruction(const Instruction& inst) {
                 break;
             }
             ValuePtr result = stack.empty() ? std::make_shared<Value>(Value::nil()) : popStack();
-            if (callFrames.empty())
+            if (callFrames.empty()) {
+                // If we're running inside a coroutine (via resumeAll), the function
+                // body was entered directly at fn->entryPoint without a CALL opcode,
+                // so there is no call frame.  Treat this as coroutine completion
+                // instead of throwing "Return outside function".
+                if (!inGeneratorExecution_ && !coroutines_.empty() && activeCoroutineId_ > 0) {
+                    // Signal end of execution — the resumeAll() loop will see
+                    // ip_ >= code_.size() and mark the coroutine as DEAD.
+                    ip_ = code_.size();
+                    break;
+                }
                 throw VMError("Return outside function", inst.line, inst.column, 1, static_cast<int>(VMErrorCode::RETURN_OUTSIDE_FUNCTION));
+            }
             if (!deferStack.empty()) runDeferredCalls();
             if (!callStack.empty()) callStack.pop_back();
             ip_ = callFrames.back().returnPc - reinterpret_cast<const uint8_t*>(0);
@@ -883,10 +976,21 @@ void VM::runInstruction(const Instruction& inst) {
         }
         case Opcode::YIELD: {
             ValuePtr val = stack.empty() ? std::make_shared<Value>(Value::nil()) : popStack();
-            if (!inGeneratorExecution_)
-                throw VMError("yield outside generator", inst.line, inst.column, 1);
-            pendingYield_ = true;
-            pendingYieldValue_ = std::move(val);
+            if (inGeneratorExecution_) {
+                // Existing generator path — resumeGenerator() handles the outer loop
+                pendingYield_ = true;
+                pendingYieldValue_ = std::move(val);
+            } else {
+                // Coroutine yield — save state and signal run() to break
+                if (coroutines_.empty()) {
+                    coroutines_.resize(1);
+                    coroutines_[0].state = CoroutineState::RUNNING;
+                }
+                saveCurrentCoroutineState();
+                coroutines_[activeCoroutineId_].state = CoroutineState::YIELDED;
+                coroutines_[activeCoroutineId_].yieldedValue = std::move(val);
+                coroutineYieldRequested_ = true;
+            }
             break;
         }
         case Opcode::NEW_OBJECT: {
@@ -1306,6 +1410,59 @@ void VM::runInstruction(const Instruction& inst) {
     }
 }
 
+void VM::saveCurrentCoroutineState() {
+    if (activeCoroutineId_ >= coroutines_.size()) return;
+    Coroutine& cor = coroutines_[activeCoroutineId_];
+    cor.code = code_;
+    cor.stringConstants = stringConstants_;
+    cor.valueConstants = valueConstants_;
+    cor.ip = ip_;
+    cor.locals = locals_;
+    cor.stack = stack;
+    cor.callFrames = callFrames;
+    cor.callStack = callStack;
+    cor.frameLocals = frameLocals_;
+    cor.deferStack = deferStack;
+    cor.iterStack = iterStack;
+    cor.tryStack = tryStack;
+    cor.exceptionStack = exceptionStack;
+    cor.codeFrameStack = codeFrameStack;
+    cor.currentScript = currentScript;
+    cor.activeSourcePath = activeSourcePath_;
+    cor.unsafeDepth = unsafeDepth_;
+}
+
+void VM::restoreCoroutineState(const Coroutine& cor) {
+    code_ = cor.code;
+    stringConstants_ = cor.stringConstants;
+    valueConstants_ = cor.valueConstants;
+    ip_ = cor.ip;
+    locals_ = cor.locals;
+    stack = cor.stack;
+    callFrames = cor.callFrames;
+    callStack = cor.callStack;
+    frameLocals_ = cor.frameLocals;
+    deferStack = cor.deferStack;
+    iterStack = cor.iterStack;
+    tryStack = cor.tryStack;
+    exceptionStack = cor.exceptionStack;
+    codeFrameStack = cor.codeFrameStack;
+    currentScript = cor.currentScript;
+    activeSourcePath_ = cor.activeSourcePath;
+    unsafeDepth_ = cor.unsafeDepth;
+    normalizeValuePtrVector(locals_);
+    for (auto& fr : frameLocals_) normalizeValuePtrVector(fr);
+    for (auto& deflist : deferStack) {
+        for (auto& p : deflist) {
+            if (!p.first) p.first = std::make_shared<Value>(Value::nil());
+            normalizeValuePtrVector(p.second);
+        }
+    }
+    for (auto& it : iterStack) {
+        if (!it.first) it.first = std::make_shared<Value>(Value::nil());
+    }
+}
+
 void VM::restoreExecutionState(
     Bytecode code,
     std::vector<std::string> stringConstants,
@@ -1519,6 +1676,10 @@ ValuePtr VM::callValue(ValuePtr callee, const std::vector<ValuePtr>& args) {
             runInstruction(inst);
             if (++guard > maxGuard) break;
             ip_++;
+            // Break on coroutine yield — OP_YIELD already saved state via saveCurrentCoroutineState()
+            if (coroutineYieldRequested_) {
+                break;
+            }
         }
 
         // safety: if callback did not unwind naturally, restore the caller frame.
@@ -1611,8 +1772,269 @@ void VM::runDeferredCalls() {
         }
     }
 }
+// ─── Cooperative coroutine scheduler ──────────────────────────────────
+// Iterates all YIELDED coroutines, restoring state and running each
+// until they yield again or complete.  This is a single round-robin
+// pass — the host should call resumeAll() in a loop to keep coroutines
+// alive across multiple frames.
+void VM::resumeAll(uint64_t currentTimeMs) {
+    currentTimeMs_ = currentTimeMs;
+
+    // Lazily ensure coroutine 0 (the main coroutine) exists
+    if (coroutines_.empty()) {
+        coroutines_.resize(1);
+        saveCurrentCoroutineState();
+        coroutines_[0].state = CoroutineState::RUNNING;
+    }
+
+    for (auto& cor : coroutines_) {
+        if (cor.state == CoroutineState::DEAD) continue;
+
+        // Track which coroutine is active
+        activeCoroutineId_ = static_cast<size_t>(&cor - coroutines_.data());
+
+        // Skip coroutine 0 (the main thread).  Its state was saved
+        // temporarily by startCoroutine() but the main-thread execution
+        // has already run to completion via VM::run().  Restoring and
+        // resuming it would re-execute the tail of the main script.
+        if (activeCoroutineId_ == 0) continue;
+
+        // ⏱ Time-aware scheduling: if this coroutine asked to sleep, check
+        // whether the host clock has advanced far enough.
+        if (cor.state == CoroutineState::YIELDED && cor.wakeTimestampMs > 0) {
+            if (currentTimeMs < cor.wakeTimestampMs) {
+                continue;  // Not ready yet — try again on the next tick
+            }
+            // Ready to wake up — clear the timer
+            cor.wakeTimestampMs = 0;
+        }
+
+        // 📂 Async I/O future check: if this coroutine is waiting on a
+        // background file read, check whether the future has completed.
+        if (cor.state == CoroutineState::YIELDED && cor.pendingStringTask.has_value()) {
+            if (cor.pendingStringTask->wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+                continue;  // Still reading — skip this coroutine for now
+            }
+            // Future is ready — extract the result string
+            std::string result;
+            try {
+                result = cor.pendingStringTask->get();
+            } catch (...) {
+                result = "[kern_fs_read_async error]";
+            }
+            cor.pendingStringTask.reset();
+            // Replace the top of the saved stack (the nil that was returned by
+            // the builtin before it yielded) with the actual file contents,
+            // so the Kern script receives the correct return value.
+            if (!cor.stack.empty()) {
+                cor.stack.back() = std::make_shared<Value>(Value::fromString(result));
+            }
+            // The coroutine will be restored below and resume normally.
+        }
+
+        restoreCoroutineState(cor);
+
+        // Clear the yield flag before running
+        coroutineYieldRequested_ = false;
+
+        // Run until yield or completion
+        try {
+            while (ip_ < code_.size()) {
+                const Instruction& inst = code_[ip_];
+
+                if (stack.size() > 10000) {
+                    throw VMError("Stack overflow - too many values on stack", inst.line, inst.column, 1,
+                                  static_cast<int>(VMErrorCode::STACK_OVERFLOW));
+                }
+
+                runInstruction(inst);
+
+                ip_++;
+                if (scriptExitCode_ >= 0) break;
+                if (coroutineYieldRequested_) {
+                    coroutineYieldRequested_ = false;
+                    cor.state = CoroutineState::YIELDED;
+                    // OP_YIELD saved ip_ at the YIELD instruction, but ip_++
+                    // above has advanced past it.  Re-save so that the next
+                    // resume continues at the instruction *after* YIELD
+                    // instead of re-executing YIELD forever.
+                    // For builtin-triggered yields (e.g. kern_sleep), this also
+                    // saves the state with ip_ past the call_builtin instruction.
+                    saveCurrentCoroutineState();
+                    break;
+                }
+            }
+        } catch (...) {
+            saveCurrentCoroutineState();
+            cor.state = CoroutineState::DEAD;
+            throw;
+        }
+
+        // Check if this coroutine finished (didn't yield)
+        if (ip_ >= code_.size() || scriptExitCode_ >= 0) {
+            saveCurrentCoroutineState();
+            cor.state = CoroutineState::DEAD;
+        }
+        // If yielded, state was already saved by the yield check above (or by OP_YIELD + the re-save)
+    }
+}
+
+// ─── sleepCurrentCoroutine: cooperative sleep via time-aware scheduling ──
+// Called from the kern_sleep builtin.  Sets the active coroutine's
+// wakeTimestampMs and signals a yield so resumeAll() breaks out.
+// The time-aware check in resumeAll() will skip this coroutine until
+// the host clock advances past wakeTimestampMs.
+void VM::sleepCurrentCoroutine(uint64_t ms) {
+    if (activeCoroutineId_ >= coroutines_.size()) return;
+    if (activeCoroutineId_ == 0) return;  // Cannot sleep the main thread
+
+    uint64_t wakeTime = currentTimeMs_ + ms;
+    coroutines_[activeCoroutineId_].wakeTimestampMs = wakeTime;
+    coroutines_[activeCoroutineId_].state = CoroutineState::YIELDED;
+    coroutineYieldRequested_ = true;
+}
+
+// ─── startAsyncFileRead: non-blocking file read via std::async ──────────
+// Called from the kern_fs_read_async builtin.  Launches a background
+// thread to read the file, stores the future, and yields the coroutine.
+void VM::startAsyncFileRead(const std::string& path) {
+    if (activeCoroutineId_ >= coroutines_.size()) return;
+    if (activeCoroutineId_ == 0) return;  // Cannot async-read on the main thread
+
+    auto& cor = coroutines_[activeCoroutineId_];
+    cor.pendingStringTask = std::async(std::launch::async, [path]() -> std::string {
+        // Read the entire file on a background thread
+        std::ifstream file(path, std::ios::binary | std::ios::ate);
+        if (!file) {
+            return std::string();
+        }
+        auto size = file.tellg();
+        file.seekg(0, std::ios::beg);
+        std::string content;
+        content.resize(static_cast<size_t>(size));
+        file.read(&content[0], size);
+        return content;
+    });
+
+    // Yield this coroutine until the future completes
+    cor.state = CoroutineState::YIELDED;
+    coroutineYieldRequested_ = true;
+}
+
+// ─── Async HTTP GET ────────────────────────────────────────────────────
+// Launches a background thread to perform an HTTP GET request, stores
+// the future in the active coroutine's pendingStringTask, and yields.
+void VM::startAsyncHttpGet(const std::string& url) {
+    if (activeCoroutineId_ >= coroutines_.size()) return;
+    if (activeCoroutineId_ == 0) return;  // Cannot async-http on main thread
+
+    auto& cor = coroutines_[activeCoroutineId_];
+    cor.pendingStringTask = std::async(std::launch::async, [url]() -> std::string {
+#ifdef _WIN32
+        return kernHttpGetWinHttp(url);
+#else
+        // On non-Windows, fall back to empty (curl/powershell could be added)
+        (void)url;
+        return std::string();
+#endif
+    });
+
+    // Yield this coroutine until the HTTP response arrives
+    cor.state = CoroutineState::YIELDED;
+    coroutineYieldRequested_ = true;
+}
+
+// ─── Async HTTP POST ───────────────────────────────────────────────────
+// Launches a background thread to perform an HTTP POST request, stores
+// the future in the active coroutine's pendingStringTask, and yields.
+void VM::startAsyncHttpPost(const std::string& url, const std::string& payload) {
+    if (activeCoroutineId_ >= coroutines_.size()) return;
+    if (activeCoroutineId_ == 0) return;  // Cannot async-http on main thread
+
+    auto& cor = coroutines_[activeCoroutineId_];
+    cor.pendingStringTask = std::async(std::launch::async, [url, payload]() -> std::string {
+#ifdef _WIN32
+        return kernHttpPostWinHttp(url, payload);
+#else
+        // On non-Windows, fall back to empty (curl/powershell could be added)
+        (void)url;
+        (void)payload;
+        return std::string();
+#endif
+    });
+
+    // Yield this coroutine until the HTTP response arrives
+    cor.state = CoroutineState::YIELDED;
+    coroutineYieldRequested_ = true;
+}
+
+// ─── Hot reload ────────────────────────────────────────────────────────
+// Kills all active coroutines (except the main thread), resets execution
+// state, loads new bytecode, and re-runs the top-level script so that
+// global function definitions are rebound.  After this call the host
+// should continue its resumeAll() loop as normal.
+void VM::hotReload(const Bytecode& code,
+                   const std::vector<std::string>& stringConstants,
+                   const std::vector<Value>& valueConstants) {
+    // ── 1. Kill all coroutines except coroutine 0 (main thread) ──────────
+    for (size_t i = 1; i < coroutines_.size(); ++i) {
+        auto& cor = coroutines_[i];
+        cor.state = CoroutineState::DEAD;
+        // Free all saved state from the old bytecode run
+        cor.code.clear();
+        cor.stringConstants.clear();
+        cor.valueConstants.clear();
+        cor.stack.clear();
+        cor.locals.clear();
+        cor.callFrames.clear();
+        cor.callStack.clear();
+        cor.frameLocals.clear();
+        cor.deferStack.clear();
+        cor.iterStack.clear();
+        cor.tryStack.clear();
+        cor.exceptionStack.clear();
+        cor.codeFrameStack.clear();
+        cor.currentScript.reset();
+        cor.wakeTimestampMs = 0;
+        cor.pendingStringTask.reset();  // Abandon any in-flight async I/O
+    }
+
+    // ── 2. Reset VM execution state ──────────────────────────────────────
+    scriptExitCode_ = -1;
+    ip_ = 0;
+    stack.clear();
+    callFrames.clear();
+    callStack.clear();
+    frameLocals_.clear();
+    deferStack.clear();
+    iterStack.clear();
+    tryStack.clear();
+    exceptionStack.clear();
+    codeFrameStack.clear();
+    currentScript.reset();
+    locals_.clear();
+    unsafeDepth_ = 0;
+    coroutineYieldRequested_ = false;
+    pendingYield_ = false;
+    doneGenerator_ = false;
+    inGeneratorExecution_ = false;
+    activeGenerator.reset();
+
+    // ── 3. Load new bytecode and constants ───────────────────────────────
+    code_ = code;
+    stringConstants_ = stringConstants;
+    valueConstants_ = valueConstants;
+    activeSourcePath_.clear();
+
+    // ── 4. Re-execute top-level script to rebind globals ─────────────────
+    // Clear exit code in case the previous script called exit()
+    scriptExitCode_ = -1;
+    run();
+}
+// ───────────────────────────────────────────────────────────────────────
 
 // Production-optimized VM execution loop with crash protection
+
 // 
 // Performance notes:
 // - Pre-reserved vectors avoid allocations
@@ -1659,10 +2081,15 @@ void VM::run() {
                           << " sp=" << stack.size() << "\n";
             }
 #endif
-            
             ip_++;
             if (scriptExitCode_ >= 0) break;
+            if (coroutineYieldRequested_) {
+                coroutineYieldRequested_ = false;
+                // State was saved by OP_YIELD → saveCurrentCoroutineState();
+                break;
+            }
         }
+
     } catch (const VMError& e) {
         // Format and print runtime error with full context
         std::cerr << "[Kern] Runtime Error [" << e.category_ << "]: " << e.what();
@@ -1687,6 +2114,81 @@ void VM::run() {
         scriptExitCode_ = 1;
     }
 }
+
+bool VM::hasActiveCoroutines() const {
+    for (const auto& cor : coroutines_) {
+        if (cor.state == CoroutineState::YIELDED || cor.state == CoroutineState::RUNNING)
+            return true;
+    }
+    return false;
+}
+
+// ─── startCoroutine: bypass generator call path ─────────────────────────
+// The codegen marks ANY function containing `yield` as a generator via
+// SET_FUNC_GENERATOR.  When CALL sees fn->isGenerator, it creates a
+// GeneratorObject instead of executing the function body.  This method
+// lets the host (or a builtin) start a yield-capable function as a
+// cooperative coroutine directly, skipping the generator branch.
+size_t VM::startCoroutine(FunctionPtr fn, std::vector<ValuePtr> args) {
+    // Ensure coroutine 0 (main thread) exists
+    if (coroutines_.empty()) {
+        coroutines_.resize(1);
+        saveCurrentCoroutineState();
+        coroutines_[0].state = CoroutineState::RUNNING;
+    }
+
+    // Save current coroutine state before switching
+    saveCurrentCoroutineState();
+
+    // Create new coroutine entry
+    size_t corId = coroutines_.size();
+    coroutines_.emplace_back();
+    Coroutine& cor = coroutines_[corId];
+    cor.state = CoroutineState::YIELDED;  // start as YIELDED so resumeAll() picks it up
+
+    // Set up function bytecode context
+    if (fn->script) {
+        cor.code = fn->script->code;
+        cor.stringConstants = fn->script->stringConstants;
+        cor.valueConstants = fn->script->valueConstants;
+        cor.currentScript = fn->script;
+        cor.activeSourcePath = fn->script->sourcePath;
+    } else {
+        cor.code = code_;
+        cor.stringConstants = stringConstants_;
+        cor.valueConstants = valueConstants_;
+        cor.currentScript = currentScript;
+        cor.activeSourcePath = activeSourcePath_;
+    }
+
+    // Starting instruction pointer = function entry point
+    cor.ip = fn->entryPoint;
+
+    // Set up locals: args first, then nil-pad to arity, then captures
+    cor.locals.clear();
+    for (const auto& a : args)
+        cor.locals.push_back(ensureNonNull(a));
+    while (cor.locals.size() < fn->arity)
+        cor.locals.push_back(std::make_shared<Value>(Value::nil()));
+    for (const auto& c : fn->captures)
+        cor.locals.push_back(ensureNonNull(c ? c : std::make_shared<Value>(Value::nil())));
+
+    // All execution stacks start empty for a fresh coroutine
+    cor.stack.clear();
+    cor.callFrames.clear();
+    cor.callStack.clear();
+    cor.frameLocals.clear();
+    cor.deferStack.clear();
+    cor.iterStack.clear();
+    cor.tryStack.clear();
+    cor.exceptionStack.clear();
+    cor.codeFrameStack.clear();
+    cor.unsafeDepth = 0;
+    cor.yieldedValue = nullptr;
+
+    return corId;
+}
+// ─────────────────────────────────────────────────────────────────────────
 
 void VM::runSubScript(Bytecode code, std::vector<std::string> stringConstants, std::vector<Value> valueConstants,
                       const std::string& sourcePath) {
@@ -1785,6 +2287,126 @@ std::vector<StackFrame> VM::getCallStackSlice(size_t start, size_t count) const 
 
 void VM::setTracing(bool enabled) {
     vmTraceEnabled_ = enabled;
+}
+
+void VM::requestStop() {
+    stopRequested = true;
+}
+
+bool VM::isStopped() const {
+    return stopRequested;
+}
+
+bool VM::isInUnsafeContext() const {
+    return unsafeDepth_ > 0;
+}
+
+size_t VM::unsafeDepth() const {
+    return static_cast<size_t>(unsafeDepth_);
+}
+
+size_t VM::getCallStackDepth() const {
+    return callStack.size();
+}
+
+uint64_t VM::getCycleCount() const {
+    return cycleCount_;
+}
+
+void VM::setActiveSourcePath(const std::string& path) {
+    activeSourcePath_ = path;
+}
+
+bool VM::hasResult() const {
+    return scriptExitCode_ >= 0;
+}
+
+const std::vector<std::string>& VM::getCliArgs() const {
+    return cliArgs;
+}
+
+void VM::setCliArgs(std::vector<std::string> args) {
+    cliArgs = std::move(args);
+}
+
+void VM::setStepLimit(uint64_t limit) {
+    stepLimit_ = limit;
+}
+
+uint64_t VM::getStepLimit() const {
+    return stepLimit_;
+}
+
+void VM::setMaxCallDepth(size_t depth) {
+    maxCallDepth_ = depth;
+}
+
+size_t VM::getMaxCallDepth() const {
+    return maxCallDepth_;
+}
+
+void VM::setCallbackStepGuard(uint64_t enabled) {
+    callbackStepGuard_ = enabled;
+}
+
+uint64_t VM::getCallbackStepGuard() const {
+    return callbackStepGuard_;
+}
+
+void VM::setScriptExitCode(int64_t code) {
+    scriptExitCode_ = code;
+}
+
+int64_t VM::getScriptExitCode() const {
+    return scriptExitCode_;
+}
+
+RuntimeGuardPolicy VM::getRuntimeGuards() const {
+    return runtimeGuards_;
+}
+
+RuntimeGuardPolicy& VM::mutableRuntimeGuards() {
+    return runtimeGuards_;
+}
+
+void VM::setRuntimeGuards(RuntimeGuardPolicy policy) {
+    runtimeGuards_ = policy;
+}
+
+ValuePtr VM::getDecoratorRegistry() const {
+    return decoratorRegistry;
+}
+
+void VM::setDecoratorRegistry(ValuePtr registry) {
+    decoratorRegistry = std::move(registry);
+}
+
+kern::ValuePtr VM::getResult() const {
+    if (stack.empty()) return std::make_shared<Value>(Value::nil());
+    ValuePtr v = stack.back();
+    return v;
+}
+
+Result<void> VM::loadBytecode(const Bytecode& code,
+                               const std::vector<std::string>& stringPool,
+                               const std::vector<Value>& valuePool) {
+    setBytecode(code);
+    setStringConstants(stringPool);
+    setValueConstants(valuePool);
+    return {};
+}
+
+bool VM::loadBytecodeFromFile(const std::string& path) {
+    Bytecode bc;
+    std::vector<std::string> strPool;
+    std::vector<Value> valPool;
+    if (!kern::loadBytecodeFromFile(path, bc, strPool, valPool)) {
+        return false;
+    }
+    setBytecode(std::move(bc));
+    setStringConstants(std::move(strPool));
+    setValueConstants(std::move(valPool));
+    return true;
 }
 
 } // namespace kern

@@ -35,3 +35,28 @@ kern.zip
 *_backup.cpp
 *_backup.hpp
 backup/
+
+# Build output directories
+build/
+build_vs/
+build-mingw/
+
+# Temporary / debug files
+*.txt
+!CHANGELOG.md
+!CREDITS.md
+!CITATION.cff
+!kern-bootstrap-SHA256SUMS
+!kern-SHA256.partial-windows
+
+# Compressed archives
+*.zip
+
+# Temp directories
+%TEMP%/
+
+# Test artifacts
+test_*.cpp
+!kern/tools/test_*.cpp
+*.cmd
+minidump.mdmp

@@ -92,10 +92,10 @@ static bool runSource(VM& vm, const std::string& source) {
         for (const auto& f : vm.getCallStackSlice()) {
             stack.push_back({f.functionName, f.filePath, f.line, f.column});
         }
-        std::string hint(vmRuntimeErrorHint(e.category, e.code));
-        g_errorReporter.reportRuntimeError(vmErrorCategory(e.category), e.line, e.column, e.what(), stack, hint,
-            vmErrorCodeString(e.category, e.code), vmRuntimeErrorDetail(e.category, e.code),
-            e.lineEnd, e.columnEnd);
+        std::string hint(vmRuntimeErrorHint(e.category_, e.code_));
+        g_errorReporter.reportRuntimeError(vmErrorCategory(e.category_), e.line_, e.column_, e.what(), stack, hint,
+            vmErrorCodeString(e.category_, e.code_), vmRuntimeErrorDetail(e.category_, e.code_),
+            e.lineEnd_, e.columnEnd_);
         return false;
     } catch (const std::exception& e) {
         g_errorReporter.reportCompileError(ErrorCategory::Other, 0, 0, std::string("Kern stopped: ") + e.what(),

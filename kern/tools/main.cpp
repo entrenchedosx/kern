@@ -232,6 +232,67 @@ static bool runSource(VM& vm, const std::string& sourceIn, const std::string& fi
         vm.setValueConstants(gen.getValueConstants());
         vm.setActiveSourcePath(filename);
         vm.run();
+
+        // ── Hot-reload file watcher ──────────────────────────────────────
+        // Track the source file's last write time.  If the file is a real
+        // path (not "<repl>") and changes while coroutines are running,
+        // we recompile it and call vm.hotReload() to swap in the new
+        // bytecode without restarting the C++ process.
+        std::optional<std::filesystem::file_time_type> fileWatchModTime;
+        bool hotReloadEnabled = !filename.empty() && filename != "<repl>"
+                             && std::filesystem::exists(filename);
+
+        // If the script uses coroutines (yield), resume them until all complete.
+        // Pass a monotonic clock so time-aware builtins (e.g. kern_sleep) work.
+        while (vm.hasActiveCoroutines()) {
+            // ── File change detection ────────────────────────────────────
+            if (hotReloadEnabled) {
+                auto currentModTime = std::filesystem::last_write_time(filename);
+                if (fileWatchModTime.has_value() && currentModTime != *fileWatchModTime) {
+                    // Source file changed — attempt hot reload
+                    std::ifstream reloadFile(filename);
+                    if (reloadFile) {
+                        std::stringstream reloadBuf;
+                        reloadBuf << reloadFile.rdbuf();
+                        std::string reloadSource = reloadBuf.str();
+                        normalizeKernSourceText(reloadSource, filename);
+
+                        // Recompile the new source
+                        bool compileOk = false;
+                        try {
+                            Lexer reloadLex(reloadSource);
+                            auto reloadTokens = reloadLex.tokenize();
+                            Parser reloadParser(std::move(reloadTokens));
+                            auto reloadProgram = reloadParser.parse();
+                            CodeGenerator reloadGen;
+                            Bytecode reloadCode = reloadGen.generate(std::move(reloadProgram));
+
+                            vm.hotReload(reloadCode,
+                                         reloadGen.getConstants(),
+                                         reloadGen.getValueConstants());
+                            fileWatchModTime = currentModTime;
+                            compileOk = true;
+                        } catch (const std::exception& e) {
+                            std::cerr << "[kern] Hot-reload compile failed: "
+                                      << e.what() << " — continuing with old bytecode\n";
+                        } catch (...) {
+                            std::cerr << "[kern] Hot-reload compile failed (unknown) "
+                                         "— continuing with old bytecode\n";
+                        }
+                        if (!compileOk) {
+                            // Re-try next tick; don't update fileWatchModTime
+                            // so we keep trying until the edit compiles.
+                        }
+                    }
+                } else if (!fileWatchModTime.has_value()) {
+                    fileWatchModTime = currentModTime;
+                }
+            }
+
+            auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count();
+            vm.resumeAll(static_cast<uint64_t>(now));
+        }
         return true;
     } catch (const LexerError& e) {
         g_errorReporter.reportCompileError(ErrorCategory::SyntaxError, e.line, e.column, e.what(), lexerCompileErrorHint(),
@@ -254,10 +315,10 @@ static bool runSource(VM& vm, const std::string& sourceIn, const std::string& fi
         for (const auto& f : vm.getCallStackSlice()) {
             stack.push_back({f.functionName, f.filePath, f.line, f.column});
         }
-        std::string hint(vmRuntimeErrorHint(e.category, e.code));
-        g_errorReporter.reportRuntimeError(vmErrorCategory(e.category), e.line, e.column, e.what(), stack, hint,
-            vmErrorCodeString(e.category, e.code), vmRuntimeErrorDetail(e.category, e.code),
-            e.lineEnd, e.columnEnd);
+        std::string hint(vmRuntimeErrorHint(e.category_, e.code_));
+        g_errorReporter.reportRuntimeError(vmErrorCategory(e.category_), e.line_, e.column_, e.what(), stack, hint,
+            vmErrorCodeString(e.category_, e.code_), vmRuntimeErrorDetail(e.category_, e.code_),
+            e.lineEnd_, e.columnEnd_);
         return false;
     } catch (const std::exception& e) {
         g_errorReporter.reportCompileError(ErrorCategory::Other, 0, 0, std::string("Kern stopped: ") + e.what(),
@@ -1851,6 +1912,99 @@ int main(int argc, char** argv) {
             std::cout << formatVmErrorCatalogJson();
             return 0;
         }
+        if (arg == "--knb-test") {
+            // Integration test: encrypt->save->load->decrypt->execute round trip.
+            // 1. Compile a simple script
+            std::string testSource = "print(\"Secure Data\");";
+            try {
+                Lexer lexer(testSource);
+                std::vector<Token> tokens = lexer.tokenize();
+                Parser parser(std::move(tokens));
+                std::unique_ptr<Program> program = parser.parse();
+                CodeGenerator gen;
+                gen.generate(std::move(program));
+
+                // 2a. Save unencrypted .knb (verify serializer works)
+                std::string plainPath = "plain_test.knb";
+                if (!gen.saveToFile(plainPath, false)) {
+                    std::cerr << "FAIL: saveToFile(encrypt=false)\n"; return 1;
+                }
+                std::cout << "OK: plain .knb saved\n";
+                // DEBUG: dump raw bytes of saved file
+                {
+                    std::ifstream rf(plainPath, std::ios::binary);
+                    std::vector<uint8_t> raw((std::istreambuf_iterator<char>(rf)), {});
+                    std::cout << "DEBUG: file size=" << raw.size() << " bytes\n";
+                    std::cout << "DEBUG: header=";
+                    for (int i = 0; i < 16 && i < (int)raw.size(); i++)
+                        std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)raw[i] << " ";
+                    std::cout << std::dec << "\n";
+                    std::cout << "DEBUG: first 32 payload bytes=";
+                    for (int i = 16; i < 48 && i < (int)raw.size(); i++)
+                        std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)raw[i] << " ";
+                    std::cout << std::dec << "\n";
+                }
+                {
+                    VM vm;
+                    registerAllBuiltins(vm);
+                    registerImportBuiltin(vm);
+                    if (!vm.loadBytecodeFromFile(plainPath)) {
+                        std::cerr << "FAIL: load plain\n"; return 1;
+                    }
+                    std::stringstream ss;
+                    auto old = std::cout.rdbuf(ss.rdbuf());
+                    vm.run();
+                    std::cout.rdbuf(old);
+                    if (ss.str().find("Secure Data") == std::string::npos) {
+                        std::cerr << "FAIL: plain output\n"; return 1;
+                    }
+                    std::cout << "OK: plain round-trip: \"" << ss.str() << "\"\n";
+                }
+                std::filesystem::remove(plainPath);
+
+                // Re-compile for encrypted test
+                Lexer lexer2(testSource);
+                std::vector<Token> tokens2 = lexer2.tokenize();
+                Parser parser2(std::move(tokens2));
+                std::unique_ptr<Program> program2 = parser2.parse();
+                CodeGenerator gen2;
+                gen2.generate(std::move(program2));
+
+                // 3. Save encrypted .knb
+                std::string knbPath = "secure_test.knb";
+                if (!gen2.saveToFile(knbPath, true)) {
+                    std::cerr << "FAIL: saveToFile(encrypt=true)\n"; return 1;
+                }
+                std::cout << "OK: encrypted .knb saved\n";
+
+                // 4. Load encrypted bytecode
+                VM vm;
+                registerAllBuiltins(vm);
+                registerImportBuiltin(vm);
+                if (!vm.loadBytecodeFromFile(knbPath)) {
+                    std::cerr << "FAIL: load encrypted\n"; return 1;
+                }
+                std::cout << "OK: loaded encrypted .knb\n";
+
+                std::stringstream ss;
+                auto old = std::cout.rdbuf(ss.rdbuf());
+                vm.run();
+                std::cout.rdbuf(old);
+                if (ss.str().find("Secure Data") == std::string::npos) {
+                    std::cerr << "FAIL: unexpected output: \"" << ss.str() << "\"\n"; return 1;
+                }
+                std::cout << "OK: output: \"" << ss.str() << "\"\n";
+                std::filesystem::remove(knbPath);
+                std::cout << "PASS: bytecode encryption round-trip verified\n";
+                return 0;
+            } catch (const LexerError& e) {
+                std::cerr << "FAIL: LexerError: " << e.what() << "\n"; return 1;
+            } catch (const ParserError& e) {
+                std::cerr << "FAIL: ParserError: " << e.what() << "\n"; return 1;
+            } catch (const std::exception& e) {
+                std::cerr << "FAIL: " << e.what() << "\n"; return 1;
+            }
+        }
         if (arg == "graph") {
             const int gr = cmdGraph(argc, argv, argBase, prog);
             if (gr == 2) return 0;
@@ -1975,7 +2129,7 @@ int main(int argc, char** argv) {
     for (int i = 0; i < argc; ++i) args.push_back(argv[i]);
     vm.setCliArgs(std::move(args));
     if (vmTraceCli)
-        vm.setVmTraceEnabled(true);
+        vm.setTracing(true);
 
     if (argc > argBase + 1 && std::string(argv[argBase]) == "--ast") {
         ResolvedKnPath rs;
@@ -2309,12 +2463,12 @@ int main(int argc, char** argv) {
             continue;
         }
         if (line == "trace on" || line == ".trace on") {
-            vm.setVmTraceEnabled(true);
+            vm.setTracing(true);
             std::cout << "VM trace: on (stderr; very noisy)\n";
             continue;
         }
         if (line == "trace off" || line == ".trace off") {
-            vm.setVmTraceEnabled(false);
+            vm.setTracing(false);
             std::cout << "VM trace: off\n";
             continue;
         }

@@ -25,17 +25,19 @@ inline constexpr uint32_t kBytecodeMagic = 0x4B45524E;
 
 /* * Bytecode file header - 16 bytes fixed size */
 struct BytecodeHeader {
-    uint32_t magic;      // 0x4B45524E = "KERN"
-    uint16_t version;    // Format version
-    uint16_t flags;      // Feature flags
-    uint32_t reserved;   // Reserved for future use
+    uint32_t magic;        // 0x4B45524E = "KERN"
+    uint16_t version;      // Format version
+    uint16_t flags;        // Feature flags
+    uint32_t reserved;     // Reserved for future use
+    uint32_t payloadSize;  // Size of payload in bytes (0 if unknown/unset)
     
     /* * Default constructor initializes to valid defaults */
-    BytecodeHeader() 
+    BytecodeHeader()
         : magic(kBytecodeMagic)
         , version(kBytecodeSchemaVersion)
         , flags(0)
-        , reserved(0) {}
+        , reserved(0)
+        , payloadSize(0) {}
     
     /* * Validate header before use */
     bool isValid() const {
@@ -90,6 +92,12 @@ inline std::vector<uint8_t> serializeHeader(const BytecodeHeader& header) {
     result.push_back(0);
     result.push_back(0);
     
+    // Payload size (4 bytes, little-endian)
+    result.push_back(header.payloadSize & 0xFF);
+    result.push_back((header.payloadSize >> 8) & 0xFF);
+    result.push_back((header.payloadSize >> 16) & 0xFF);
+    result.push_back((header.payloadSize >> 24) & 0xFF);
+    
     return result;
 }
 
@@ -115,8 +123,14 @@ inline BytecodeHeader deserializeHeader(const uint8_t* data, size_t len) {
     header.flags = static_cast<uint16_t>(data[6]) |
                   (static_cast<uint16_t>(data[7]) << 8);
     
-    // Reserved
+    // Reserved (4 bytes, skip)
     header.reserved = 0;
+    
+    // Payload size (little-endian, bytes 12-15)
+    header.payloadSize = static_cast<uint32_t>(data[12]) |
+                        (static_cast<uint32_t>(data[13]) << 8) |
+                        (static_cast<uint32_t>(data[14]) << 16) |
+                        (static_cast<uint32_t>(data[15]) << 24);
     
     return header;
 }

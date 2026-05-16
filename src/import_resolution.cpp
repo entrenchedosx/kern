@@ -316,11 +316,11 @@ static bool compileAndRunImportedSource(VM* v, const std::string& displayPath, c
         std::vector<StackFrame> stack;
         for (const auto& f : v->getCallStackSlice())
             stack.push_back({f.functionName, f.filePath, f.line, f.column});
-        std::string hint(vmRuntimeErrorHint(e.category, e.code));
-        g_errorReporter.reportRuntimeError(vmErrorCategory(e.category), e.line, e.column, e.what(), stack, hint,
-            vmErrorCodeString(e.category, e.code),
-            std::string(vmRuntimeErrorDetail(e.category, e.code)) + "\n" + importVmDetail(displayPath),
-            e.lineEnd, e.columnEnd);
+        std::string hint(vmRuntimeErrorHint(e.category_, e.code_));
+        g_errorReporter.reportRuntimeError(vmErrorCategory(e.category_), e.line_, e.column_, e.what(), stack, hint,
+            vmErrorCodeString(e.category_, e.code_),
+            std::string(vmRuntimeErrorDetail(e.category_, e.code_)) + "\n" + importVmDetail(displayPath),
+            e.lineEnd_, e.columnEnd_);
     } catch (const std::exception& e) {
         ErrorReporterImportScope scope(g_errorReporter, displayPath, source);
         g_errorReporter.reportCompileError(ErrorCategory::Other, 0, 0, std::string("import failed: ") + e.what(),

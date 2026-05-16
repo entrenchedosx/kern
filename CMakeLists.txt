@@ -246,6 +246,8 @@ set(VM_SOURCES
     "${KERN_VM_DIR}/bytecode_verifier.cpp"
     "${KERN_VM_DIR}/kern_socket.cpp"
     "${KERN_VM_DIR}/builtins.cpp"
+    "${KERN_VM_DIR}/json_parser.cpp"
+    "${KERN_VM_DIR}/ffi_module.cpp"
 )
 if(WIN32)
   list(APPEND VM_SOURCES "${KERN_VM_DIR}/http_get_winhttp.cpp")
@@ -348,6 +350,36 @@ endif()
 add_executable(kern_contract_humanize "${KERN_SRC_DIR}/tests/humanize_path_contract_test.cpp" ${ERROR_SOURCES})
 target_include_directories(kern_contract_humanize PRIVATE ${KERN_TOOLCHAIN_PRIVATE_INCLUDES})
 kern_apply_strict_warnings(kern_contract_humanize)
+
+add_executable(kern_hot_reload_test "${KERN_CLI_DIR}/hot_reload_test.cpp")
+target_link_libraries(kern_hot_reload_test PRIVATE kern_core)
+target_compile_definitions(kern_hot_reload_test PRIVATE KERN_VERSION="${KERN_VERSION}")
+kern_apply_strict_warnings(kern_hot_reload_test)
+
+add_executable(kern_async_fs_test "${KERN_CLI_DIR}/async_fs_test.cpp")
+target_link_libraries(kern_async_fs_test PRIVATE kern_core)
+target_compile_definitions(kern_async_fs_test PRIVATE KERN_VERSION="${KERN_VERSION}")
+kern_apply_strict_warnings(kern_async_fs_test)
+
+add_executable(kern_async_http_test "${KERN_CLI_DIR}/async_http_test.cpp")
+target_link_libraries(kern_async_http_test PRIVATE kern_core)
+target_compile_definitions(kern_async_http_test PRIVATE KERN_VERSION="${KERN_VERSION}")
+kern_apply_strict_warnings(kern_async_http_test)
+
+add_executable(kern_web_suite_test "${KERN_CLI_DIR}/test_web_suite.cpp")
+target_link_libraries(kern_web_suite_test PRIVATE kern_core)
+target_compile_definitions(kern_web_suite_test PRIVATE KERN_VERSION="${KERN_VERSION}")
+kern_apply_strict_warnings(kern_web_suite_test)
+
+add_executable(kern_type_optimizer_test "${KERN_CLI_DIR}/type_optimizer_test.cpp")
+target_link_libraries(kern_type_optimizer_test PRIVATE kern_core)
+target_compile_definitions(kern_type_optimizer_test PRIVATE KERN_VERSION="${KERN_VERSION}")
+kern_apply_strict_warnings(kern_type_optimizer_test)
+
+add_executable(kern_ffi_test "${KERN_CLI_DIR}/ffi_test.cpp")
+target_link_libraries(kern_ffi_test PRIVATE kern_core)
+target_compile_definitions(kern_ffi_test PRIVATE KERN_VERSION="${KERN_VERSION}")
+kern_apply_strict_warnings(kern_ffi_test)
 
 kern_apply_strict_warnings(kern)
 kern_apply_strict_warnings(kern_repl)

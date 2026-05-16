@@ -2,8 +2,11 @@
 #include <variant>
 #include <string>
 #include <sstream>
+#include <cstring>
 
 namespace kern {
+
+// ── Value implementation ──────────────────────────────────────────────────
 
 bool Value::isTruthy() const {
     return std::visit([](auto&& arg) -> bool {

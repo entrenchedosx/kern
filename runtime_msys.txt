@@ -1,5 +1,0 @@
-Kern Runtime CLI - Execution Truth Test
-Executing VM bytecode...
-42
-VM Result: 42
-Execution Truth achieved!
