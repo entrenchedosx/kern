@@ -28,54 +28,367 @@ namespace kern {
 
 namespace kern {
 
+// ── Heap allocation helpers for TaggedValue objects ──────────────────
+// These allocate ObjHeader-based objects on the C heap.  In the future
+// these should go through the GC/allocator; for now we track allocations
+// via an intrusive linked list (firstObject_) so the VM destructor can
+// properly free each object with its required C++ destructor call.
+// NOTE: non-static (declared in vm.hpp) so builtins.cpp and module files
+// can use them across translation units.
+
+// ── VM::registerObject — prepend to the intrusive allocation list ───
+void VM::registerObject(ObjHeader* obj) {
+    obj->next = firstObject_;
+    firstObject_ = obj;
+}
+
+// ── VM::freeAllObjects — walk the intrusive linked list and free every
+//     heap-allocated ObjHeader (ObjString, ObjArray, ObjMap, ObjClosure),
+//     calling the appropriate sub-object destructor before std::free().
+void VM::freeAllObjects() {
+    ObjHeader* cur = firstObject_;
+    while (cur) {
+        ObjHeader* next = cur->next;
+        switch (cur->type) {
+            case ObjType::String: {
+                // ObjString: flexible array member (chars[]), no heap sub-objects
+                break;
+            }
+            case ObjType::Array: {
+                auto* arr = static_cast<ObjArray*>(cur);
+                std::free(arr->elements);
+                break;
+            }
+            case ObjType::Map: {
+                auto* map = static_cast<ObjMap*>(cur);
+                map->entries.~unordered_map();
+                break;
+            }
+            case ObjType::Closure: {
+                auto* closure = static_cast<ObjClosure*>(cur);
+                closure->captures.~vector();
+                break;
+            }
+            default:
+                // Other ObjType values (Class, Instance, Generator, Vec3,
+                // Struct, Ffi, RawPtr) are NOT allocated via the allocObj*
+                // path and should never appear in the tracking list.
+                break;
+        }
+        std::free(cur);
+        cur = next;
+    }
+    firstObject_ = nullptr;
+}
+
+// ── VM::markObject — push a heap object onto the gray worklist ─────
+void VM::markObject(ObjHeader* obj) {
+    if (!obj) return;
+    if (obj->isMarked) return;  // Already in the gray set
+    obj->isMarked = true;
+    grayStack_.push_back(obj);
+}
+
+// ── VM::markValue — if val is a heap object, mark it ───────────────
+void VM::markValue(ValuePtr val) {
+    if (!val.isObj()) return;
+    auto* obj = reinterpret_cast<ObjHeader*>(val.payload());
+    markObject(obj);
+}
+
+// ── VM::markRoots — walk every GC root and mark reachable objects ──
+void VM::markRoots() {
+    // 1. Stack
+    for (auto& v : stack) {
+        markValue(v);
+    }
+    // 2. Globals
+    for (auto& kv : globals) {
+        markValue(kv.second);
+    }
+    // 3. Current frame locals
+    for (auto& v : locals_) {
+        markValue(v);
+    }
+    // 4. Frame-local slots (per-call-frame register windows)
+    for (auto& frame : frameLocals_) {
+        for (auto& v : frame) {
+            markValue(v);
+        }
+    }
+    // 5. Coroutine snapshots (each coroutine has its own stack & locals)
+    for (auto& cor : coroutines_) {
+        for (auto& v : cor.stack) {
+            markValue(v);
+        }
+        for (auto& v : cor.locals) {
+            markValue(v);
+        }
+    }
+}
+
+// ── VM::traceReferences — drain the gray worklist ──────────────────
+void VM::traceReferences() {
+    while (!grayStack_.empty()) {
+        ObjHeader* obj = grayStack_.back();
+        grayStack_.pop_back();
+        
+        switch (obj->type) {
+            case ObjType::String:
+                // No child references; characters are stored inline.
+                break;
+                
+            case ObjType::Array: {
+                auto* arr = static_cast<ObjArray*>(obj);
+                for (uint32_t i = 0; i < arr->count; ++i) {
+                    markValue(arr->elements[i]);
+                }
+                break;
+            }
+                
+            case ObjType::Map: {
+                auto* map = static_cast<ObjMap*>(obj);
+                for (auto& kv : map->entries) {
+                    markValue(kv.second);
+                }
+                break;
+            }
+                
+            case ObjType::Closure: {
+                auto* closure = static_cast<ObjClosure*>(obj);
+                for (auto& cap : closure->captures) {
+                    markValue(cap);
+                }
+                break;
+            }
+                
+            default:
+                // Non-tracked types (Class, Instance, Generator, Vec3,
+                // Struct, Ffi, RawPtr) are managed via shared_ptr/keepAlive
+                // and are NOT in the firstObject_ tracking list.  Their
+                // references are not traced here.
+                break;
+        }
+    }
+}
+
+// ── VM::sweep — free unmarked objects, reset marks on survivors ────
+void VM::sweep() {
+    ObjHeader** prev = &firstObject_;
+    ObjHeader* cur = firstObject_;
+    while (cur) {
+        if (!cur->isMarked) {
+            // Unmarked → free
+            *prev = cur->next;
+            switch (cur->type) {
+                case ObjType::String:
+                    // Flexible array member, no heap sub-objects
+                    break;
+                case ObjType::Array: {
+                    auto* arr = static_cast<ObjArray*>(cur);
+                    std::free(arr->elements);
+                    break;
+                }
+                case ObjType::Map: {
+                    auto* map = static_cast<ObjMap*>(cur);
+                    map->entries.~unordered_map();
+                    break;
+                }
+                case ObjType::Closure: {
+                    auto* closure = static_cast<ObjClosure*>(cur);
+                    closure->captures.~vector();
+                    break;
+                }
+                default:
+                    // Non-tracked types should never appear in the list
+                    break;
+            }
+            std::free(cur);
+            cur = *prev;  // cur now points to the next object
+        } else {
+            // Marked → survive, reset mark for next GC cycle
+            cur->isMarked = false;
+            prev = &cur->next;
+            cur = cur->next;
+        }
+    }
+}
+
+// ── VM::collectGarbage — orchestrate a full mark-and-sweep cycle ───
+void VM::collectGarbage() {
+    markRoots();
+    traceReferences();
+    sweep();
+}
+
+ObjString* allocObjString(const char* data, size_t len, VM* vm) {
+    size_t allocSize = sizeof(ObjString) + len + 1;
+    auto* raw = static_cast<ObjString*>(std::malloc(allocSize));
+    if (!raw) throw std::bad_alloc();
+    raw->type = ObjType::String;
+    raw->isMarked = false;
+    if (vm) { vm->registerObject(raw); }
+    else    { raw->next = nullptr; }
+    raw->length = static_cast<uint32_t>(len);
+    uint32_t h = 2166136261u;
+    for (size_t i = 0; i < len; ++i) {
+        h ^= static_cast<uint8_t>(data[i]);
+        h *= 16777619u;
+    }
+    raw->hash = h;
+    std::memcpy(raw->chars, data, len);
+    raw->chars[len] = '\0';
+    return raw;
+}
+
+ObjString* allocObjString(const std::string& s, VM* vm) {
+    return allocObjString(s.data(), s.size(), vm);
+}
+
+ObjArray* allocObjArray(VM* vm) {
+    auto* raw = static_cast<ObjArray*>(std::malloc(sizeof(ObjArray)));
+    if (!raw) throw std::bad_alloc();
+    raw->type = ObjType::Array;
+    raw->isMarked = false;
+    if (vm) { vm->registerObject(raw); }
+    else    { raw->next = nullptr; }
+    raw->capacity = 0;
+    raw->count = 0;
+    raw->elements = nullptr;
+    return raw;
+}
+
+ObjArray* allocObjArray(const std::vector<TaggedValue>& elems, VM* vm) {
+    auto* raw = allocObjArray(vm);
+    if (elems.empty()) return raw;
+    raw->capacity = raw->count = static_cast<uint32_t>(elems.size());
+    raw->elements = static_cast<TaggedValue*>(std::malloc(raw->count * sizeof(TaggedValue)));
+    if (!raw->elements) { std::free(raw); throw std::bad_alloc(); }
+    std::memcpy(raw->elements, elems.data(), raw->count * sizeof(TaggedValue));
+    return raw;
+}
+
+ObjMap* allocObjMap(VM* vm) {
+    auto* raw = static_cast<ObjMap*>(std::malloc(sizeof(ObjMap)));
+    if (!raw) throw std::bad_alloc();
+    raw->type = ObjType::Map;
+    raw->isMarked = false;
+    if (vm) { vm->registerObject(raw); }
+    else    { raw->next = nullptr; }
+    new (&raw->entries) std::unordered_map<std::string, TaggedValue>();
+    return raw;
+}
+
+ObjMap* allocObjMap(std::unordered_map<std::string, TaggedValue>&& entries, VM* vm) {
+    auto* raw = static_cast<ObjMap*>(std::malloc(sizeof(ObjMap)));
+    if (!raw) throw std::bad_alloc();
+    raw->type = ObjType::Map;
+    raw->isMarked = false;
+    if (vm) { vm->registerObject(raw); }
+    else    { raw->next = nullptr; }
+    new (&raw->entries) std::unordered_map<std::string, TaggedValue>(std::move(entries));
+    return raw;
+}
+
+ObjClosure* allocObjClosure(FunctionObject* fn, VM* vm) {
+    auto* raw = static_cast<ObjClosure*>(std::malloc(sizeof(ObjClosure)));
+    if (!raw) throw std::bad_alloc();
+    raw->type = ObjType::Closure;
+    raw->isMarked = false;
+    if (vm) { vm->registerObject(raw); }
+    else    { raw->next = nullptr; }
+    raw->fn = fn;
+    new (&raw->captures) std::vector<TaggedValue>();
+    return raw;
+}
+
+// ── TaggedValue::fromValue — convert legacy Value to NaN-boxed TaggedValue ──
+TaggedValue TaggedValue::fromValue(const Value& v, VM* vm) {
+    switch (v.type) {
+        case Value::Type::NIL:   return TaggedValue::nil();
+        case Value::Type::BOOL:  return TaggedValue::fromBool(v.asBool());
+        case Value::Type::INT:   return TaggedValue::fromInt32(v.asInt());
+        case Value::Type::FLOAT: return TaggedValue::fromFloat(v.asFloat());
+        case Value::Type::STRING:
+            return TaggedValue::fromString(allocObjString(v.asString(), vm));
+        case Value::Type::ARRAY: {
+            auto& arr = std::get<std::vector<ValuePtr>>(v.data);
+            std::vector<TaggedValue> elems;
+            elems.reserve(arr.size());
+            for (auto& x : arr) elems.push_back(x);
+            return TaggedValue::fromArray(allocObjArray(elems, vm));
+        }
+        case Value::Type::MAP: {
+            auto& src = std::get<std::unordered_map<std::string, ValuePtr>>(v.data);
+            auto* map = allocObjMap(vm);
+            for (auto& kv : src)
+                map->entries[kv.first] = kv.second;
+            return TaggedValue::fromMap(map);
+        }
+        case Value::Type::FUNCTION: {
+            auto fn = std::get<FunctionPtr>(v.data);
+            auto* closure = allocObjClosure(fn.get(), vm);
+            closure->captures = fn->captures;
+            return TaggedValue::fromClosure(closure);
+        }
+        case Value::Type::CLASS:
+            return TaggedValue::fromClass(std::get<ClassPtr>(v.data).get());
+        case Value::Type::INSTANCE:
+            return TaggedValue::fromInstance(std::get<InstancePtr>(v.data).get());
+        case Value::Type::GENERATOR:
+            return TaggedValue::fromGenerator(std::get<GeneratorPtr>(v.data).get());
+        case Value::Type::PTR:
+            return TaggedValue::fromPtr(std::get<void*>(v.data));
+        case Value::Type::VEC3:
+            return TaggedValue::fromVec3(std::get<Vec3Ptr>(v.data).get());
+        case Value::Type::STRUCT:
+            return TaggedValue::fromStruct(std::get<StructPtr>(v.data).get());
+        case Value::Type::FFI_FN:
+            return TaggedValue::fromFfi(std::get<FfiClosurePtr>(v.data).get());
+    }
+    return TaggedValue::nil();
+}
+
 /* * map subscript: string key, or int/float coerced to decimal string (for handles-as-keys).
  * SAFETY: Returns false for null, nil, or invalid types - never crashes.
  */
 static bool mapIndexToKey(const ValuePtr& index, std::string& out) {
-    if (!index) return false;
-    
-    // Explicit NIL check to prevent use of nil as dictionary key
-    if (index->type == Value::Type::NIL) {
-        return false;
-    }
-    
-    switch (index->type) {
-        case Value::Type::STRING:
-            try {
-                out = std::get<std::string>(index->data);
-                return true;
-            } catch (...) {
-                return false;
-            }
-        case Value::Type::INT:
-            try {
-                out = std::to_string(std::get<int64_t>(index->data));
-                return true;
-            } catch (...) {
-                return false;
-            }
-        case Value::Type::FLOAT:
-            try {
-                out = std::to_string(std::get<double>(index->data));
-                return true;
-            } catch (...) {
-                return false;
-            }
-        default:
-            // Reject all other types (FUNC, MAP, ARRAY, PTR, etc.)
+    if (index.isNil()) return false;
+    if (index.isString()) {
+        try {
+            out = std::string(index.asStringPtr()->chars, index.asStringPtr()->length);
+            return true;
+        } catch (...) {
             return false;
+        }
     }
+    if (index.isInt32()) {
+        try {
+            out = std::to_string(index.asInt64());
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }
+    if (index.isFloat()) {
+        try {
+            out = std::to_string(index.asFloat());
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }
+    // Reject all other types (FUNC, MAP, ARRAY, PTR, etc.)
+    return false;
 }
 
-/* * canonicalize null shared_ptr to a NIL Value (stack and stored locals must never hold nullptr).*/
+/* * TaggedValue is never null (default-constructs to NIL). ensureNonNull is an identity. */
 static ValuePtr ensureNonNull(ValuePtr v) {
-    return v ? std::move(v) : std::make_shared<Value>(Value::nil());
+    return v;
 }
 
-static void normalizeValuePtrVector(std::vector<ValuePtr>& v) {
-    for (auto& x : v) {
-        if (!x) x = std::make_shared<Value>(Value::nil());
-    }
+static void normalizeValuePtrVector(std::vector<ValuePtr>&) {
+    // TaggedValue is never null — no-op
 }
 
 struct ThrownErrorInfo {
@@ -90,29 +403,29 @@ struct ThrownErrorInfo {
 
 static int mapIntField(const std::unordered_map<std::string, ValuePtr>& m, const char* key, int fallback = 0) {
     auto it = m.find(key);
-    if (it == m.end() || !it->second) return fallback;
-    if (it->second->type == Value::Type::INT) return static_cast<int>(std::get<int64_t>(it->second->data));
-    if (it->second->type == Value::Type::FLOAT) return static_cast<int>(std::get<double>(it->second->data));
+    if (it == m.end() || it->second.isNil()) return fallback;
+    if (it->second.isInt32()) return static_cast<int>(it->second.asInt64());
+    if (it->second.isFloat()) return static_cast<int>(it->second.asFloat());
     return fallback;
 }
 
 static ThrownErrorInfo classifyThrownError(const ValuePtr& v) {
     ThrownErrorInfo out;
-    if (!v) return out;
-    out.message = v->toString();
-    if (v->type != Value::Type::MAP) return out;
-    auto& m = std::get<std::unordered_map<std::string, ValuePtr>>(v->data);
+    if (v.isNil()) return out;
+    out.message = v.toString();
+    if (!v.isMap()) return out;
+    auto& m = v.asMapPtr()->entries;
     out.line = mapIntField(m, "line", 0);
     out.column = mapIntField(m, "column", 0);
     out.lineEnd = mapIntField(m, "lineEnd", out.line);
     out.columnEnd = mapIntField(m, "columnEnd", 0);
     auto mit = m.find("message");
-    if (mit != m.end() && mit->second && mit->second->type == Value::Type::STRING)
-        out.message = std::get<std::string>(mit->second->data);
+    if (mit != m.end() && !mit->second.isNil() && mit->second.isString())
+        out.message = std::string(mit->second.asStringPtr()->chars, mit->second.asStringPtr()->length);
     auto cit = m.find("code");
-    if (cit == m.end() || !cit->second || cit->second->type != Value::Type::STRING)
+    if (cit == m.end() || cit->second.isNil() || !cit->second.isString())
         return out;
-    VMErrorCode code = vmErrorCodeFromToken(std::get<std::string>(cit->second->data));
+    VMErrorCode code = vmErrorCodeFromToken(std::string(cit->second.asStringPtr()->chars, cit->second.asStringPtr()->length));
     out.code = static_cast<int>(code);
     out.category = vmCategoryFromCode(code, out.category);
     return out;
@@ -151,7 +464,9 @@ VM::~VM() {
     // Break shared_ptr cycles to prevent reference leaks
     currentScript.reset();
     entryScriptCache.reset();
-    activeGenerator.reset();
+    activeGenerator = nullptr;
+    functionKeepAlive_.clear();
+    generatorKeepAlive_.clear();
     
     // Clear VM state vectors
     stack.clear();
@@ -163,6 +478,9 @@ VM::~VM() {
     deferStack.clear();
     iterStack.clear();
     codeFrameStack.clear();
+    
+    // Free all heap-allocated ObjHeader objects (GC tracking list)
+    freeAllObjects();
     
     // Note: Global state cleanup is now explicit via VM::shutdownGlobalState()
     // This removes hidden coupling between VM instances
@@ -249,6 +567,15 @@ void VM::registerBuiltin(size_t index, BuiltinFn fn) {
     }
 }
 
+void VM::registerBuiltinGlobal(const std::string& name, size_t builtinIndex) {
+    auto fn = std::make_shared<FunctionObject>();
+    fn->isBuiltin = true;
+    fn->builtinIndex = builtinIndex;
+    functionKeepAlive_.push_back(fn);
+    auto* closure = allocObjClosure(fn.get(), this);
+    globals[name] = TaggedValue::fromClosure(closure);
+}
+
 bool VM::builtinSlotFilled(size_t index) const {
     if (index < builtinsVec_.size() && builtinsVec_[index])
         return true;
@@ -257,20 +584,17 @@ bool VM::builtinSlotFilled(size_t index) const {
 }
 
 void VM::setGlobal(const std::string& name, ValuePtr value) {
-    globals[name] = ensureNonNull(std::move(value));
+    globals[name] = value;
 }
 
 ValuePtr VM::getGlobal(const std::string& name) const {
     auto it = globals.find(name);
-    return it != globals.end() ? it->second : nullptr;
+    return it != globals.end() ? it->second : TaggedValue::nil();
 }
 
 std::unordered_map<std::string, ValuePtr> VM::getGlobalsSnapshot() const {
-    auto m = globals;
-    for (auto& kv : m) {
-        if (!kv.second) kv.second = std::make_shared<Value>(Value::nil());
-    }
-    return m;
+    // TaggedValue is never null — no replacement needed
+    return globals;
 }
 
 ValuePtr VM::popStack() {
@@ -278,22 +602,20 @@ ValuePtr VM::popStack() {
         throw VMError("Stack underflow", 0, 0, 1, static_cast<int>(VMErrorCode::STACK_UNDERFLOW));
     ValuePtr v = stack.back();
     stack.pop_back();
-    return ensureNonNull(std::move(v));
+    return v;
 }
 
 ValuePtr VM::getResult() {
-    if (stack.empty()) return std::make_shared<Value>(Value::nil());
-    ValuePtr& top = stack.back();
-    if (!top) top = std::make_shared<Value>(Value::nil());
-    return top;
+    if (stack.empty()) return TaggedValue::nil();
+    return stack.back();
 }
 
 std::string VM::getOperandStr(const Instruction& inst) {
-    if (!std::holds_alternative<size_t>(inst.operand)) {
+    if (operandType(inst.op) != 4) {
         throw VMError("Invalid bytecode operand: expected string constant index", inst.line, inst.column, 1,
                       static_cast<int>(VMErrorCode::INVALID_BYTECODE));
     }
-    size_t idx = std::get<size_t>(inst.operand);
+    size_t idx = inst.sizeOperand;
     if (idx >= stringConstants_.size()) {
         throw VMError("Invalid bytecode operand: string constant index out of range", inst.line, inst.column, 1,
                       static_cast<int>(VMErrorCode::INVALID_BYTECODE));
@@ -302,11 +624,11 @@ std::string VM::getOperandStr(const Instruction& inst) {
 }
 
 size_t VM::getOperandU64(const Instruction& inst) {
-    if (!std::holds_alternative<size_t>(inst.operand)) {
+    if (operandType(inst.op) != 4) {
         throw VMError("Invalid bytecode operand: expected unsigned operand", inst.line, inst.column, 1,
                       static_cast<int>(VMErrorCode::INVALID_BYTECODE));
     }
-    return std::get<size_t>(inst.operand);
+    return inst.sizeOperand;
 }
 
 void VM::push(ValuePtr v) {
@@ -314,29 +636,27 @@ void VM::push(ValuePtr v) {
         throw VMError("Stack overflow: exceeded maximum stack size", 0, 0, 1,
                       static_cast<int>(VMErrorCode::STACK_OVERFLOW));
     }
-    stack.push_back(ensureNonNull(std::move(v)));
+    stack.push_back(v);
 }
 
 ValuePtr VM::peek() {
     if (stack.empty())
         throw VMError("Stack underflow", 0, 0, 1, static_cast<int>(VMErrorCode::STACK_UNDERFLOW));
-    ValuePtr& top = stack.back();
-    if (!top) top = std::make_shared<Value>(Value::nil());
-    return top;
+    return stack.back();
 }
 
 static double toDouble(ValuePtr v) {
-    if (!v) return 0;
-    if (v->type == Value::Type::INT) return static_cast<double>(std::get<int64_t>(v->data));
-    if (v->type == Value::Type::FLOAT) return std::get<double>(v->data);
+    if (v.isNil()) return 0;
+    if (v.isInt32()) return static_cast<double>(v.asInt64());
+    if (v.isFloat()) return v.asFloat();
     return 0;
 }
 
 static int64_t toInt(ValuePtr v) {
-    if (!v) return 0;
-    if (v->type == Value::Type::INT) return std::get<int64_t>(v->data);
-    if (v->type == Value::Type::FLOAT) {
-        double d = std::get<double>(v->data);
+    if (v.isNil()) return 0;
+    if (v.isInt32()) return v.asInt64();
+    if (v.isFloat()) {
+        double d = v.asFloat();
         if (!std::isfinite(d)) return 0;
         constexpr double kMax = static_cast<double>(std::numeric_limits<int64_t>::max());
         constexpr double kMin = static_cast<double>(std::numeric_limits<int64_t>::min());
@@ -348,8 +668,8 @@ static int64_t toInt(ValuePtr v) {
 }
 
 static void* toPtr(ValuePtr v) {
-    if (!v || v->type != Value::Type::PTR) return nullptr;
-    return std::get<void*>(v->data);
+    if (v.isNil() || !v.isPtr()) return nullptr;
+    return v.asRawPtr();
 }
 
 void VM::runInstruction(const Instruction& inst) {
@@ -357,55 +677,43 @@ void VM::runInstruction(const Instruction& inst) {
     if (stepLimit_ != 0 && cycleCount_ > stepLimit_)
         throw VMError("Step limit exceeded", inst.line, inst.column, 1, static_cast<int>(VMErrorCode::STEP_LIMIT_EXCEEDED));
     auto requireNumeric = [&](const ValuePtr& v, const char* opName) {
-        if (!v || (v->type != Value::Type::INT && v->type != Value::Type::FLOAT)) {
+        if (v.isNil() || !v.isNumeric()) {
             throw VMError(std::string("Invalid operation: ") + opName + " expects numeric operands",
                           inst.line, inst.column, 2, static_cast<int>(VMErrorCode::INVALID_OPERATION));
         }
     };
     auto requireInteger = [&](const ValuePtr& v, const char* opName) {
-        if (!v || v->type != Value::Type::INT) {
+        if (v.isNil() || !v.isInt32()) {
             throw VMError(std::string("Invalid operation: ") + opName + " expects integer operands",
                           inst.line, inst.column, 2, static_cast<int>(VMErrorCode::INVALID_OPERATION));
         }
     };
     switch (inst.op) {
         case Opcode::CONST_I64:
-            if (!std::holds_alternative<int64_t>(inst.operand))
-                throw VMError("Invalid bytecode operand: CONST_I64 expects int64", inst.line, inst.column, 1,
-                              static_cast<int>(VMErrorCode::INVALID_BYTECODE));
-            push(std::make_shared<Value>(Value::fromInt(std::get<int64_t>(inst.operand))));
+            push(TaggedValue::fromInt32(static_cast<int32_t>(inst.intOperand)));
             break;
         case Opcode::CONST_F64:
-            if (!std::holds_alternative<double>(inst.operand))
-                throw VMError("Invalid bytecode operand: CONST_F64 expects float", inst.line, inst.column, 1,
-                              static_cast<int>(VMErrorCode::INVALID_BYTECODE));
-            push(std::make_shared<Value>(Value::fromFloat(std::get<double>(inst.operand))));
+            push(TaggedValue::fromFloat(inst.floatOperand));
             break;
         case Opcode::CONST_STR: {
-            if (!std::holds_alternative<size_t>(inst.operand))
-                throw VMError("Invalid bytecode operand: CONST_STR expects string constant index", inst.line, inst.column, 1,
-                              static_cast<int>(VMErrorCode::INVALID_BYTECODE));
-            size_t idx = std::get<size_t>(inst.operand);
+            size_t idx = inst.sizeOperand;
             if (idx >= stringConstants_.size())
                 throw VMError("Invalid bytecode operand: CONST_STR index out of range", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::INVALID_BYTECODE));
-            push(std::make_shared<Value>(Value::fromString(stringConstants_[idx])));
+            push(TaggedValue::fromString(allocObjString(stringConstants_[idx], this)));
             break;
         }
         case Opcode::CONST_TRUE:
-            push(std::make_shared<Value>(Value::fromBool(true)));
+            push(TaggedValue::fromBool(true));
             break;
         case Opcode::CONST_FALSE:
-            push(std::make_shared<Value>(Value::fromBool(false)));
+            push(TaggedValue::fromBool(false));
             break;
         case Opcode::CONST_NULL:
-            push(std::make_shared<Value>(Value::nil()));
+            push(TaggedValue::nil());
             break;
         case Opcode::LOAD: {
-            if (!std::holds_alternative<int64_t>(inst.operand))
-                throw VMError("Invalid bytecode operand: LOAD expects local slot index", inst.line, inst.column, 1,
-                              static_cast<int>(VMErrorCode::INVALID_BYTECODE));
-            int64_t rawSlot = std::get<int64_t>(inst.operand);
+            int64_t rawSlot = inst.intOperand;
             if (rawSlot < 0)
                 throw VMError("Invalid bytecode operand: negative local slot in LOAD", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::INVALID_BYTECODE));
@@ -419,23 +727,20 @@ void VM::runInstruction(const Instruction& inst) {
             break;
         }
         case Opcode::STORE: {
-            if (!std::holds_alternative<int64_t>(inst.operand))
-                throw VMError("Invalid bytecode operand: STORE expects local slot index", inst.line, inst.column, 1,
-                              static_cast<int>(VMErrorCode::INVALID_BYTECODE));
-            int64_t rawSlot = std::get<int64_t>(inst.operand);
+            int64_t rawSlot = inst.intOperand;
             if (rawSlot < 0)
                 throw VMError("Invalid bytecode operand: negative local slot in STORE", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::INVALID_BYTECODE));
             size_t slot = static_cast<size_t>(rawSlot);
-            while (locals_.size() <= slot) locals_.push_back(std::make_shared<Value>(Value::nil()));
+            while (locals_.size() <= slot) locals_.push_back(TaggedValue::nil());
             locals_[slot] = popStack();
             break;
         }
         case Opcode::LOAD_GLOBAL: {
             std::string name = getOperandStr(inst);
             auto it = globals.find(name);
-            ValuePtr v = it != globals.end() ? ensureNonNull(it->second) : std::make_shared<Value>(Value::nil());
-            push(std::move(v));
+            ValuePtr v = it != globals.end() ? it->second : TaggedValue::nil();
+            push(v);
             break;
         }
         case Opcode::STORE_GLOBAL: {
@@ -453,22 +758,22 @@ void VM::runInstruction(const Instruction& inst) {
         }
         case Opcode::ADD: {
             ValuePtr b = popStack(), a = popStack();
-            if (a->type == Value::Type::STRING || b->type == Value::Type::STRING)
-                push(std::make_shared<Value>(Value::fromString(a->toString() + b->toString())));
-            else if (a->type == Value::Type::PTR && b->type == Value::Type::INT) {
+            if (a.isString() || b.isString())
+                push(TaggedValue::fromString(allocObjString(a.toString() + b.toString(), this)));
+            else if (a.isPtr() && b.isInt32()) {
                 void* p = toPtr(a);
                 if (!p) throw VMError("Null pointer arithmetic", inst.line, inst.column, 2);
                 int64_t off = toInt(b);
-                push(std::make_shared<Value>(Value::fromPtr(static_cast<char*>(p) + off)));
-            } else if (a->type == Value::Type::INT && b->type == Value::Type::PTR) {
+                push(TaggedValue::fromPtr(static_cast<char*>(p) + off));
+            } else if (a.isInt32() && b.isPtr()) {
                 int64_t off = toInt(a);
                 void* p = toPtr(b);
                 if (!p) throw VMError("Null pointer arithmetic", inst.line, inst.column, 2);
-                push(std::make_shared<Value>(Value::fromPtr(static_cast<char*>(p) + off)));
-            } else if (a->type == Value::Type::FLOAT || b->type == Value::Type::FLOAT)
-                push(std::make_shared<Value>(Value::fromFloat(toDouble(a) + toDouble(b))));
-            else if (a->type == Value::Type::INT && b->type == Value::Type::INT)
-                push(std::make_shared<Value>(Value::fromInt(toInt(a) + toInt(b))));
+                push(TaggedValue::fromPtr(static_cast<char*>(p) + off));
+            } else if (a.isFloat() || b.isFloat())
+                push(TaggedValue::fromFloat(toDouble(a) + toDouble(b)));
+            else if (a.isInt32() && b.isInt32())
+                push(TaggedValue::fromInt32(static_cast<int32_t>(toInt(a) + toInt(b))));
             else
                 throw VMError("Invalid operation: ADD expects numeric, string, or ptr+int operands",
                               inst.line, inst.column, 2, static_cast<int>(VMErrorCode::INVALID_OPERATION));
@@ -476,29 +781,28 @@ void VM::runInstruction(const Instruction& inst) {
         }
         case Opcode::ADD_INT: {
             ValuePtr b = popStack(), a = popStack();
-            push(std::make_shared<Value>(Value::fromInt(toInt(a) + toInt(b))));
+            push(TaggedValue::fromInt32(static_cast<int32_t>(toInt(a) + toInt(b))));
             break;
         }
         case Opcode::ADD_FLOAT: {
             ValuePtr b = popStack(), a = popStack();
-            push(std::make_shared<Value>(Value::fromFloat(toDouble(a) + toDouble(b))));
+            push(TaggedValue::fromFloat(toDouble(a) + toDouble(b)));
             break;
         }
         case Opcode::SUB: {
             ValuePtr b = popStack(), a = popStack();
-            if (a->type == Value::Type::PTR && b->type == Value::Type::INT) {
+            if (a.isPtr() && b.isInt32()) {
                 void* p = toPtr(a);
                 if (!p) throw VMError("Null pointer arithmetic", inst.line, inst.column, 2);
                 int64_t off = toInt(b);
-                push(std::make_shared<Value>(Value::fromPtr(static_cast<char*>(p) - off)));
-            } else if (a->type == Value::Type::PTR && b->type == Value::Type::PTR) {
+                push(TaggedValue::fromPtr(static_cast<char*>(p) - off));
+            } else if (a.isPtr() && b.isPtr()) {
                 char* pa = static_cast<char*>(toPtr(a));
                 char* pb = static_cast<char*>(toPtr(b));
                 if (!pa || !pb) throw VMError("Null pointer arithmetic", inst.line, inst.column, 2);
-                push(std::make_shared<Value>(Value::fromInt(static_cast<int64_t>(pa - pb))));
-            } else if ((a->type == Value::Type::INT || a->type == Value::Type::FLOAT) &&
-                       (b->type == Value::Type::INT || b->type == Value::Type::FLOAT))
-                push(std::make_shared<Value>(Value::fromFloat(toDouble(a) - toDouble(b))));
+                push(TaggedValue::fromInt32(static_cast<int32_t>(pa - pb)));
+            } else if ((a.isInt32() || a.isFloat()) && (b.isInt32() || b.isFloat()))
+                push(TaggedValue::fromFloat(toDouble(a) - toDouble(b)));
             else
                 throw VMError("Invalid operation: SUB expects numeric, ptr-int, or ptr-ptr operands",
                               inst.line, inst.column, 2, static_cast<int>(VMErrorCode::INVALID_OPERATION));
@@ -506,29 +810,29 @@ void VM::runInstruction(const Instruction& inst) {
         }
         case Opcode::SUB_INT: {
             ValuePtr b = popStack(), a = popStack();
-            push(std::make_shared<Value>(Value::fromInt(toInt(a) - toInt(b))));
+            push(TaggedValue::fromInt32(static_cast<int32_t>(toInt(a) - toInt(b))));
             break;
         }
         case Opcode::SUB_FLOAT: {
             ValuePtr b = popStack(), a = popStack();
-            push(std::make_shared<Value>(Value::fromFloat(toDouble(a) - toDouble(b))));
+            push(TaggedValue::fromFloat(toDouble(a) - toDouble(b)));
             break;
         }
         case Opcode::MUL: {
             ValuePtr b = popStack(), a = popStack();
             requireNumeric(a, "MUL");
             requireNumeric(b, "MUL");
-            push(std::make_shared<Value>(Value::fromFloat(toDouble(a) * toDouble(b))));
+            push(TaggedValue::fromFloat(toDouble(a) * toDouble(b)));
             break;
         }
         case Opcode::MUL_INT: {
             ValuePtr b = popStack(), a = popStack();
-            push(std::make_shared<Value>(Value::fromInt(toInt(a) * toInt(b))));
+            push(TaggedValue::fromInt32(static_cast<int32_t>(toInt(a) * toInt(b))));
             break;
         }
         case Opcode::MUL_FLOAT: {
             ValuePtr b = popStack(), a = popStack();
-            push(std::make_shared<Value>(Value::fromFloat(toDouble(a) * toDouble(b))));
+            push(TaggedValue::fromFloat(toDouble(a) * toDouble(b)));
             break;
         }
         case Opcode::DIV: {
@@ -538,7 +842,7 @@ void VM::runInstruction(const Instruction& inst) {
             double den = toDouble(b);
             if (den == 0)
                 throw VMError("Division by zero", inst.line, inst.column, 4, static_cast<int>(VMErrorCode::DIVISION_BY_ZERO));
-            push(std::make_shared<Value>(Value::fromFloat(toDouble(a) / den)));
+            push(TaggedValue::fromFloat(toDouble(a) / den));
             break;
         }
         case Opcode::DIV_INT: {
@@ -546,7 +850,7 @@ void VM::runInstruction(const Instruction& inst) {
             int64_t den = toInt(b);
             if (den == 0)
                 throw VMError("Division by zero", inst.line, inst.column, 4, static_cast<int>(VMErrorCode::DIVISION_BY_ZERO));
-            push(std::make_shared<Value>(Value::fromInt(toInt(a) / den)));
+            push(TaggedValue::fromInt32(static_cast<int32_t>(toInt(a) / den)));
             break;
         }
         case Opcode::DIV_FLOAT: {
@@ -554,7 +858,7 @@ void VM::runInstruction(const Instruction& inst) {
             double den = toDouble(b);
             if (den == 0)
                 throw VMError("Division by zero", inst.line, inst.column, 4, static_cast<int>(VMErrorCode::DIVISION_BY_ZERO));
-            push(std::make_shared<Value>(Value::fromFloat(toDouble(a) / den)));
+            push(TaggedValue::fromFloat(toDouble(a) / den));
             break;
         }
         case Opcode::MOD: {
@@ -564,127 +868,125 @@ void VM::runInstruction(const Instruction& inst) {
             int64_t den = toInt(b);
             if (den == 0)
                 throw VMError("Division by zero", inst.line, inst.column, 4, static_cast<int>(VMErrorCode::DIVISION_BY_ZERO));
-            push(std::make_shared<Value>(Value::fromInt(toInt(a) % den)));
+            push(TaggedValue::fromInt32(static_cast<int32_t>(toInt(a) % den)));
             break;
         }
         case Opcode::POW: {
             ValuePtr b = popStack(), a = popStack();
             requireNumeric(a, "POW");
             requireNumeric(b, "POW");
-            push(std::make_shared<Value>(Value::fromFloat(std::pow(toDouble(a), toDouble(b)))));
+            push(TaggedValue::fromFloat(std::pow(toDouble(a), toDouble(b))));
             break;
         }
         case Opcode::NEG: {
             ValuePtr v = popStack();
             requireNumeric(v, "NEG");
-            if (v->type == Value::Type::FLOAT) push(std::make_shared<Value>(Value::fromFloat(-toDouble(v))));
-            else push(std::make_shared<Value>(Value::fromInt(-toInt(v))));
+            if (v.isFloat()) push(TaggedValue::fromFloat(-toDouble(v)));
+            else push(TaggedValue::fromInt32(static_cast<int32_t>(-toInt(v))));
             break;
         }
         case Opcode::NEG_INT: {
             ValuePtr v = popStack();
-            push(std::make_shared<Value>(Value::fromInt(-toInt(v))));
+            push(TaggedValue::fromInt32(static_cast<int32_t>(-toInt(v))));
             break;
         }
         case Opcode::NEG_FLOAT: {
             ValuePtr v = popStack();
-            push(std::make_shared<Value>(Value::fromFloat(-toDouble(v))));
+            push(TaggedValue::fromFloat(-toDouble(v)));
             break;
         }
         case Opcode::EQ: {
             ValuePtr b = popStack(), a = popStack();
-            bool eq = (a && b) ? a->equals(*b) : (a.get() == b.get());
-            push(std::make_shared<Value>(Value::fromBool(eq)));
+            push(TaggedValue::fromBool(a.equals(b)));
             break;
         }
         case Opcode::EQ_INT: {
             ValuePtr b = popStack(), a = popStack();
-            push(std::make_shared<Value>(Value::fromBool(toInt(a) == toInt(b))));
+            push(TaggedValue::fromBool(toInt(a) == toInt(b)));
             break;
         }
         case Opcode::EQ_FLOAT: {
             ValuePtr b = popStack(), a = popStack();
-            push(std::make_shared<Value>(Value::fromBool(toDouble(a) == toDouble(b))));
+            push(TaggedValue::fromBool(toDouble(a) == toDouble(b)));
             break;
         }
         case Opcode::NE: {
             ValuePtr b = popStack(), a = popStack();
-            bool eq = (a && b) ? a->equals(*b) : (a.get() == b.get());
-            push(std::make_shared<Value>(Value::fromBool(!eq)));
+            push(TaggedValue::fromBool(!a.equals(b)));
             break;
         }
         case Opcode::LT: {
             ValuePtr b = popStack(), a = popStack();
             requireNumeric(a, "LT");
             requireNumeric(b, "LT");
-            push(std::make_shared<Value>(Value::fromBool(toDouble(a) < toDouble(b))));
+            push(TaggedValue::fromBool(toDouble(a) < toDouble(b)));
             break;
         }
         case Opcode::LT_INT: {
             ValuePtr b = popStack(), a = popStack();
-            push(std::make_shared<Value>(Value::fromBool(toInt(a) < toInt(b))));
+            push(TaggedValue::fromBool(toInt(a) < toInt(b)));
             break;
         }
         case Opcode::LT_FLOAT: {
             ValuePtr b = popStack(), a = popStack();
-            push(std::make_shared<Value>(Value::fromBool(toDouble(a) < toDouble(b))));
+            push(TaggedValue::fromBool(toDouble(a) < toDouble(b)));
             break;
         }
         case Opcode::LE: {
             ValuePtr b = popStack(), a = popStack();
             requireNumeric(a, "LE");
             requireNumeric(b, "LE");
-            push(std::make_shared<Value>(Value::fromBool(toDouble(a) <= toDouble(b))));
+            push(TaggedValue::fromBool(toDouble(a) <= toDouble(b)));
             break;
         }
         case Opcode::GT: {
             ValuePtr b = popStack(), a = popStack();
             requireNumeric(a, "GT");
             requireNumeric(b, "GT");
-            push(std::make_shared<Value>(Value::fromBool(toDouble(a) > toDouble(b))));
+            push(TaggedValue::fromBool(toDouble(a) > toDouble(b)));
             break;
         }
         case Opcode::GE: {
             ValuePtr b = popStack(), a = popStack();
             requireNumeric(a, "GE");
             requireNumeric(b, "GE");
-            push(std::make_shared<Value>(Value::fromBool(toDouble(a) >= toDouble(b))));
+            push(TaggedValue::fromBool(toDouble(a) >= toDouble(b)));
             break;
         }
         case Opcode::AND: {
             ValuePtr b = popStack(), a = popStack();
-            push(std::make_shared<Value>(Value::fromBool((a && a->isTruthy()) && (b && b->isTruthy()))));
+            push(TaggedValue::fromBool(a.isTruthy() && b.isTruthy()));
             break;
         }
         case Opcode::OR: {
             ValuePtr b = popStack(), a = popStack();
-            push(std::make_shared<Value>(Value::fromBool((a && a->isTruthy()) || (b && b->isTruthy()))));
+            push(TaggedValue::fromBool(a.isTruthy() || b.isTruthy()));
             break;
         }
         case Opcode::NOT: {
             ValuePtr v = popStack();
-            push(std::make_shared<Value>(Value::fromBool(!(v && v->isTruthy()))));
+            push(TaggedValue::fromBool(!v.isTruthy()));
             break;
         }
         case Opcode::BIT_AND: {
             ValuePtr b = popStack(), a = popStack();
             requireInteger(a, "BIT_AND");
             requireInteger(b, "BIT_AND");
-            push(std::make_shared<Value>(Value::fromInt(toInt(a) & toInt(b))));
+            push(TaggedValue::fromInt32(static_cast<int32_t>(toInt(a) & toInt(b))));
             break;
         }
         case Opcode::BIT_OR: {
             ValuePtr b = popStack(), a = popStack();
             requireInteger(a, "BIT_OR");
             requireInteger(b, "BIT_OR");
-            push(std::make_shared<Value>(Value::fromInt(toInt(a) | toInt(b))));
+            push(TaggedValue::fromInt32(static_cast<int32_t>(toInt(a) | toInt(b))));
             break;
         }
         case Opcode::BIT_XOR: {
             ValuePtr b = popStack(), a = popStack();
             requireInteger(a, "BIT_XOR");
             requireInteger(b, "BIT_XOR");
-            push(std::make_shared<Value>(Value::fromInt(toInt(a) ^ toInt(b))));
+            push(TaggedValue::fromInt32(static_cast<int32_t>(toInt(a) ^ toInt(b))));
             break;
         }
         case Opcode::SHL: {
@@ -692,7 +994,7 @@ void VM::runInstruction(const Instruction& inst) {
             requireInteger(a, "SHL");
             requireInteger(b, "SHL");
             int64_t sh = toInt(b) & 63;
-            push(std::make_shared<Value>(Value::fromInt(toInt(a) << sh)));
+            push(TaggedValue::fromInt32(static_cast<int32_t>(toInt(a) << sh)));
             break;
         }
         case Opcode::SHR: {
@@ -700,7 +1002,7 @@ void VM::runInstruction(const Instruction& inst) {
             requireInteger(a, "SHR");
             requireInteger(b, "SHR");
             int64_t sh = toInt(b) & 63;
-            push(std::make_shared<Value>(Value::fromInt(toInt(a) >> sh)));
+            push(TaggedValue::fromInt32(static_cast<int32_t>(toInt(a) >> sh)));
             break;
         }
         case Opcode::JMP: {
@@ -712,7 +1014,7 @@ void VM::runInstruction(const Instruction& inst) {
         }
         case Opcode::JMP_IF_FALSE: {
             ValuePtr v = popStack();
-            if (!v->isTruthy()) {
+            if (!v.isTruthy()) {
                 size_t target = getOperandU64(inst);
                 if (target == 0 || target > code_.size())
                     throw VMError("Invalid jump target", inst.line, inst.column, 1, static_cast<int>(VMErrorCode::INVALID_JUMP_TARGET));
@@ -722,7 +1024,7 @@ void VM::runInstruction(const Instruction& inst) {
         }
         case Opcode::JMP_IF_TRUE: {
             ValuePtr v = popStack();
-            if (v->isTruthy()) {
+            if (v.isTruthy()) {
                 size_t target = getOperandU64(inst);
                 if (target == 0 || target > code_.size())
                     throw VMError("Invalid jump target", inst.line, inst.column, 1, static_cast<int>(VMErrorCode::INVALID_JUMP_TARGET));
@@ -738,44 +1040,41 @@ void VM::runInstruction(const Instruction& inst) {
             for (size_t i = 0; i < argc; ++i) args.push_back(popStack());
             std::reverse(args.begin(), args.end());
             ValuePtr callee = popStack();
-            // callee is never null (popStack canonicalizes); non-FUNCTION falls through below.
-            if (callee->type == Value::Type::FUNCTION) {
-                auto& fn = std::get<FunctionPtr>(callee->data);
+            // TaggedValue is never null — check via isFunction/isFfi
+            if (callee.isFunction()) {
+                auto* fn = callee.asClosurePtr()->fn;
                 if (fn->isBuiltin) {
                     BuiltinFn* fast = (fn->builtinIndex < builtinsVec_.size()) ? &builtinsVec_[fn->builtinIndex] : nullptr;
                     if (fast && *fast)
-                        push(std::make_shared<Value>((*fast)(this, args)));
+                        push(TaggedValue::fromValue((*fast)(this, args), this));
                     else {
                         auto it = builtins_.find(fn->builtinIndex);
                         if (it != builtins_.end()) {
-                            push(std::make_shared<Value>(it->second(this, args)));
+                            push(TaggedValue::fromValue(it->second(this, args), this));
                         } else {
                             throw VMError("Invalid builtin index", inst.line, inst.column, 1, static_cast<int>(VMErrorCode::INVALID_BYTECODE));
                         }
                     }
                 } else if (fn->isGenerator) {
                     auto go = std::make_shared<GeneratorObject>();
-                    go->fn = fn;
+                    go->fn = std::make_shared<FunctionObject>(*fn);
                     go->ip = fn->entryPoint;
                     go->locals = std::move(args);
                     while (go->locals.size() < fn->arity)
-                        go->locals.push_back(std::make_shared<Value>(Value::nil()));
+                        go->locals.push_back(TaggedValue::nil());
                     for (const auto& c : fn->captures)
-                        go->locals.push_back(ensureNonNull(c ? c : std::make_shared<Value>(Value::nil())));
+                        go->locals.push_back(c.isNil() ? TaggedValue::nil() : c);
                     go->exhausted = false;
-                    push(std::make_shared<Value>(Value::fromGenerator(std::move(go))));
+                    generatorKeepAlive_.push_back(go);
+                    push(TaggedValue::fromGenerator(go.get()));
                 } else {
                     if (maxCallDepth_ > 0 && callFrames.size() >= maxCallDepth_) {
                         throw VMError("Maximum call depth exceeded (" + std::to_string(maxCallDepth_) + ")", inst.line, inst.column, 1);
                     }
-                    // tail-call check must use the caller's bytecode/ip_. Switching code_ for fn->script first
-                    // would read the wrong instruction (cross-script calls: e.g. callback from module -> main).
                     bool tailCall = (ip_ + 1 < code_.size() && code_[ip_ + 1].op == Opcode::RETURN)
                         && !deferStack.empty() && deferStack.back().empty();
-                    // When maxCallDepth_ is enforced, do not reuse frames: tail recursion would bypass the limit.
                     if (maxCallDepth_ > 0) tailCall = false;
                     const std::string callerPath = activeSourcePath_;
-                    // if function was defined in an imported script, switch to its bytecode for the call
                     if (fn->script) {
                         codeFrameStack.push_back(
                             std::make_tuple(std::move(code_), std::move(stringConstants_), std::move(valueConstants_), callerPath));
@@ -784,17 +1083,16 @@ void VM::runInstruction(const Instruction& inst) {
                         valueConstants_ = fn->script->valueConstants;
                         activeSourcePath_ = fn->script->sourcePath;
                     }
-                    // tail-call reuse is invalid without an outer frame (would callStack.back() UB).
                     auto appendCaptures = [&] {
                         for (const auto& c : fn->captures)
-                            locals_.push_back(ensureNonNull(c ? c : std::make_shared<Value>(Value::nil())));
+                            locals_.push_back(c.isNil() ? TaggedValue::nil() : c);
                     };
                     if (tailCall && !callStack.empty()) {
                         callStack.back() = {fn->name.empty() ? "<anonymous>" : fn->name, callerPath, inst.line, inst.column};
                         locals_.clear();
                         for (size_t i = 0; i < args.size(); ++i)
-                            locals_.push_back(ensureNonNull(ValuePtr(args[i])));
-                        while (locals_.size() < fn->arity) locals_.push_back(std::make_shared<Value>(Value::nil()));
+                            locals_.push_back(args[i]);
+                        while (locals_.size() < fn->arity) locals_.push_back(TaggedValue::nil());
                         appendCaptures();
                         ip_ = fn->entryPoint - 1;
                     } else {
@@ -804,16 +1102,16 @@ void VM::runInstruction(const Instruction& inst) {
                         frameLocals_.push_back(std::move(locals_));
                         locals_.clear();
                         for (size_t i = 0; i < args.size(); ++i)
-                            locals_.push_back(ensureNonNull(ValuePtr(args[i])));
+                            locals_.push_back(args[i]);
                         while (locals_.size() < fn->arity)
-                            locals_.push_back(std::make_shared<Value>(Value::nil()));
+                            locals_.push_back(TaggedValue::nil());
                         appendCaptures();
                         ip_ = fn->entryPoint - 1;
                     }
                 }
-            } else if (callee->type == Value::Type::FFI_FN) {
-                auto& ffi = std::get<FfiClosurePtr>(callee->data);
-                push(std::make_shared<Value>(callFfiFunction(ffi.get(), args)));
+            } else if (callee.isFfi()) {
+                auto* ffi = callee.asFfiPtr();
+                push(TaggedValue::fromValue(callFfiFunction(ffi, args), this));
             } else {
                 throw VMError("Invalid call target: value is not callable", inst.line, inst.column, 2,
                               static_cast<int>(VMErrorCode::INVALID_CALL_TARGET));
@@ -840,7 +1138,7 @@ void VM::runInstruction(const Instruction& inst) {
                 doneGenerator_ = true;
                 break;
             }
-            ValuePtr result = stack.empty() ? std::make_shared<Value>(Value::nil()) : popStack();
+            ValuePtr result = stack.empty() ? TaggedValue::nil() : popStack();
             if (callFrames.empty()) {
                 // If we're running inside a coroutine (via resumeAll), the function
                 // body was entered directly at fn->entryPoint without a CALL opcode,
@@ -890,16 +1188,14 @@ void VM::runInstruction(const Instruction& inst) {
                 }
                 fn->script = entryScriptCache;
             }
-            push(std::make_shared<Value>(Value::fromFunction(fn)));
+            functionKeepAlive_.push_back(fn);
+            auto* closure = allocObjClosure(fn.get(), this);
+            push(TaggedValue::fromClosure(closure));
             break;
         }
         case Opcode::BUILD_CLOSURE: {
-            if (!std::holds_alternative<std::pair<size_t, size_t>>(inst.operand))
-                throw VMError("Invalid bytecode operand: BUILD_CLOSURE expects pair(entry, captureCount)", inst.line, inst.column, 1,
-                              static_cast<int>(VMErrorCode::INVALID_BYTECODE));
-            auto p = std::get<std::pair<size_t, size_t>>(inst.operand);
-            size_t entry = p.first;
-            size_t captureCount = p.second;
+            size_t entry = inst.pairOperand.a;
+            size_t captureCount = inst.pairOperand.b;
             if (entry >= code_.size()) throw VMError("Invalid function entry point", inst.line, inst.column);
             if (stack.size() < captureCount)
                 throw VMError("Stack underflow in BUILD_CLOSURE", inst.line, inst.column, 1,
@@ -924,21 +1220,24 @@ void VM::runInstruction(const Instruction& inst) {
                 }
                 fn->script = entryScriptCache;
             }
-            push(std::make_shared<Value>(Value::fromFunction(fn)));
+            functionKeepAlive_.push_back(fn);
+            auto* closure = allocObjClosure(fn.get(), this);
+            closure->captures = std::move(fn->captures);
+            push(TaggedValue::fromClosure(closure));
             break;
         }
         case Opcode::SET_FUNC_ARITY: {
             size_t arity = getOperandU64(inst);
             ValuePtr v = popStack();
-            if (v->type == Value::Type::FUNCTION)
-                std::get<FunctionPtr>(v->data)->arity = arity;
+            if (v.isFunction())
+                v.asClosurePtr()->fn->arity = arity;
             push(std::move(v));
             break;
         }
         case Opcode::SET_FUNC_PARAM_NAMES: {
             std::string joined = getOperandStr(inst);
             ValuePtr v = popStack();
-            if (v->type == Value::Type::FUNCTION) {
+            if (v.isFunction()) {
                 std::vector<std::string> names;
                 for (size_t i = 0; i < joined.size(); ) {
                     size_t c = joined.find(',', i);
@@ -947,7 +1246,7 @@ void VM::runInstruction(const Instruction& inst) {
                     i = c + 1;
                 }
                 if (names.empty() && !joined.empty()) names.push_back(joined);
-                std::get<FunctionPtr>(v->data)->paramNames = std::move(names);
+                v.asClosurePtr()->fn->paramNames = std::move(names);
             }
             push(std::move(v));
             break;
@@ -955,27 +1254,27 @@ void VM::runInstruction(const Instruction& inst) {
         case Opcode::SET_FUNC_NAME: {
             std::string name = getOperandStr(inst);
             ValuePtr v = popStack();
-            if (v->type == Value::Type::FUNCTION)
-                std::get<FunctionPtr>(v->data)->name = name;
+            if (v.isFunction())
+                v.asClosurePtr()->fn->name = name;
             push(std::move(v));
             break;
         }
         case Opcode::SET_FUNC_GENERATOR: {
             ValuePtr v = popStack();
-            if (v->type == Value::Type::FUNCTION)
-                std::get<FunctionPtr>(v->data)->isGenerator = true;
+            if (v.isFunction())
+                v.asClosurePtr()->fn->isGenerator = true;
             push(std::move(v));
             break;
         }
         case Opcode::SET_FUNC_STRUCT: {
             ValuePtr v = popStack();
-            if (v->type == Value::Type::FUNCTION)
-                std::get<FunctionPtr>(v->data)->isStructConstructor = true;
+            if (v.isFunction())
+                v.asClosurePtr()->fn->isStructConstructor = true;
             push(std::move(v));
             break;
         }
         case Opcode::YIELD: {
-            ValuePtr val = stack.empty() ? std::make_shared<Value>(Value::nil()) : popStack();
+            ValuePtr val = stack.empty() ? TaggedValue::nil() : popStack();
             if (inGeneratorExecution_) {
                 // Existing generator path — resumeGenerator() handles the outer loop
                 pendingYield_ = true;
@@ -994,7 +1293,7 @@ void VM::runInstruction(const Instruction& inst) {
             break;
         }
         case Opcode::NEW_OBJECT: {
-            push(std::make_shared<Value>(Value::fromMap(ValueMap{})));
+            push(TaggedValue::fromMap(allocObjMap(this)));
             break;
         }
         case Opcode::BUILD_ARRAY: {
@@ -1008,59 +1307,60 @@ void VM::runInstruction(const Instruction& inst) {
             arr.reserve(n);
             for (size_t i = 0; i < n; ++i) arr.push_back(popStack());
             std::reverse(arr.begin(), arr.end());
-            push(std::make_shared<Value>(Value::fromArray(std::move(arr))));
+            push(TaggedValue::fromArray(allocObjArray(arr, this)));
             break;
         }
         case Opcode::SPREAD: {
             ValuePtr spreadVal = popStack();
             ValuePtr accVal = popStack();
-            if (accVal->type != Value::Type::ARRAY) { push(std::move(accVal)); push(std::move(spreadVal)); break; }
-            if (spreadVal->type != Value::Type::ARRAY) { push(std::move(accVal)); push(std::move(spreadVal)); break; }
-            auto& acc = std::get<std::vector<ValuePtr>>(accVal->data);
-            auto& sp = std::get<std::vector<ValuePtr>>(spreadVal->data);
-            for (auto& x : acc) x = ensureNonNull(ValuePtr(x));
-            for (auto& x : sp) x = ensureNonNull(ValuePtr(x));
-            acc.insert(acc.end(), sp.begin(), sp.end());
+            if (!accVal.isArray()) { push(std::move(accVal)); push(std::move(spreadVal)); break; }
+            if (!spreadVal.isArray()) { push(std::move(accVal)); push(std::move(spreadVal)); break; }
+            auto* accArr = accVal.asArrayPtr();
+            auto* spArr = spreadVal.asArrayPtr();
+            size_t newCount = accArr->count + spArr->count;
+            auto* newElements = static_cast<TaggedValue*>(std::realloc(accArr->elements, newCount * sizeof(TaggedValue)));
+            if (!newElements && newCount > 0) throw std::bad_alloc();
+            accArr->elements = newElements;
+            std::memcpy(accArr->elements + accArr->count, spArr->elements, spArr->count * sizeof(TaggedValue));
+            accArr->count = static_cast<uint32_t>(newCount);
+            accArr->capacity = static_cast<uint32_t>(newCount);
             push(accVal);
             break;
         }
         case Opcode::GET_FIELD: {
             ValuePtr obj = popStack();
             std::string field = getOperandStr(inst);
-            if (obj && obj->type == Value::Type::MAP) {
-                auto& m = std::get<std::unordered_map<std::string, ValuePtr>>(obj->data);
-                auto it = m.find(field);
-                if (it != m.end()) {
-                    it->second = ensureNonNull(ValuePtr(it->second));
+            if (obj.isMap()) {
+                auto& entries = obj.asMapPtr()->entries;
+                auto it = entries.find(field);
+                if (it != entries.end()) {
                     push(it->second);
                 } else {
-                    auto proto = m.find("__class");
-                    if (proto != m.end() && proto->second && proto->second->type == Value::Type::MAP) {
-                        auto& cm = std::get<std::unordered_map<std::string, ValuePtr>>(proto->second->data);
+                    auto proto = entries.find("__class");
+                    if (proto != entries.end() && proto->second.isMap()) {
+                        auto& cm = proto->second.asMapPtr()->entries;
                         auto cit = cm.find(field);
                         if (cit != cm.end()) {
-                            cit->second = ensureNonNull(ValuePtr(cit->second));
                             push(cit->second);
-                        } else push(std::make_shared<Value>(Value::nil()));
-                    } else push(std::make_shared<Value>(Value::nil()));
+                        } else push(TaggedValue::nil());
+                    } else push(TaggedValue::nil());
                 }
-            } else if (obj && obj->type == Value::Type::VEC3) {
-                auto v = std::get<Vec3Ptr>(obj->data);
-                if (field == "x") push(std::make_shared<Value>(Value::fromFloat(v->x)));
-                else if (field == "y") push(std::make_shared<Value>(Value::fromFloat(v->y)));
-                else if (field == "z") push(std::make_shared<Value>(Value::fromFloat(v->z)));
-                else push(std::make_shared<Value>(Value::nil()));
-            } else push(std::make_shared<Value>(Value::nil()));
+            } else if (obj.isVec3()) {
+                auto* v = obj.asVec3Ptr();
+                if (field == "x") push(TaggedValue::fromFloat(v->x));
+                else if (field == "y") push(TaggedValue::fromFloat(v->y));
+                else if (field == "z") push(TaggedValue::fromFloat(v->z));
+                else push(TaggedValue::nil());
+            } else push(TaggedValue::nil());
             break;
         }
         case Opcode::SET_FIELD: {
             ValuePtr val = popStack();
             ValuePtr obj = popStack();
             std::string field = getOperandStr(inst);
-            ValuePtr stored = ensureNonNull(std::move(val));
-            if (obj && obj->type == Value::Type::MAP)
-                std::get<std::unordered_map<std::string, ValuePtr>>(obj->data)[field] = stored;
-            push(stored);
+            if (obj.isMap())
+                obj.asMapPtr()->entries[field] = val;
+            push(val);
             break;
         }
         case Opcode::BUILD_VEC3: {
@@ -1068,112 +1368,115 @@ void VM::runInstruction(const Instruction& inst) {
             requireNumeric(x, "BUILD_VEC3 x");
             requireNumeric(y, "BUILD_VEC3 y");
             requireNumeric(z, "BUILD_VEC3 z");
-            push(std::make_shared<Value>(Value::fromVec3(toDouble(x), toDouble(y), toDouble(z))));
+            auto* v = new Vec3Object{toDouble(x), toDouble(y), toDouble(z)};
+            push(TaggedValue::fromVec3(v));
             break;
         }
         case Opcode::VEC3_GET_X: {
             ValuePtr v = popStack();
-            if (v && v->type == Value::Type::VEC3) {
-                auto vec = std::get<Vec3Ptr>(v->data);
-                push(std::make_shared<Value>(Value::fromFloat(vec->x)));
+            if (v.isVec3()) {
+                push(TaggedValue::fromFloat(v.asVec3Ptr()->x));
             } else {
-                push(std::make_shared<Value>(Value::nil()));
+                push(TaggedValue::nil());
             }
             break;
         }
         case Opcode::VEC3_GET_Y: {
             ValuePtr v = popStack();
-            if (v && v->type == Value::Type::VEC3) {
-                auto vec = std::get<Vec3Ptr>(v->data);
-                push(std::make_shared<Value>(Value::fromFloat(vec->y)));
+            if (v.isVec3()) {
+                push(TaggedValue::fromFloat(v.asVec3Ptr()->y));
             } else {
-                push(std::make_shared<Value>(Value::nil()));
+                push(TaggedValue::nil());
             }
             break;
         }
         case Opcode::VEC3_GET_Z: {
             ValuePtr v = popStack();
-            if (v && v->type == Value::Type::VEC3) {
-                auto vec = std::get<Vec3Ptr>(v->data);
-                push(std::make_shared<Value>(Value::fromFloat(vec->z)));
+            if (v.isVec3()) {
+                push(TaggedValue::fromFloat(v.asVec3Ptr()->z));
             } else {
-                push(std::make_shared<Value>(Value::nil()));
+                push(TaggedValue::nil());
             }
             break;
         }
         case Opcode::GET_INDEX: {
             ValuePtr index = popStack(), obj = popStack();
-            if (obj && obj->type == Value::Type::ARRAY) {
-                auto& arr = std::get<std::vector<ValuePtr>>(obj->data);
+            if (obj.isArray()) {
+                auto* arr = obj.asArrayPtr();
                 int64_t raw = toInt(index);
-                size_t i = static_cast<size_t>(raw >= 0 ? raw : std::max(int64_t(0), raw + static_cast<int64_t>(arr.size())));
-                if (i < arr.size()) {
-                    arr[i] = ensureNonNull(ValuePtr(arr[i]));
-                    push(arr[i]);
-                } else push(std::make_shared<Value>(Value::nil()));
-            } else if (obj && obj->type == Value::Type::STRING) {
-                const std::string& s = std::get<std::string>(obj->data);
+                size_t i = static_cast<size_t>(raw >= 0 ? raw : std::max(int64_t(0), raw + static_cast<int64_t>(arr->count)));
+                if (i < arr->count) {
+                    push(arr->elements[i]);
+                } else push(TaggedValue::nil());
+            } else if (obj.isString()) {
+                auto* s = obj.asStringPtr();
                 int64_t raw = toInt(index);
-                int64_t len = static_cast<int64_t>(s.size());
+                int64_t len = static_cast<int64_t>(s->length);
                 int64_t i = (raw >= 0) ? raw : raw + len;
                 if (i >= 0 && i < len)
-                    push(std::make_shared<Value>(Value::fromString(s.substr(static_cast<size_t>(i), 1))));
+                    push(TaggedValue::fromString(allocObjString(s->chars + i, 1, this)));
                 else
-                    push(std::make_shared<Value>(Value::nil()));
-            } else if (obj && obj->type == Value::Type::MAP) {
+                    push(TaggedValue::nil());
+            } else if (obj.isMap()) {
                 std::string key;
                 if (mapIndexToKey(index, key)) {
-                    auto& m = std::get<std::unordered_map<std::string, ValuePtr>>(obj->data);
-                    auto it = m.find(key);
-                    if (it != m.end()) {
-                        it->second = ensureNonNull(ValuePtr(it->second));
+                    auto& entries = obj.asMapPtr()->entries;
+                    auto it = entries.find(key);
+                    if (it != entries.end()) {
                         push(it->second);
-                    } else push(std::make_shared<Value>(Value::nil()));
+                    } else push(TaggedValue::nil());
                 } else
-                    push(std::make_shared<Value>(Value::nil()));
-            } else push(std::make_shared<Value>(Value::nil()));
+                    push(TaggedValue::nil());
+            } else push(TaggedValue::nil());
             break;
         }
         case Opcode::ARRAY_LEN: {
             ValuePtr obj = popStack();
-            if (obj && obj->type == Value::Type::ARRAY) {
-                auto& arr = std::get<std::vector<ValuePtr>>(obj->data);
-                push(std::make_shared<Value>(Value::fromInt(static_cast<int64_t>(arr.size()))));
+            if (obj.isArray()) {
+                push(TaggedValue::fromInt32(static_cast<int32_t>(obj.asArrayPtr()->count)));
             } else
-                push(std::make_shared<Value>(Value::fromInt(0)));
+                push(TaggedValue::fromInt32(0));
             break;
         }
         case Opcode::SET_INDEX: {
             ValuePtr val = popStack(), index = popStack(), obj = popStack();
-            ValuePtr stored = ensureNonNull(std::move(val));
-            if (obj && obj->type == Value::Type::ARRAY) {
-                auto& arr = std::get<std::vector<ValuePtr>>(obj->data);
+            if (obj.isArray()) {
+                auto* arr = obj.asArrayPtr();
                 int64_t raw = toInt(index);
-                if (raw < 0) raw += static_cast<int64_t>(arr.size());
+                if (raw < 0) raw += static_cast<int64_t>(arr->count);
                 if (raw < 0) raw = 0;
                 const size_t kMaxArraySize = 64 * 1024 * 1024;
                 size_t i = static_cast<size_t>(raw);
                 if (i > kMaxArraySize)
                     throw VMError("Array index out of range", inst.line, inst.column, 6);
-                while (arr.size() <= i) arr.push_back(std::make_shared<Value>(Value::nil()));
-                arr[i] = stored;
-            } else if (obj && obj->type == Value::Type::MAP) {
+                if (i >= arr->count) {
+                    size_t newCount = i + 1;
+                    auto* newElements = static_cast<TaggedValue*>(std::realloc(arr->elements, newCount * sizeof(TaggedValue)));
+                    if (!newElements) throw std::bad_alloc();
+                    for (size_t j = arr->count; j < newCount; ++j)
+                        newElements[j] = TaggedValue::nil();
+                    arr->elements = newElements;
+                    arr->count = static_cast<uint32_t>(newCount);
+                    arr->capacity = static_cast<uint32_t>(newCount);
+                }
+                arr->elements[i] = val;
+            } else if (obj.isMap()) {
                 std::string key;
                 if (mapIndexToKey(index, key))
-                    std::get<std::unordered_map<std::string, ValuePtr>>(obj->data)[key] = stored;
+                    obj.asMapPtr()->entries[key] = val;
             }
-            push(stored);
+            push(val);
             break;
         }
         case Opcode::PRINT: {
             ValuePtr v = peek();
-            std::cout << (v ? v->toString() : "null") << std::endl;
+            std::cout << v.toString() << std::endl;
             break;
         }
         case Opcode::BUILTIN: {
             size_t idx = getOperandU64(inst);
             auto it = builtins_.find(idx);
-            if (it != builtins_.end()) push(std::make_shared<Value>(it->second(this, {})));
+            if (it != builtins_.end()) push(TaggedValue::fromValue(it->second(this, {}), this));
             else
                 throw VMError("Invalid builtin index in bytecode", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::INVALID_BYTECODE));
@@ -1197,7 +1500,7 @@ void VM::runInstruction(const Instruction& inst) {
             break;
         }
         case Opcode::THROW: {
-            ValuePtr val = stack.empty() ? std::make_shared<Value>(Value::nil()) : popStack();
+            ValuePtr val = stack.empty() ? TaggedValue::nil() : popStack();
             attachTracebackToError(val);
             if (tryStack.empty() || exceptionStack.empty()) {
                 ThrownErrorInfo info = classifyThrownError(val);
@@ -1224,7 +1527,7 @@ void VM::runInstruction(const Instruction& inst) {
         }
         case Opcode::RETHROW: {
             // RETHROW requires an active exception frame with a thrown value
-            if (exceptionStack.empty() || !exceptionStack.back().thrown) {
+            if (exceptionStack.empty() || exceptionStack.back().thrown.isNil()) {
                 throw VMError("No active exception to rethrow", inst.line, inst.column, 1,
                               static_cast<int>(VMErrorCode::INVALID_OPERATION));
             }
@@ -1253,33 +1556,30 @@ void VM::runInstruction(const Instruction& inst) {
         case Opcode::SLICE: {
             if (stack.size() < 4) throw VMError("Stack underflow in slice", inst.line, inst.column, 6);
             ValuePtr stepVal = popStack(), endVal = popStack(), startVal = popStack(), obj = popStack();
-            if (!obj || obj->type != Value::Type::ARRAY) { push(std::make_shared<Value>(Value::fromArray(ValueArray{}))); break; }
-            auto& arr = std::get<std::vector<ValuePtr>>(obj->data);
-            // heal null slots in the source array (same contract as SPREAD / GET_INDEX).
-            for (auto& x : arr) x = ensureNonNull(ValuePtr(x));
-            int64_t len = static_cast<int64_t>(arr.size());
-            int64_t start = (startVal && startVal->type != Value::Type::NIL) ? toInt(startVal) : 0;
-            int64_t end = (endVal && endVal->type != Value::Type::NIL) ? toInt(endVal) : len;
-            int64_t step = (stepVal && stepVal->type != Value::Type::NIL) ? toInt(stepVal) : 1;
+            if (!obj.isArray()) { push(TaggedValue::fromArray(allocObjArray(this))); break; }
+            auto* arr = obj.asArrayPtr();
+            int64_t len = static_cast<int64_t>(arr->count);
+            int64_t start = !startVal.isNil() ? toInt(startVal) : 0;
+            int64_t end = !endVal.isNil() ? toInt(endVal) : len;
+            int64_t step = !stepVal.isNil() ? toInt(stepVal) : 1;
             if (step == 0) step = 1;
             if (start < 0) start = std::max(int64_t(0), start + len);
             if (end < 0) end = std::max(int64_t(0), end + len);
             if (end > len) end = len;
             if (start > len) start = len;
             std::vector<ValuePtr> out;
-            // bounds-check every index (start can exceed len before clamp; step can still skip safely).
             if (step > 0) {
                 for (int64_t i = start; i < end; i += step) {
                     if (i >= 0 && i < len)
-                        out.push_back(ensureNonNull(ValuePtr(arr[static_cast<size_t>(i)])));
+                        out.push_back(arr->elements[static_cast<size_t>(i)]);
                 }
             } else if (step < 0) {
                 for (int64_t i = start; i > end; i += step) {
                     if (i >= 0 && i < len)
-                        out.push_back(ensureNonNull(ValuePtr(arr[static_cast<size_t>(i)])));
+                        out.push_back(arr->elements[static_cast<size_t>(i)]);
                 }
             }
-            push(std::make_shared<Value>(Value::fromArray(std::move(out))));
+            push(TaggedValue::fromArray(allocObjArray(out, this)));
             break;
         }
         case Opcode::FOR_IN_ITER: {
@@ -1288,63 +1588,57 @@ void VM::runInstruction(const Instruction& inst) {
             break;
         }
         case Opcode::FOR_IN_NEXT: {
-            size_t slot1, slot2 = static_cast<size_t>(-1);
-            if (std::holds_alternative<std::pair<size_t, size_t>>(inst.operand)) {
-                auto p = std::get<std::pair<size_t, size_t>>(inst.operand);
-                slot1 = p.first;
-                slot2 = p.second;
-            } else {
-                slot1 = getOperandU64(inst);
-            }
-            if (iterStack.empty()) { push(std::make_shared<Value>(Value::fromBool(false))); break; }
+            size_t slot1 = inst.pairOperand.a;
+            size_t slot2 = inst.pairOperand.b;
+            if (iterStack.empty()) { push(TaggedValue::fromBool(false)); break; }
             auto& [v, i] = iterStack.back();
-            if (v->type == Value::Type::ARRAY) {
-                auto& arr = std::get<std::vector<ValuePtr>>(v->data);
-                if (i < arr.size()) {
-                    while (locals_.size() <= slot1) locals_.push_back(std::make_shared<Value>(Value::nil()));
-                    locals_[slot1] = ensureNonNull(ValuePtr(arr[i]));
+            if (v.isArray()) {
+                auto* arr = v.asArrayPtr();
+                if (i < arr->count) {
+                    while (locals_.size() <= slot1) locals_.push_back(TaggedValue::nil());
+                    locals_[slot1] = arr->elements[i];
                     i++;
-                    push(std::make_shared<Value>(Value::fromBool(true)));
+                    push(TaggedValue::fromBool(true));
                 } else {
                     iterStack.pop_back();
-                    push(std::make_shared<Value>(Value::fromBool(false)));
+                    push(TaggedValue::fromBool(false));
                 }
-            } else if (v->type == Value::Type::MAP) {
-                auto& m = std::get<std::unordered_map<std::string, ValuePtr>>(v->data);
+            } else if (v.isMap()) {
+                auto& entries = v.asMapPtr()->entries;
                 std::vector<std::string> keys;
-                for (const auto& kv : m) keys.push_back(kv.first);
+                for (const auto& kv : entries) keys.push_back(kv.first);
                 std::sort(keys.begin(), keys.end());
                 if (i < keys.size()) {
-                    while (locals_.size() <= slot1) locals_.push_back(std::make_shared<Value>(Value::nil()));
-                    locals_[slot1] = std::make_shared<Value>(Value::fromString(keys[i]));
+                    while (locals_.size() <= slot1) locals_.push_back(TaggedValue::nil());
+                    locals_[slot1] = TaggedValue::fromString(allocObjString(keys[i], this));
                     if (slot2 != static_cast<size_t>(-1)) {
-                        while (locals_.size() <= slot2) locals_.push_back(std::make_shared<Value>(Value::nil()));
-                        locals_[slot2] = ensureNonNull(ValuePtr(m[keys[i]]));
+                        while (locals_.size() <= slot2) locals_.push_back(TaggedValue::nil());
+                        locals_[slot2] = entries[keys[i]];
                     }
                     i++;
-                    push(std::make_shared<Value>(Value::fromBool(true)));
+                    push(TaggedValue::fromBool(true));
                 } else {
                     iterStack.pop_back();
-                    push(std::make_shared<Value>(Value::fromBool(false)));
+                    push(TaggedValue::fromBool(false));
                 }
-            } else if (v->type == Value::Type::GENERATOR) {
-                auto gen = std::get<GeneratorPtr>(v->data);
+            } else if (v.isGenerator()) {
+                auto* gen = v.asGeneratorPtr();
                 ValuePtr yielded;
                 if (!resumeGenerator(gen, yielded)) {
                     iterStack.pop_back();
-                    push(std::make_shared<Value>(Value::fromBool(false)));
+                    push(TaggedValue::fromBool(false));
                 } else {
-                    while (locals_.size() <= slot1) locals_.push_back(std::make_shared<Value>(Value::nil()));
-                    locals_[slot1] = ensureNonNull(std::move(yielded));
+                    while (locals_.size() <= slot1) locals_.push_back(TaggedValue::nil());
+                    locals_[slot1] = std::move(yielded);
                     if (slot2 != static_cast<size_t>(-1)) {
-                        while (locals_.size() <= slot2) locals_.push_back(std::make_shared<Value>(Value::nil()));
-                        locals_[slot2] = std::make_shared<Value>(Value::nil());
+                        while (locals_.size() <= slot2) locals_.push_back(TaggedValue::nil());
+                        locals_[slot2] = TaggedValue::nil();
                     }
-                    push(std::make_shared<Value>(Value::fromBool(true)));
+                    push(TaggedValue::fromBool(true));
                 }
             } else {
                 iterStack.pop_back();
-                push(std::make_shared<Value>(Value::fromBool(false)));
+                push(TaggedValue::fromBool(false));
             }
             break;
         }
@@ -1366,29 +1660,29 @@ void VM::runInstruction(const Instruction& inst) {
                           inst.line, inst.column, 1, static_cast<int>(VMErrorCode::INVALID_BYTECODE));
         case Opcode::ALLOC: {
             int64_t n = toInt(popStack());
-            if (n <= 0) { push(std::make_shared<Value>(Value::fromPtr(nullptr))); break; }
+            if (n <= 0) { push(TaggedValue::fromPtr(nullptr)); break; }
             const size_t kMaxAlloc = 256 * 1024 * 1024;  // 256 miB
             size_t sz = static_cast<size_t>(n);
             if (sz > kMaxAlloc)
                 throw VMError("Allocation size too large", inst.line, inst.column, 1);
             void* p = std::malloc(sz);
             if (!p) throw VMError("Allocation failed", inst.line, inst.column, 1);
-            push(std::make_shared<Value>(Value::fromPtr(p)));
+            push(TaggedValue::fromPtr(p));
             break;
         }
         case Opcode::FREE: {
             ValuePtr v = popStack();
-            if (v->type == Value::Type::PTR) {
-                void* p = std::get<void*>(v->data);
+            if (v.isPtr()) {
+                void* p = v.asRawPtr();
                 if (p) std::free(p);
             }
             break;
         }
         case Opcode::MEM_COPY: {
             ValuePtr vn = popStack(), vsrc = popStack(), vdst = popStack();
-            if (vdst->type != Value::Type::PTR || vsrc->type != Value::Type::PTR) break;
-            void* dest = std::get<void*>(vdst->data);
-            void* src = std::get<void*>(vsrc->data);
+            if (!vdst.isPtr() || !vsrc.isPtr()) break;
+            void* dest = vdst.asRawPtr();
+            void* src = vsrc.asRawPtr();
             const size_t kMaxCopy = 256 * 1024 * 1024;  // keep memcpy bounded
             size_t n = static_cast<size_t>(std::max(int64_t(0), toInt(vn)));
             if (n > kMaxCopy) throw VMError("mem_copy size too large", inst.line, inst.column, 3);
@@ -1450,17 +1744,8 @@ void VM::restoreCoroutineState(const Coroutine& cor) {
     currentScript = cor.currentScript;
     activeSourcePath_ = cor.activeSourcePath;
     unsafeDepth_ = cor.unsafeDepth;
-    normalizeValuePtrVector(locals_);
-    for (auto& fr : frameLocals_) normalizeValuePtrVector(fr);
-    for (auto& deflist : deferStack) {
-        for (auto& p : deflist) {
-            if (!p.first) p.first = std::make_shared<Value>(Value::nil());
-            normalizeValuePtrVector(p.second);
-        }
-    }
-    for (auto& it : iterStack) {
-        if (!it.first) it.first = std::make_shared<Value>(Value::nil());
-    }
+    // TaggedValue is never null — normalizeValuePtrVector was a no-op for shared_ptr safety,
+    // and default-constructed TaggedValue is already NIL.  Clean nil-placement is implicit.
 }
 
 void VM::restoreExecutionState(
@@ -1495,20 +1780,11 @@ void VM::restoreExecutionState(
     codeFrameStack = std::move(codeFrameStack);
     this->currentScript = std::move(currentScript);
     activeSourcePath_ = std::move(activeSourcePath);
-    normalizeValuePtrVector(locals_);
-    for (auto& fr : frameLocals_) normalizeValuePtrVector(fr);
-    for (auto& deflist : this->deferStack) {
-        for (auto& p : deflist) {
-            if (!p.first) p.first = std::make_shared<Value>(Value::nil());
-            normalizeValuePtrVector(p.second);
-        }
-    }
-    for (auto& it : iterStack) {
-        if (!it.first) it.first = std::make_shared<Value>(Value::nil());
-    }
+    // TaggedValue is never null — nil-placement and normalizeValuePtrVector are no-ops.
+    // Default-constructed TaggedValue is already NIL.
 }
 
-bool VM::resumeGenerator(std::shared_ptr<GeneratorObject> gen, ValuePtr& out) {
+bool VM::resumeGenerator(GeneratorObject* gen, ValuePtr& out) {
     if (!gen || !gen->fn) return false;
     if (gen->exhausted) return false;
     Bytecode savedCode = code_;
@@ -1563,7 +1839,7 @@ bool VM::resumeGenerator(std::shared_ptr<GeneratorObject> gen, ValuePtr& out) {
                     std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedException),
                     std::move(savedCFS), std::move(savedCurScript), std::move(savedActivePath));
                 inGeneratorExecution_ = false;
-                activeGenerator.reset();
+                activeGenerator = nullptr;
                 return true;
             }
             if (doneGenerator_) {
@@ -1573,7 +1849,7 @@ bool VM::resumeGenerator(std::shared_ptr<GeneratorObject> gen, ValuePtr& out) {
                     std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedException),
                     std::move(savedCFS), std::move(savedCurScript), std::move(savedActivePath));
                 inGeneratorExecution_ = false;
-                activeGenerator.reset();
+                activeGenerator = nullptr;
                 return false;
             }
             ip_++;
@@ -1584,7 +1860,7 @@ bool VM::resumeGenerator(std::shared_ptr<GeneratorObject> gen, ValuePtr& out) {
             std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedException),
             std::move(savedCFS), std::move(savedCurScript), std::move(savedActivePath));
         inGeneratorExecution_ = false;
-        activeGenerator.reset();
+        activeGenerator = nullptr;
         return false;
     } catch (...) {
         restoreExecutionState(std::move(savedCode), std::move(savedStr), std::move(savedVal), savedIp,
@@ -1592,50 +1868,50 @@ bool VM::resumeGenerator(std::shared_ptr<GeneratorObject> gen, ValuePtr& out) {
             std::move(savedCS), std::move(savedIter), std::move(savedTry), std::move(savedException),
             std::move(savedCFS), std::move(savedCurScript), std::move(savedActivePath));
         inGeneratorExecution_ = false;
-        activeGenerator.reset();
+        activeGenerator = nullptr;
         throw;
     }
 }
 
 void VM::attachTracebackToError(ValuePtr val) {
-    if (!val || val->type != Value::Type::MAP) return;
-    auto& m = std::get<std::unordered_map<std::string, ValuePtr>>(val->data);
+    if (val.isNil() || !val.isMap()) return;
+    auto& m = val.asMapPtr()->entries;
     if (m.find("traceback") != m.end()) return;
     const size_t depth = callStack.size();
     const auto slice = getCallStackSlice(kMaxCallStackSnapshotFrames);
     std::vector<ValuePtr> arr;
     arr.reserve(slice.size() + 1);
     if (depth > slice.size()) {
-        std::unordered_map<std::string, ValuePtr> marker;
-        marker["name"] = std::make_shared<Value>(Value::fromString(
-            "(" + std::to_string(depth - slice.size()) + " outer frame(s) omitted)"));
-        marker["file"] = std::make_shared<Value>(Value::fromString(""));
-        marker["line"] = std::make_shared<Value>(Value::fromInt(0));
-        marker["column"] = std::make_shared<Value>(Value::fromInt(0));
-        arr.push_back(std::make_shared<Value>(Value::fromMap(std::move(marker))));
+        auto* markerMap = allocObjMap(this);
+        markerMap->entries["name"] = TaggedValue::fromString(allocObjString(
+            "(" + std::to_string(depth - slice.size()) + " outer frame(s) omitted)", this));
+        markerMap->entries["file"] = TaggedValue::fromString(allocObjString("", this));
+        markerMap->entries["line"] = TaggedValue::fromInt32(0);
+        markerMap->entries["column"] = TaggedValue::fromInt32(0);
+        arr.push_back(TaggedValue::fromMap(markerMap));
     }
     for (const auto& f : slice) {
-        std::unordered_map<std::string, ValuePtr> fm;
-        fm["name"] = std::make_shared<Value>(Value::fromString(f.functionName));
+        auto* fm = allocObjMap(this);
+        fm->entries["name"] = TaggedValue::fromString(allocObjString(f.functionName, this));
         // Raw path (e.g. "<repl>") for programmatic use; use humanizePathForDisplay in format_exception / stacktrace.
-        fm["file"] = std::make_shared<Value>(Value::fromString(f.filePath));
-        fm["line"] = std::make_shared<Value>(Value::fromInt(f.line));
-        fm["column"] = std::make_shared<Value>(Value::fromInt(f.column));
-        arr.push_back(std::make_shared<Value>(Value::fromMap(std::move(fm))));
+        fm->entries["file"] = TaggedValue::fromString(allocObjString(f.filePath, this));
+        fm->entries["line"] = TaggedValue::fromInt32(static_cast<int32_t>(f.line));
+        fm->entries["column"] = TaggedValue::fromInt32(static_cast<int32_t>(f.column));
+        arr.push_back(TaggedValue::fromMap(fm));
     }
-    m["traceback"] = std::make_shared<Value>(Value::fromArray(std::move(arr)));
+    m["traceback"] = TaggedValue::fromArray(allocObjArray(arr, this));
 }
 
 void VM::initBuiltins() {
     registerBuiltin(0, [](VM*, std::vector<ValuePtr> args) {
-        for (const auto& a : args) std::cout << (a ? a->toString() : "null");
+        for (const auto& a : args) std::cout << a.toString();
         std::cout << std::endl;
         return Value::nil();
     });
 }
 
 ValuePtr VM::callValue(ValuePtr callee, const std::vector<ValuePtr>& args) {
-    if (!callee) return std::make_shared<Value>(Value::nil());
+    if (callee.isNil()) return TaggedValue::nil();
     if (maxCallDepth_ > 0 && callFrames.size() >= maxCallDepth_)
         throw VMError("Maximum call depth exceeded (" + std::to_string(maxCallDepth_) + ")", 0, 0, 1);
     // exception-safe snapshot so failed callbacks can't corrupt VM control-flow stacks.
@@ -1700,10 +1976,10 @@ ValuePtr VM::callValue(ValuePtr callee, const std::vector<ValuePtr>& args) {
                 valueConstants_ = std::move(std::get<2>(t));
                 activeSourcePath_ = std::move(std::get<3>(t));
             }
-            push(std::make_shared<Value>(Value::nil()));
+            push(TaggedValue::nil());
         }
         ip_ = savedIp;
-        if (stack.empty()) return std::make_shared<Value>(Value::nil());
+        if (stack.empty()) return TaggedValue::nil();
         ValuePtr result = popStack();
         return result;
     } catch (...) {
@@ -1734,17 +2010,17 @@ void VM::runDeferredCalls() {
     while (!list.empty()) {
         auto [callee, args] = std::move(list.back());
         list.pop_back();
-        if (!callee) continue;
-        if (callee->type == Value::Type::FUNCTION) {
-            auto& fn = std::get<FunctionPtr>(callee->data);
+        if (callee.isNil()) continue;
+        if (callee.isFunction()) {
+            auto* fn = callee.asClosurePtr()->fn;
             if (fn->isBuiltin) {
                 BuiltinFn* fast = (fn->builtinIndex < builtinsVec_.size()) ? &builtinsVec_[fn->builtinIndex] : nullptr;
                 if (fast && *fast)
-                    push(std::make_shared<Value>((*fast)(this, args)));
+                    push(TaggedValue::fromValue((*fast)(this, args), this));
                 else {
                     auto it = builtins_.find(fn->builtinIndex);
                     if (it != builtins_.end()) {
-                        push(std::make_shared<Value>(it->second(this, args)));
+                        push(TaggedValue::fromValue(it->second(this, args), this));
                     } else {
                         throw VMError("Invalid builtin index", 0, 0, 1, static_cast<int>(VMErrorCode::INVALID_BYTECODE));
                     }
@@ -1757,9 +2033,9 @@ void VM::runDeferredCalls() {
                 frameLocals_.push_back(std::move(locals_));
                 locals_.clear();
                 for (size_t i = 0; i < args.size(); ++i)
-                    locals_.push_back(ensureNonNull(ValuePtr(args[i])));
+                    locals_.push_back(args[i]);
                 while (locals_.size() < fn->arity)
-                    locals_.push_back(std::make_shared<Value>(Value::nil()));
+                    locals_.push_back(TaggedValue::nil());
                 // match main run(): after CALL, ip_ is entryPoint-1 then incremented to entryPoint before executing.
                 ip_ = fn->entryPoint - 1;
                 while (callFrames.size() > savedFrames) {
@@ -1827,7 +2103,7 @@ void VM::resumeAll(uint64_t currentTimeMs) {
             // the builtin before it yielded) with the actual file contents,
             // so the Kern script receives the correct return value.
             if (!cor.stack.empty()) {
-                cor.stack.back() = std::make_shared<Value>(Value::fromString(result));
+                cor.stack.back() = TaggedValue::fromString(allocObjString(result, this));
             }
             // The coroutine will be restored below and resume normally.
         }
@@ -2018,7 +2294,7 @@ void VM::hotReload(const Bytecode& code,
     pendingYield_ = false;
     doneGenerator_ = false;
     inGeneratorExecution_ = false;
-    activeGenerator.reset();
+    activeGenerator = nullptr;
 
     // ── 3. Load new bytecode and constants ───────────────────────────────
     code_ = code;
@@ -2103,7 +2379,7 @@ void VM::run() {
         scriptExitCode_ = e.category_;
         
         // Attach traceback to any error value on stack
-        if (!stack.empty() && stack.back()) {
+        if (!stack.empty()) {
             attachTracebackToError(stack.back());
         }
     } catch (const std::exception& e) {
@@ -2167,11 +2443,11 @@ size_t VM::startCoroutine(FunctionPtr fn, std::vector<ValuePtr> args) {
     // Set up locals: args first, then nil-pad to arity, then captures
     cor.locals.clear();
     for (const auto& a : args)
-        cor.locals.push_back(ensureNonNull(a));
+        cor.locals.push_back(a);
     while (cor.locals.size() < fn->arity)
-        cor.locals.push_back(std::make_shared<Value>(Value::nil()));
+        cor.locals.push_back(TaggedValue::nil());
     for (const auto& c : fn->captures)
-        cor.locals.push_back(ensureNonNull(c ? c : std::make_shared<Value>(Value::nil())));
+        cor.locals.push_back(c);
 
     // All execution stacks start empty for a fresh coroutine
     cor.stack.clear();
@@ -2184,7 +2460,7 @@ size_t VM::startCoroutine(FunctionPtr fn, std::vector<ValuePtr> args) {
     cor.exceptionStack.clear();
     cor.codeFrameStack.clear();
     cor.unsafeDepth = 0;
-    cor.yieldedValue = nullptr;
+    cor.yieldedValue = TaggedValue::nil();
 
     return corId;
 }
@@ -2382,9 +2658,8 @@ void VM::setDecoratorRegistry(ValuePtr registry) {
 }
 
 kern::ValuePtr VM::getResult() const {
-    if (stack.empty()) return std::make_shared<Value>(Value::nil());
-    ValuePtr v = stack.back();
-    return v;
+    if (stack.empty()) return TaggedValue::nil();
+    return stack.back();
 }
 
 Result<void> VM::loadBytecode(const Bytecode& code,

@@ -27,6 +27,21 @@
 
 namespace kern {
 
+// ── Heap allocation helpers for TaggedValue objects ──────────────────
+// These allocate ObjHeader-based objects on the C heap. Declared here
+// (not static) so they are accessible from builtins.cpp, module files,
+// and any other translation unit that includes this header.
+// Defined in vm.cpp.
+// When vm is non-null, the new object is linked into the VM's intrusive
+// firstObject_ linked list for GC tracking.
+ObjString* allocObjString(const char* data, size_t len, VM* vm = nullptr);
+ObjString* allocObjString(const std::string& s, VM* vm = nullptr);
+ObjArray* allocObjArray(VM* vm = nullptr);
+ObjArray* allocObjArray(const std::vector<TaggedValue>& elems, VM* vm = nullptr);
+ObjMap* allocObjMap(VM* vm = nullptr);
+ObjMap* allocObjMap(std::unordered_map<std::string, TaggedValue>&& entries, VM* vm = nullptr);
+ObjClosure* allocObjClosure(FunctionObject* fn, VM* vm = nullptr);
+
 // ─── Coroutine support for cooperative multi-tasking ────────────────────
 enum class CoroutineState : uint8_t {
     RUNNING,  // Active or ready to resume
@@ -307,12 +322,19 @@ public:
     void setStringConstants(std::vector<std::string> constants);
     void setValueConstants(std::vector<Value> constants);
     void registerBuiltin(size_t index, BuiltinFn fn);
+    // Helper for external registration code (vec3_builtins, collection_builtins, ffi_module):
+    // Creates a FunctionObject with the given builtinIndex, keeps it alive, wraps it
+    // in an ObjClosure, and stores it as a global with the given name.
+    void registerBuiltinGlobal(const std::string& name, size_t builtinIndex);
     bool builtinSlotFilled(size_t index) const;
     void runDeferredCalls();
     void runSubScript(Bytecode code, std::vector<std::string> stringConstants, std::vector<Value> valueConstants, const std::string& name);
-    bool resumeGenerator(std::shared_ptr<GeneratorObject> gen, ValuePtr& out);
+    bool resumeGenerator(GeneratorObject* gen, ValuePtr& out);
     void attachTracebackToError(ValuePtr val);
     void initBuiltins();
+    
+    // Garbage collection
+    void collectGarbage();
     
     // Execution state restoration
     void restoreExecutionState(
@@ -353,6 +375,16 @@ private:
     // Memory management
     std::unique_ptr<Allocator> allocator;
     
+    // GC-ready intrusive linked list of all heap-allocated ObjHeader objects
+    // (ObjString, ObjArray, ObjMap, ObjClosure, etc.).  Each allocObj* helper
+    // links new objects into this list via registerObject().
+    ObjHeader* firstObject_ = nullptr;
+    
+    // Gray stack for tri-color mark-and-sweep GC (worklist of reachable objects
+    // whose children have not yet been traced).  Populated by markObject(),
+    // drained by traceReferences().
+    std::vector<ObjHeader*> grayStack_;
+    
     // Execution state variables
     Bytecode code_;
     std::vector<std::string> stringConstants_;
@@ -385,7 +417,45 @@ private:
     std::vector<std::tuple<Bytecode, std::vector<std::string>, std::vector<Value>, std::string>> codeFrameStack;
     std::shared_ptr<ScriptCode> currentScript;
     std::shared_ptr<ScriptCode> entryScriptCache;
-    std::shared_ptr<GeneratorObject> activeGenerator;
+    GeneratorObject* activeGenerator = nullptr;
+    // Keep-alive vectors: TaggedValue stores raw pointers to heap objects.
+    // These shared_ptrs prevent premature destruction.
+    std::vector<std::shared_ptr<FunctionObject>> functionKeepAlive_;
+    std::vector<std::shared_ptr<GeneratorObject>> generatorKeepAlive_;
+    
+    // Register a newly-allocated ObjHeader into the intrusive linked list
+    // (prepends to firstObject_).  Called by the allocObj* helpers.
+    // Public because the namespace-scope allocObj* free functions (declared
+    // above in this header) need to call it from vm.cpp.
+public:
+    void registerObject(ObjHeader* obj);
+
+private:
+    
+    // Walk the firstObject_ linked list, call proper C++ destructors for
+    // each ObjHeader-derived type, then std::free() the allocation.
+    void freeAllObjects();
+    
+    // ── Mark-and-Sweep Garbage Collector ──────────────────────────
+    
+    // Mark a single heap object (push onto the gray worklist).
+    void markObject(ObjHeader* obj);
+    
+    // If val is a heap object (OBJ tag), extract the ObjHeader* and mark it.
+    void markValue(ValuePtr val);
+    
+    // Walk all GC roots (stack, globals, locals, frameLocals, coroutines)
+    // and mark every reachable heap object.
+    void markRoots();
+    
+    // Process the gray worklist: for each gray object, mark its children
+    // (Array elements, Map values, Closure captures).
+    void traceReferences();
+    
+    // Walk the firstObject_ linked list, free unmarked objects, clear the
+    // isMarked flag on survivors for the next cycle.
+    void sweep();
+    
     bool vmTraceEnabled_ = false;
     
     RuntimeGuardPolicy runtimeGuards_;

@@ -46,6 +46,7 @@
 #endif
 #include "platform/env_compat.hpp"
 #include "platform/kern_env.hpp"
+#include "platform/updater.hpp"
 
 using namespace kern;
 
@@ -212,14 +213,12 @@ static bool runSource(VM& vm, const std::string& sourceIn, const std::string& fi
         declaredGlobals.insert("__import");
         for (const auto& inst : code) {
             if (inst.op != Opcode::STORE_GLOBAL) continue;
-            if (inst.operand.index() != 4) continue;
-            size_t idx = std::get<size_t>(inst.operand);
+            size_t idx = inst.sizeOperand;
             if (idx < constants.size()) declaredGlobals.insert(constants[idx]);
         }
         for (const auto& inst : code) {
             if (inst.op != Opcode::LOAD_GLOBAL) continue;
-            if (inst.operand.index() != 4) continue;
-            size_t idx = std::get<size_t>(inst.operand);
+            size_t idx = inst.sizeOperand;
             if (idx >= constants.size()) continue;
             const std::string& name = constants[idx];
             if (declaredGlobals.find(name) == declaredGlobals.end())
@@ -395,6 +394,7 @@ static void printUsage(const char* prog) {
         << "Options:\n"
         << "  --version, -v          Show version and exit.\n"
         << "  --help, -h            Show this help and exit.\n"
+        << "  --update              Check GitHub for a newer version of Kern and apply it.\n"
 #ifdef _WIN32
         << "  --repair-association  (Windows) Re-apply per-user .kn association, icon, and shell verbs; exit.\n"
 #endif
@@ -1878,6 +1878,14 @@ int main(int argc, char** argv) {
     }
     if (argc > argBase) {
         std::string arg = argv[argBase];
+        if (arg == "--update") {
+            std::string ver = "1.0.0";
+#ifdef KERN_VERSION
+            ver = KERN_VERSION;
+#endif
+            kern::handleUpdate(ver);
+            return 0;
+        }
         if (arg == "--version" || arg == "-v") {
             std::string ver = "1.0.0";
 #ifdef KERN_VERSION
